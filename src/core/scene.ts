@@ -70,12 +70,12 @@ export function buildScene(d: Diagram, m: Measurer, o: SceneOptions = {}): Scene
     if (e.kind === "association") {
       const p0 = r.p0 ?? edgePoint(r.from, aimOf(r, "from"), 0);
       const p1 = r.p1 ?? edgePoint(r.to, aimOf(r, "to"), 0);
-      drawAssociation(k, p0, p1);
-      if (label) placeLabel(m, texts, obstaclePolys, k, e.id, label, p0, p1, r.from, stepOf);
+      drawAssociation(k, p0, p1, r.interior);
+      if (label) placeLabel(m, texts, obstaclePolys, k, e.id, label, p0, r.interior[0] ?? p1, r.from, stepOf);
     } else if (e.kind === "include" || e.kind === "extend") {
       const p0 = r.p0 ?? edgePoint(r.from, aimOf(r, "from"), 0);
       const p1 = r.p1 ?? edgePoint(r.to, aimOf(r, "to"), 0);
-      texts.push(drawDependency(m, k, e.id, p0, p1, e.kind, stepOf));
+      texts.push(drawDependency(m, k, e.id, p0, p1, e.kind, stepOf, r.interior));
     } else {
       const p0 = r.p0 ?? edgePoint(r.from, aimOf(r, "from"), 0.06);
       const p1 = r.p1 ?? edgePoint(r.to, aimOf(r, "to"), 0.06);

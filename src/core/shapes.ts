@@ -3,7 +3,7 @@
  * Geometry follows reference/diagrams.py with its pt/72 sizes converted to px/96. Everything is
  * predefined; the pen only renders.
  */
-import { CH, GR, Sketch, type Pt, type Poly } from "./pen";
+import { CH, GR, Sketch, catmull, type Pt, type Poly } from "./pen";
 import { seedFor } from "./pyrandom";
 import type { DiagramNode, NodeKind } from "./model";
 import { PX, textBlock, type Measurer } from "./measure";
@@ -305,30 +305,65 @@ export function drawDashedArrow(k: Sketch, route: Pt[]): Sketch {
   return k;
 }
 
-/** diagrams.association: one plain stroke from a to b, no head. */
-export function drawAssociation(k: Sketch, a: Pt, b: Pt): Sketch {
+/** diagrams.association: one plain stroke from a to b, no head; a bent route runs through its interior points. */
+export function drawAssociation(k: Sketch, a: Pt, b: Pt, interior: Pt[] = []): Sketch {
   const mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - 0.01];
-  return k.pen([a, mid, b], { color: CH, width: 0.026, taperIn: 0, taperOut: 0 });
+  return k.pen([a, ...(interior.length ? interior : [mid]), b], { color: CH, width: 0.026, taperIn: 0, taperOut: 0 });
 }
 
-/** diagrams.dependency: dashed open-headed arrow from a to b (outline points) with the «stereotype» label above the line. */
-export function drawDependency(m: Measurer, k: Sketch, name: string, a: Pt, b: Pt, stereotype: "include" | "extend", step: number): TextEl {
-  const { ux, uy, L } = unit(a, b);
-  let t = 0.06;
-  while (t < L - 0.12) {
-    const e = Math.min(t + 0.16, L - 0.06);
-    k.pen([[a[0] + ux * t, a[1] + uy * t], [a[0] + ux * e, a[1] + uy * e]], { color: CH, width: 0.022, taperIn: 0, taperOut: 0 });
-    t = e + 0.1;
+/**
+ * diagrams.dependency: dashed open-headed arrow from a to b (outline points) with the «stereotype» label
+ * above the line. A bent route dashes along the smoothed curve instead, with the label at the bend.
+ */
+export function drawDependency(m: Measurer, k: Sketch, name: string, a: Pt, b: Pt, stereotype: "include" | "extend", step: number,
+  interior: Pt[] = []): TextEl {
+  let { ux, uy, L } = unit(a, b);
+  let mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  if (interior.length) {
+    // walk the curve: 0.16 on, 0.1 off, starting 0.06 in and stopping 0.06 before the tip
+    const c = catmull([a, ...interior, b], 0.01);
+    const cum = [0];
+    for (let i = 1; i < c.length; i++) cum.push(cum[i - 1] + Math.hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]));
+    L = cum[cum.length - 1];
+    const at = (s: number): Pt => {
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < s) i++;
+      const t = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+      return [c[i - 1][0] + (c[i][0] - c[i - 1][0]) * t, c[i - 1][1] + (c[i][1] - c[i - 1][1]) * t];
+    };
+    let t = 0.06;
+    while (t < L - 0.12) {
+      const e = Math.min(t + 0.16, L - 0.06);
+      const pts: Pt[] = [];
+      for (let s = t; s < e; s += 0.02) pts.push(at(s));
+      pts.push(at(e));
+      k.pen(pts, { color: CH, width: 0.022, taperIn: 0, taperOut: 0 });
+      t = e + 0.1;
+    }
+    ({ ux, uy } = unit(at(Math.max(0, L - 0.3)), b));
+    mid = interior[Math.floor(interior.length / 2)];
+  } else {
+    let t = 0.06;
+    while (t < L - 0.12) {
+      const e = Math.min(t + 0.16, L - 0.06);
+      k.pen([[a[0] + ux * t, a[1] + uy * t], [a[0] + ux * e, a[1] + uy * e]], { color: CH, width: 0.022, taperIn: 0, taperOut: 0 });
+      t = e + 0.1;
+    }
   }
   const tip: Pt = [b[0] - ux * 0.06, b[1] - uy * 0.06];
   for (const sgn of [-1, 1]) {
     const ang = Math.atan2(uy, ux) + Math.PI + sgn * (28 * Math.PI) / 180;
     k.pen([[tip[0] + 0.2 * Math.cos(ang), tip[1] + 0.2 * Math.sin(ang)], tip], { color: CH, width: 0.024, taperIn: 0, taperOut: 0 });
   }
-  const mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
   const txt = `«${stereotype}»`;
   let nx = -uy, ny = ux;
   if (ny > 0) { nx = -nx; ny = -ny; }
+  if (interior.length) {
+    // a bent line gets its label on the outside of the bend, away from the nodes it skirts
+    const chord: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const o = unit(chord, mid);
+    nx = o.ux; ny = o.uy;
+  }
   const { adv, top, bot } = m.measure(txt, SMALL_PX, 300);
   const w = adv / PX, h = (bot - top) / PX;
   const off = (w / 2) * Math.abs(nx) + (h / 2) * Math.abs(ny) + 0.1;

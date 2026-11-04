@@ -10,6 +10,8 @@ import { edgePoint, nodeSize } from "../src/core/shapes";
 import { MARGIN } from "../src/core/scene";
 import type { Diagram } from "../src/core/model";
 import { BG } from "../src/core/pen";
+import { checkScene } from "../src/core/qa";
+const checkSceneErrors = (sc: Scene) => checkScene(sc, { minDisplayPx: 1280 }).errors;
 
 const DIR = new URL("../fixtures/diagrams/", import.meta.url);
 const fixtures = readdirSync(DIR).filter((f) => f.endsWith(".ksd")).sort();
@@ -231,5 +233,27 @@ describe("svg", () => {
     const svg = sceneToSvg(scenes.get("flow-approval.ksd")!);
     const nums = svg.match(/ d="M([0-9.]+) /)![1];
     expect(nums).toMatch(/^[0-9]+\.[0-9]$/);
+  });
+});
+
+describe("bent connectors", () => {
+  it("an association that would cross a node it doesn't join bends around it, and the bend is drawn", () => {
+    const d = parse(readFileSync(new URL("usecase-actor-inside.ksd", DIR), "utf8"));
+    const lay = layoutUseCase(d, stubMeasurer);
+    const e2 = lay.routes.find((r) => r.edge.id === "e2")!;
+    expect(e2.interior.length).toBe(1);
+    const sc = buildScene(d, stubMeasurer);
+    const borrow = sc.nodes.find((n) => n.id === "borrow")!;
+    const line = sc.elements.find((e) => e.name === "e2")!;
+    const xs = line.sketch.items.flatMap(([p]) => p.map((q) => q[0]));
+    // the stroke swings clear of the ellipse it must not cross
+    expect(Math.min(...xs)).toBeLessThan(borrow.cx - borrow.w / 2 - 0.2);
+  });
+  it("a dependency with a bend still gets its label and head", () => {
+    const d = parse("diagram use-case\ntitle t\nactor a\nboundary b \"B\" {\nuse-case u \"one\"\nuse-case v \"two\"\nuse-case w \"three\"\n}\na -- u\na -- v\na -- w\nu -include-> w");
+    const sc = buildScene(d, stubMeasurer);
+    const t = sc.texts.find((t) => t.name === "e4:label")!;
+    expect(t.s).toBe("«include»");
+    expect(checkSceneErrors(sc)).toEqual([]);
   });
 });

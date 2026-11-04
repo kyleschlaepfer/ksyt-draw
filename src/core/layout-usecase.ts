@@ -108,8 +108,20 @@ export function layoutUseCase(d: Diagram, m: Measurer): Layout {
       const L = Math.hypot(b.cx - a.cx, b.cy - a.cy) || 1;
       const nx = -(b.cy - a.cy) / L, ny = (b.cx - a.cx) / L;
       const mx = (a.cx + b.cx) / 2, my = (a.cy + b.cy) / 2;
-      let best: Pt | null = null;
+      let best: Pt | null = null, bestScore = Infinity;
       const others = ids.map((id) => nodes.get(id)!).filter((n) => n !== a && n !== b);
+      const actors = d.nodes.filter((n) => n.kind === "actor").map((n) => nodes.get(n.id)!);
+      // prefer the side that crosses fewer other connectors, then the one farther from the actors
+      const score = (p: Pt): number => {
+        let crossings = 0;
+        for (const o of edges) {
+          if (o === e) continue;
+          const oa = nodes.get(o.from)!, ob = nodes.get(o.to)!;
+          if (segmentsCross([a.cx, a.cy], p, [oa.cx, oa.cy], [ob.cx, ob.cy]) || segmentsCross(p, [b.cx, b.cy], [oa.cx, oa.cy], [ob.cx, ob.cy])) crossings++;
+        }
+        const near = actors.length ? Math.min(...actors.map((t) => Math.hypot(t.cx - p[0], t.cy - p[1]))) : 10;
+        return crossings * 100 - Math.min(near, 10);
+      };
       for (const side of [1, -1]) {
         // start just past the widest blocker, then widen until the curve clears every node
         let off = 0;
@@ -120,12 +132,27 @@ export function layoutUseCase(d: Diagram, m: Measurer): Layout {
         for (let tries = 0; tries < 6; tries++, off += 0.2) {
           const p: Pt = [mx + nx * side * off, my + ny * side * off];
           if (curveClear([a.cx, a.cy], p, [b.cx, b.cy], others)) {
-            if (!best || off < Math.hypot(best[0] - mx, best[1] - my)) best = p;
+            const sc = score(p) + off;
+            if (sc < bestScore) { best = p; bestScore = sc; }
             break;
           }
         }
       }
-      if (best) { bends.set(e.id, best); out.push(best); }
+      if (best) {
+        bends.set(e.id, best);
+        out.push(best);
+        if (e.kind === "include" || e.kind === "extend") {
+          // the «include» label sits outside the bend; keep it inside the boundary too
+          const { adv, top, bot } = m.measure(`\u00ab${e.kind}\u00bb`, SMALL_PX, 300);
+          const w = adv / PX, h = (bot - top) / PX;
+          const ox = best[0] - mx, oy = best[1] - my;
+          const oL = Math.hypot(ox, oy) || 1;
+          const nx2 = ox / oL, ny2 = oy / oL;
+          const off = (w / 2) * Math.abs(nx2) + (h / 2) * Math.abs(ny2) + 0.1;
+          const cx = best[0] + nx2 * off, cy = best[1] + ny2 * off;
+          out.push([cx - w / 2 - 0.1, cy - h / 2 - 0.1], [cx + w / 2 + 0.1, cy + h / 2 + 0.1]);
+        }
+      }
     }
     return out;
   };
@@ -142,7 +169,8 @@ export function layoutUseCase(d: Diagram, m: Measurer): Layout {
       if (inside.length) {
         const minX = Math.min(...inside.map((n) => n.cx - n.w / 2), ...bendPts.map((p) => p[0] - 0.1));
         const maxX = Math.max(...inside.map((n) => n.cx + n.w / 2), ...bendPts.map((p) => p[0] + 0.1));
-        const minY = Math.min(...inside.map((n) => n.cy - n.h / 2)), maxY = Math.max(...inside.map((n) => n.cy + n.h / 2));
+        const minY = Math.min(...inside.map((n) => n.cy - n.h / 2), ...bendPts.map((p) => p[1] - 0.1));
+        const maxY = Math.max(...inside.map((n) => n.cy + n.h / 2), ...bendPts.map((p) => p[1] + 0.1));
         g.cx = (minX + maxX) / 2;
         g.w = maxX - minX + 0.8;
         g.h = maxY - minY + 1.0;
@@ -221,6 +249,15 @@ function curveClear(a: Pt, p: Pt, b: Pt, nodes: NodeGeom[]): boolean {
     }
   }
   return true;
+}
+
+/** Do segments p1-p2 and p3-p4 cross (sharing an endpoint doesn't count)? */
+function segmentsCross(p1: Pt, p2: Pt, p3: Pt, p4: Pt): boolean {
+  const d = (p: Pt, q: Pt, r: Pt) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const same = (p: Pt, q: Pt) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1e-9;
+  if (same(p1, p3) || same(p1, p4) || same(p2, p3) || same(p2, p4)) return false;
+  const d1 = d(p3, p4, p1), d2 = d(p3, p4, p2), d3 = d(p1, p2, p3), d4 = d(p1, p2, p4);
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
 }
 
 /** Does the segment a-b cross the node's box (grown by pad)? */
