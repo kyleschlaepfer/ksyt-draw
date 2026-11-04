@@ -152,7 +152,8 @@ export function mountFigure(host: HTMLElement, d: Diagram, m: Measurer, o: Figur
 function findingRow(sev: string, rule: string, loc: string, problem: string, fix: string): HTMLLIElement {
   const li = el("li");
   const row = el("div", "row");
-  row.append(el("span", "sev", sev), el("span", "sep", "·"), el("span", "rule", rule), el("span", "sep", "·"), el("span", "loc", loc));
+  const cells = [el("span", "sev", sev), el("span", "rule", rule), ...(loc ? [el("span", "loc", loc)] : [])];
+  cells.forEach((c, i) => { if (i) row.appendChild(el("span", "sep", "\u00b7")); row.appendChild(c); });
   li.appendChild(row);
   if (problem) li.appendChild(el("p", undefined, problem));
   if (fix) li.appendChild(el("p", "fix", fix));
