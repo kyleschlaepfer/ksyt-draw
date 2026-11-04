@@ -1,0 +1,23 @@
+{
+ "inferred_family": "flow",
+ "status": "changes-required",
+ "findings": [
+  {
+   "severity": "major",
+   "rule_id": "STRUCT-DANGLING-EDGE",
+   "location": "edge e2",
+   "confidence": "medium"
+  }
+ ],
+ "full_findings": [
+  {
+   "severity": "major",
+   "rule_id": "STRUCT-DANGLING-EDGE",
+   "location": "edge e2",
+   "problem": "The to end of this connector is not attached to any diagram element ('archive').",
+   "rationale": "A connector that starts or ends nowhere leaves the relationship unreadable.",
+   "minimal_fix": "Attach it to the element it refers to, or remove it.",
+   "confidence": "medium"
+  }
+ ]
+}

@@ -1,0 +1,114 @@
+{
+ "contract_version": "1.0",
+ "diagram_id": "approval-unlabeled",
+ "claimed_diagram_type": "flowchart",
+ "notation_profile": "general-diagram",
+ "narration_excerpt": "A submitted request is reviewed, then approved or rejected.",
+ "legend": null,
+ "nodes": [
+  {
+   "id": "begin",
+   "kind": "terminator",
+   "label": "start",
+   "step": 0
+  },
+  {
+   "id": "review",
+   "kind": "process",
+   "label": "review request",
+   "step": 0
+  },
+  {
+   "id": "ok",
+   "kind": "decision",
+   "label": "approved?",
+   "step": 0
+  },
+  {
+   "id": "schedule",
+   "kind": "process",
+   "label": "schedule the work",
+   "step": 0
+  },
+  {
+   "id": "notify",
+   "kind": "process",
+   "label": "notify requester",
+   "step": 0
+  },
+  {
+   "id": "done",
+   "kind": "terminator",
+   "label": "end",
+   "step": 0
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "arrow",
+   "from": "begin",
+   "to": "review",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e2",
+   "kind": "arrow",
+   "from": "review",
+   "to": "ok",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e3",
+   "kind": "arrow",
+   "from": "ok",
+   "to": "schedule",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e4",
+   "kind": "arrow",
+   "from": "ok",
+   "to": "notify",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e5",
+   "kind": "arrow",
+   "from": "schedule",
+   "to": "done",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e6",
+   "kind": "arrow",
+   "from": "notify",
+   "to": "done",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  }
+ ],
+ "web": {
+  "title": "After review, a request takes one of two paths",
+  "desc": "",
+  "direction": "down",
+  "warnings": []
+ }
+}

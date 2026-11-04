@@ -1,0 +1,50 @@
+[
+ {
+  "name": "a",
+  "seed": 56907
+ },
+ {
+  "name": "resident",
+  "seed": 92686
+ },
+ {
+  "name": "apply",
+  "seed": 10887
+ },
+ {
+  "name": "e1",
+  "seed": 95439
+ },
+ {
+  "name": "ok",
+  "seed": 18703
+ },
+ {
+  "name": "decision-ok",
+  "seed": 85496
+ },
+ {
+  "name": "fork-split",
+  "seed": 32650
+ },
+ {
+  "name": "usecase-permit:pay",
+  "seed": 50262
+ },
+ {
+  "name": "approval:e3",
+  "seed": 1176
+ },
+ {
+  "name": "«include»",
+  "seed": 76740
+ },
+ {
+  "name": "Permit clerk",
+  "seed": 13440
+ },
+ {
+  "name": "",
+  "seed": 1000
+ }
+]

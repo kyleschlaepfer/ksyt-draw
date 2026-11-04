@@ -1,0 +1,22 @@
+# Correct flowchart: every decision exit labeled. Expected: pass.
+diagram flowchart
+id approval
+title After review, a request takes exactly one of two paths
+desc Flowchart. Start, submit request, review request, then the decision approved?. Yes leads to schedule the work, then end. No leads to notify requester, then end.
+narration A submitted request is reviewed, then approved or rejected.
+
+start begin
+process submit "submit request"
+process review "review request"
+decision ok "approved?"
+process schedule "schedule the work"
+process notify "notify requester"
+end done
+
+begin -> submit
+submit -> review
+review -> ok
+ok -> schedule : yes
+ok -> notify : no
+schedule -> done
+notify -> done

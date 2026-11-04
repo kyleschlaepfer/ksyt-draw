@@ -1,0 +1,21 @@
+# A fork where the narration says "either". Expected: ACTIVITY-PARALLEL-VS-EXCLUSIVE (major).
+diagram activity
+id refund-fork
+title After a return is checked, the customer gets one of two outcomes
+narration Once the return is checked, the customer either gets a refund or gets store credit.
+
+start begin
+action check "check return"
+fork split
+action refund "issue refund"
+action credit "issue store credit"
+join merge-bar
+end done
+
+begin -> check
+check -> split
+split -> refund
+split -> credit
+refund -> merge-bar
+credit -> merge-bar
+merge-bar -> done

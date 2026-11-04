@@ -1,0 +1,64 @@
+{
+ "contract_version": "1.0",
+ "diagram_id": "checkout",
+ "claimed_diagram_type": "use-case",
+ "notation_profile": "uml-inspired",
+ "narration_excerpt": "Check out includes authenticate, every time.",
+ "legend": null,
+ "nodes": [
+  {
+   "id": "customer",
+   "kind": "actor",
+   "label": "Customer",
+   "step": 0
+  },
+  {
+   "id": "shop",
+   "kind": "boundary",
+   "label": "Online store",
+   "step": 0
+  },
+  {
+   "id": "checkout",
+   "kind": "use-case",
+   "label": "check out",
+   "step": 0,
+   "inside": "shop"
+  },
+  {
+   "id": "auth",
+   "kind": "use-case",
+   "label": "authenticate",
+   "step": 0,
+   "inside": "shop"
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "association",
+   "from": "customer",
+   "to": "checkout",
+   "label": null,
+   "style": "plain-line",
+   "directed": false,
+   "step": 0
+  },
+  {
+   "id": "e2",
+   "kind": "include",
+   "from": "auth",
+   "to": "checkout",
+   "label": null,
+   "style": "dashed-arrow",
+   "directed": true,
+   "step": 0
+  }
+ ],
+ "web": {
+  "title": "Checking out always includes signing in",
+  "desc": "",
+  "direction": "down",
+  "warnings": []
+ }
+}

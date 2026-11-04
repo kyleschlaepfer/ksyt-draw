@@ -1,0 +1,27 @@
+# Correct fork/join with parallel narration, revealed in three steps. Expected: pass.
+diagram activity
+id onboarding
+title A new hire's laptop and badge are prepared at the same time
+desc Activity diagram. Start, accept offer, then a fork: order laptop and print badge run at the same time. A join waits for both, then first day, then end.
+narration After the offer is accepted, IT orders the laptop and security prints the badge at the same time.
+
+start begin
+action accept "accept offer"
+begin -> accept
+
+step 1
+fork split
+action laptop "order laptop"
+action badge "print badge"
+accept -> split
+split -> laptop
+split -> badge
+
+step 2
+join wait
+action first "first day"
+end done
+laptop -> wait
+badge -> wait
+wait -> first
+first -> done

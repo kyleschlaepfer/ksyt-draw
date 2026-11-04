@@ -1,0 +1,14 @@
+# The include points the wrong way and the narration says so. Expected: UC-INCLUDE-DIRECTION (major, high).
+diagram use-case
+id checkout
+title Checking out always includes signing in
+narration Check out includes authenticate, every time.
+
+actor customer "Customer"
+boundary shop "Online store" {
+  use-case checkout "check out"
+  use-case auth "authenticate"
+}
+
+customer -- checkout
+auth -include-> checkout

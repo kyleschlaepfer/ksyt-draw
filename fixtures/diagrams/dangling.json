@@ -1,0 +1,73 @@
+{
+ "contract_version": "1.0",
+ "diagram_id": "dangling",
+ "claimed_diagram_type": "flowchart",
+ "notation_profile": "general-diagram",
+ "narration_excerpt": "",
+ "legend": null,
+ "nodes": [
+  {
+   "id": "begin",
+   "kind": "terminator",
+   "label": "start",
+   "step": 0
+  },
+  {
+   "id": "review",
+   "kind": "process",
+   "label": "review request",
+   "step": 0
+  },
+  {
+   "id": "done",
+   "kind": "terminator",
+   "label": "end",
+   "step": 0
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "arrow",
+   "from": "begin",
+   "to": "review",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e2",
+   "kind": "arrow",
+   "from": "review",
+   "to": "archive",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e3",
+   "kind": "arrow",
+   "from": "review",
+   "to": "done",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  }
+ ],
+ "web": {
+  "title": "A request is reviewed and archived",
+  "desc": "",
+  "direction": "down",
+  "warnings": [
+   {
+    "code": "PARSE-UNKNOWN-NODE",
+    "edge": "e2",
+    "end": "to",
+    "node": "archive"
+   }
+  ]
+ }
+}

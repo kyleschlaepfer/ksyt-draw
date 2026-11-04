@@ -1,0 +1,38 @@
+{
+ "inferred_family": "use-case",
+ "status": "changes-required",
+ "findings": [
+  {
+   "severity": "major",
+   "rule_id": "UC-ACTOR-INSIDE",
+   "location": "actor 'Member'",
+   "confidence": "high"
+  },
+  {
+   "severity": "minor",
+   "rule_id": "UC-ASSOC-DIRECTED",
+   "location": "Member -> borrow book",
+   "confidence": "high"
+  }
+ ],
+ "full_findings": [
+  {
+   "severity": "minor",
+   "rule_id": "UC-ASSOC-DIRECTED",
+   "location": "Member -> borrow book",
+   "problem": "The actor link is drawn as a directed arrow.",
+   "rationale": "Actor-use case associations are plain lines; an arrowhead reads as a step in a sequence.",
+   "minimal_fix": "Draw a plain line (no arrowhead).",
+   "confidence": "high"
+  },
+  {
+   "severity": "major",
+   "rule_id": "UC-ACTOR-INSIDE",
+   "location": "actor 'Member'",
+   "problem": "The actor is drawn inside the system boundary.",
+   "rationale": "Actors are roles outside the subject; inside the box they read as part of the system.",
+   "minimal_fix": "Move the actor outside the boundary.",
+   "confidence": "high"
+  }
+ ]
+}

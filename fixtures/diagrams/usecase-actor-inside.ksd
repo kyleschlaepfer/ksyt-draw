@@ -1,0 +1,14 @@
+# Actor inside the boundary and a directed association. Expected: UC-ACTOR-INSIDE (major), UC-ASSOC-DIRECTED (minor).
+diagram use-case
+id library
+title Members borrow and renew books
+narration Members borrow books and renew loans.
+
+boundary lib "Library system" {
+  actor member "Member"
+  use-case borrow "borrow book"
+  use-case renew "renew loan"
+}
+
+member -> borrow
+member -- renew

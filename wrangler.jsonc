@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ksyt-draw",
+  "compatibility_date": "2026-11-01",
+  // Static assets only: no Worker script. _headers in dist/ sets CSP and framing.
+  "assets": { "directory": "./dist", "not_found_handling": "404-page" },
+  // Creates the DNS record and certificate. Don't hand-create a "draw" CNAME first.
+  "routes": [{ "pattern": "draw.kyleschlaepfer.com", "custom_domain": true }]
+}

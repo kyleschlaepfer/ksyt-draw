@@ -1,0 +1,19 @@
+# Decision exits unlabeled. Expected: FLOW-DECISION-GUARD (major).
+diagram flowchart
+id approval-unlabeled
+title After review, a request takes one of two paths
+narration A submitted request is reviewed, then approved or rejected.
+
+start begin
+process review "review request"
+decision ok "approved?"
+process schedule "schedule the work"
+process notify "notify requester"
+end done
+
+begin -> review
+review -> ok
+ok -> schedule
+ok -> notify
+schedule -> done
+notify -> done

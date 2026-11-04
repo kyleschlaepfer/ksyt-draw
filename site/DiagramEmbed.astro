@@ -1,0 +1,82 @@
+---
+/**
+ * A KSyt Draw diagram on a kyleschlaepfer.com page. Copy to src/components/DiagramEmbed.astro,
+ * copy draw-host.ts to src/scripts/draw-host.ts, and `npm i lz-string` in the site repo.
+ *
+ * In a lesson (.mdx):
+ *   import DiagramEmbed from "../../components/DiagramEmbed.astro";
+ *   import permit from "../../diagrams/permit-portal.ksd?raw";
+ *
+ *   <DiagramEmbed ksd={permit} caption="Paying the fee is always part of applying, so apply includes pay." />
+ *
+ * The figure's claim goes in `caption` (one sentence, visible). The embed itself carries the SVG title,
+ * description and "describe this figure" details. Put extra text (a fuller walkthrough) in the slot.
+ */
+import LZString from "lz-string";
+
+interface Props {
+  ksd: string; // the .ksd text (import it with ?raw)
+  caption: string; // the claim, one sentence
+  title?: string; // iframe title for screen readers; default "<type> diagram: <title line>"
+  height?: number; // starting height in px before the embed reports its own (default 360)
+  lint?: boolean; // show the notation check panel (default off on lesson pages)
+  step?: number | "all"; // first build-up step (default 0)
+  origin?: string; // where the embed lives (default production; use http://localhost:5173 while developing it)
+}
+
+const {
+  ksd,
+  caption,
+  title,
+  height = 360,
+  lint = false,
+  step,
+  origin = "https://draw.kyleschlaepfer.com",
+} = Astro.props;
+
+const header = (key: string) =>
+  ksd
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.startsWith(key + " "))
+    ?.slice(key.length + 1)
+    .trim();
+
+const type = header("diagram");
+const titleLine = header("title");
+const id = header("id") ?? "diagram";
+if (!type || !titleLine) {
+  throw new Error("DiagramEmbed: the .ksd needs a `diagram <type>` line and a `title` line.");
+}
+for (const [name, value] of [["caption", caption], ["title", title ?? ""], ["ksd", ksd]]) {
+  if (value.includes("\u2014")) throw new Error(`DiagramEmbed: em dash in ${name} (house rule: no em dashes).`);
+}
+
+const typeName: Record<string, string> = { flowchart: "Flowchart", activity: "Activity diagram", "use-case": "Use-case diagram" };
+const frameTitle = title ?? `${typeName[type] ?? "Diagram"}: ${titleLine}`;
+
+// Always URLSearchParams: lz-string's alphabet has "+" and "$", which must be percent-encoded.
+const params = new URLSearchParams({ v: "1", d: LZString.compressToEncodedURIComponent(ksd), id });
+if (lint) params.set("lint", "1");
+if (step !== undefined) params.set("step", String(step));
+const src = `${origin}/embed/#${params.toString()}`;
+const playground = `${origin}/#${new URLSearchParams({ v: "1", d: params.get("d")! }).toString()}`;
+---
+
+<figure class="fig ksyt-draw">
+  <iframe
+    class="ksyt-draw-frame"
+    src={src}
+    title={frameTitle}
+    loading="lazy"
+    referrerpolicy="strict-origin-when-cross-origin"
+    sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"
+    style={`width:100%;height:${height}px;border:0;display:block`}></iframe>
+  <figcaption class="note">{caption}</figcaption>
+  <slot />
+  <noscript><p class="note"><a href={playground}>Open this diagram</a></p></noscript>
+</figure>
+
+<script>
+  import "../scripts/draw-host";
+</script>

@@ -1,0 +1,98 @@
+{
+ "contract_version": "1.0",
+ "diagram_id": "permit-as-flow",
+ "claimed_diagram_type": "use-case",
+ "notation_profile": "uml-inspired",
+ "narration_excerpt": "The resident submits a request, the clerk reviews it, and it's approved or rejected.",
+ "legend": null,
+ "nodes": [
+  {
+   "id": "resident",
+   "kind": "actor",
+   "label": "Resident",
+   "step": 0
+  },
+  {
+   "id": "portal",
+   "kind": "boundary",
+   "label": "Permit portal",
+   "step": 0
+  },
+  {
+   "id": "submit",
+   "kind": "use-case",
+   "label": "submit request",
+   "step": 0,
+   "inside": "portal"
+  },
+  {
+   "id": "review",
+   "kind": "use-case",
+   "label": "review request",
+   "step": 0,
+   "inside": "portal"
+  },
+  {
+   "id": "approve",
+   "kind": "use-case",
+   "label": "approve permit",
+   "step": 0,
+   "inside": "portal"
+  },
+  {
+   "id": "reject",
+   "kind": "use-case",
+   "label": "reject permit",
+   "step": 0,
+   "inside": "portal"
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "association",
+   "from": "resident",
+   "to": "submit",
+   "label": null,
+   "style": "plain-line",
+   "directed": false,
+   "step": 0
+  },
+  {
+   "id": "e2",
+   "kind": "arrow",
+   "from": "submit",
+   "to": "review",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e3",
+   "kind": "arrow",
+   "from": "review",
+   "to": "approve",
+   "label": "yes",
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e4",
+   "kind": "arrow",
+   "from": "review",
+   "to": "reject",
+   "label": "no",
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  }
+ ],
+ "web": {
+  "title": "How a permit gets approved",
+  "desc": "",
+  "direction": "down",
+  "warnings": []
+ }
+}

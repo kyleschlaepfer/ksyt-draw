@@ -1,0 +1,23 @@
+{
+ "inferred_family": "use-case",
+ "status": "changes-required",
+ "findings": [
+  {
+   "severity": "major",
+   "rule_id": "UC-INCLUDE-DIRECTION",
+   "location": "«include» authenticate -> check out",
+   "confidence": "high"
+  }
+ ],
+ "full_findings": [
+  {
+   "severity": "major",
+   "rule_id": "UC-INCLUDE-DIRECTION",
+   "location": "«include» authenticate -> check out",
+   "problem": "The «include» arrow appears reversed: it points from 'authenticate' to 'check out'.",
+   "rationale": "«include» points from the including (base) use case to the included, reused one. Reversed, it says the reused fragment depends on the base.",
+   "minimal_fix": "Reverse it: arrow from 'check out' to 'authenticate'.",
+   "confidence": "high"
+  }
+ ]
+}

@@ -1,0 +1,130 @@
+{
+ "contract_version": "1.0",
+ "diagram_id": "refund-fork",
+ "claimed_diagram_type": "activity",
+ "notation_profile": "uml-inspired",
+ "narration_excerpt": "Once the return is checked, the customer either gets a refund or gets store credit.",
+ "legend": null,
+ "nodes": [
+  {
+   "id": "begin",
+   "kind": "initial",
+   "label": null,
+   "step": 0
+  },
+  {
+   "id": "check",
+   "kind": "action",
+   "label": "check return",
+   "step": 0
+  },
+  {
+   "id": "split",
+   "kind": "fork",
+   "label": null,
+   "step": 0
+  },
+  {
+   "id": "refund",
+   "kind": "action",
+   "label": "issue refund",
+   "step": 0
+  },
+  {
+   "id": "credit",
+   "kind": "action",
+   "label": "issue store credit",
+   "step": 0
+  },
+  {
+   "id": "merge-bar",
+   "kind": "join",
+   "label": null,
+   "step": 0
+  },
+  {
+   "id": "done",
+   "kind": "final",
+   "label": null,
+   "step": 0
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "arrow",
+   "from": "begin",
+   "to": "check",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e2",
+   "kind": "arrow",
+   "from": "check",
+   "to": "split",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e3",
+   "kind": "arrow",
+   "from": "split",
+   "to": "refund",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e4",
+   "kind": "arrow",
+   "from": "split",
+   "to": "credit",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e5",
+   "kind": "arrow",
+   "from": "refund",
+   "to": "merge-bar",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e6",
+   "kind": "arrow",
+   "from": "credit",
+   "to": "merge-bar",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e7",
+   "kind": "arrow",
+   "from": "merge-bar",
+   "to": "done",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  }
+ ],
+ "web": {
+  "title": "After a return is checked, the customer gets one of two outcomes",
+  "desc": "",
+  "direction": "down",
+  "warnings": []
+ }
+}

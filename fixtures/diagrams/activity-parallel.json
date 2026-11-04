@@ -1,0 +1,146 @@
+{
+ "contract_version": "1.0",
+ "diagram_id": "onboarding",
+ "claimed_diagram_type": "activity",
+ "notation_profile": "uml-inspired",
+ "narration_excerpt": "After the offer is accepted, IT orders the laptop and security prints the badge at the same time.",
+ "legend": null,
+ "nodes": [
+  {
+   "id": "begin",
+   "kind": "initial",
+   "label": null,
+   "step": 0
+  },
+  {
+   "id": "accept",
+   "kind": "action",
+   "label": "accept offer",
+   "step": 0
+  },
+  {
+   "id": "split",
+   "kind": "fork",
+   "label": null,
+   "step": 1
+  },
+  {
+   "id": "laptop",
+   "kind": "action",
+   "label": "order laptop",
+   "step": 1
+  },
+  {
+   "id": "badge",
+   "kind": "action",
+   "label": "print badge",
+   "step": 1
+  },
+  {
+   "id": "wait",
+   "kind": "join",
+   "label": null,
+   "step": 2
+  },
+  {
+   "id": "first",
+   "kind": "action",
+   "label": "first day",
+   "step": 2
+  },
+  {
+   "id": "done",
+   "kind": "final",
+   "label": null,
+   "step": 2
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "arrow",
+   "from": "begin",
+   "to": "accept",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e2",
+   "kind": "arrow",
+   "from": "accept",
+   "to": "split",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 1
+  },
+  {
+   "id": "e3",
+   "kind": "arrow",
+   "from": "split",
+   "to": "laptop",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 1
+  },
+  {
+   "id": "e4",
+   "kind": "arrow",
+   "from": "split",
+   "to": "badge",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 1
+  },
+  {
+   "id": "e5",
+   "kind": "arrow",
+   "from": "laptop",
+   "to": "wait",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 2
+  },
+  {
+   "id": "e6",
+   "kind": "arrow",
+   "from": "badge",
+   "to": "wait",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 2
+  },
+  {
+   "id": "e7",
+   "kind": "arrow",
+   "from": "wait",
+   "to": "first",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 2
+  },
+  {
+   "id": "e8",
+   "kind": "arrow",
+   "from": "first",
+   "to": "done",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 2
+  }
+ ],
+ "web": {
+  "title": "A new hire's laptop and badge are prepared at the same time",
+  "desc": "Activity diagram. Start, accept offer, then a fork: order laptop and print badge run at the same time. A join waits for both, then first day, then end.",
+  "direction": "down",
+  "warnings": []
+ }
+}

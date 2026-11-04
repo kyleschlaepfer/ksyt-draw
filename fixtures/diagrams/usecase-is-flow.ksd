@@ -1,0 +1,18 @@
+# A process drawn in ovals. Expected: FAMILY-USECASE-IS-FLOW (critical).
+diagram use-case
+id permit-as-flow
+title How a permit gets approved
+narration The resident submits a request, the clerk reviews it, and it's approved or rejected.
+
+actor resident "Resident"
+boundary portal "Permit portal" {
+  use-case submit "submit request"
+  use-case review "review request"
+  use-case approve "approve permit"
+  use-case reject "reject permit"
+}
+
+resident -- submit
+submit -> review
+review -> approve : yes
+review -> reject : no

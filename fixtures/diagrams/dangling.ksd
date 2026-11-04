@@ -1,0 +1,10 @@
+# An edge to a node that was never declared. Expected parse warning PARSE-UNKNOWN-NODE and lint STRUCT-DANGLING-EDGE (major).
+diagram flowchart
+id dangling
+title A request is reviewed and archived
+start begin
+process review "review request"
+end done
+begin -> review
+review -> archive
+review -> done

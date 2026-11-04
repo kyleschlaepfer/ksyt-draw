@@ -1,0 +1,23 @@
+{
+ "inferred_family": "flow",
+ "status": "blocked",
+ "findings": [
+  {
+   "severity": "critical",
+   "rule_id": "FAMILY-USECASE-IS-FLOW",
+   "location": "diagram",
+   "confidence": "high"
+  }
+ ],
+ "full_findings": [
+  {
+   "severity": "critical",
+   "rule_id": "FAMILY-USECASE-IS-FLOW",
+   "location": "diagram",
+   "problem": "Called a use-case diagram, but it shows a chronological flow with branches.",
+   "rationale": "Use-case diagrams show who uses the system for which goals; they have no order or decisions. Re-shaping boxes into ovals would not fix this.",
+   "minimal_fix": "Redraw as an activity diagram (or a flowchart): steps, a decision with labeled outcomes. Keep a use-case diagram only if the lesson is about actors and goals.",
+   "confidence": "high"
+  }
+ ]
+}

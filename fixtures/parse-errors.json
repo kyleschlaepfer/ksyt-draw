@@ -1,0 +1,57 @@
+[
+ {
+  "source": "diagram sequence\ntitle x",
+  "line": 1,
+  "message": "unknown diagram type 'sequence' (flowchart, activity, use-case)"
+ },
+ {
+  "source": "title first\ndiagram flowchart",
+  "line": 1,
+  "message": "the first line must be: diagram flowchart | activity | use-case"
+ },
+ {
+  "source": "diagram flowchart\ntitle t\nprocess a\nprocess a",
+  "line": 4,
+  "message": "duplicate id 'a'"
+ },
+ {
+  "source": "diagram flowchart\ntitle t\nwidget a",
+  "line": 3,
+  "message": "unknown kind 'widget'"
+ },
+ {
+  "source": "diagram use-case\ntitle t\nboundary b \"B\" {\nuse-case u\n",
+  "line": 0,
+  "message": "boundary 'b' is never closed with }"
+ },
+ {
+  "source": "diagram use-case\ntitle t\nboundary b \"B\" {\nboundary c \"C\" {\n}\n}",
+  "line": 4,
+  "message": "boundaries can't nest"
+ },
+ {
+  "source": "diagram flowchart\nprocess a",
+  "line": 0,
+  "message": "a diagram needs a title: one line saying what it shows (its finding, not its topic)"
+ },
+ {
+  "source": "diagram flowchart\ntitle a — b",
+  "line": 2,
+  "message": "em dash in 'a — b' (house rule: no em dashes)"
+ },
+ {
+  "source": "diagram flowchart\ntitle t\nprocess a \"x\" at 1",
+  "line": 3,
+  "message": "at takes two numbers in inches: at X Y"
+ },
+ {
+  "source": "diagram use-case\ntitle t\nstart s",
+  "line": 3,
+  "message": "start/end don't exist in use-case diagrams"
+ },
+ {
+  "source": "diagram flowchart\ntitle t\n}",
+  "line": 3,
+  "message": "} without an open boundary"
+ }
+]

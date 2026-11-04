@@ -1,0 +1,22 @@
+# Correct use-case diagram with include and extend. Expected: pass.
+diagram use-case
+id permit-portal
+title Residents apply and track; paying the fee is always part of applying
+desc Use-case diagram for the permit portal. Resident is associated with apply for permit and track status. Permit clerk is associated with review application. Apply for permit includes pay fee. Request fee waiver extends pay fee.
+narration Apply for permit includes pay fee. Request fee waiver extends pay fee, but only for some residents.
+
+actor resident "Resident"
+actor clerk "Permit clerk" right
+boundary portal "Permit portal" {
+  use-case apply "apply for permit"
+  use-case track "track status"
+  use-case review "review application"
+  use-case pay "pay fee"
+  use-case waiver "request fee waiver"
+}
+
+resident -- apply
+resident -- track
+clerk -- review
+apply -include-> pay
+waiver -extend-> pay

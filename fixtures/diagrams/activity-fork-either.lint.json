@@ -1,0 +1,23 @@
+{
+ "inferred_family": "flow",
+ "status": "changes-required",
+ "findings": [
+  {
+   "severity": "major",
+   "rule_id": "ACTIVITY-PARALLEL-VS-EXCLUSIVE",
+   "location": "fork bar",
+   "confidence": "medium"
+  }
+ ],
+ "full_findings": [
+  {
+   "severity": "major",
+   "rule_id": "ACTIVITY-PARALLEL-VS-EXCLUSIVE",
+   "location": "fork bar",
+   "problem": "The narration describes a choice (\"either\") but the diagram forks into concurrent paths.",
+   "rationale": "A fork bar teaches that every path runs at the same time.",
+   "minimal_fix": "Replace the fork with a decision diamond and label each outcome.",
+   "confidence": "medium"
+  }
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "contract_version": "1.0",
+ "diagram_id": "library",
+ "claimed_diagram_type": "use-case",
+ "notation_profile": "uml-inspired",
+ "narration_excerpt": "Members borrow books and renew loans.",
+ "legend": null,
+ "nodes": [
+  {
+   "id": "lib",
+   "kind": "boundary",
+   "label": "Library system",
+   "step": 0
+  },
+  {
+   "id": "member",
+   "kind": "actor",
+   "label": "Member",
+   "step": 0,
+   "inside": "lib"
+  },
+  {
+   "id": "borrow",
+   "kind": "use-case",
+   "label": "borrow book",
+   "step": 0,
+   "inside": "lib"
+  },
+  {
+   "id": "renew",
+   "kind": "use-case",
+   "label": "renew loan",
+   "step": 0,
+   "inside": "lib"
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "arrow",
+   "from": "member",
+   "to": "borrow",
+   "label": null,
+   "style": "solid-arrow",
+   "directed": true,
+   "step": 0
+  },
+  {
+   "id": "e2",
+   "kind": "association",
+   "from": "member",
+   "to": "renew",
+   "label": null,
+   "style": "plain-line",
+   "directed": false,
+   "step": 0
+  }
+ ],
+ "web": {
+  "title": "Members borrow and renew books",
+  "desc": "",
+  "direction": "down",
+  "warnings": []
+ }
+}

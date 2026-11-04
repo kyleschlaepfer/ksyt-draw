@@ -1,0 +1,133 @@
+{
+ "cases": [
+  {
+   "case": "pen-straight",
+   "sketch_seed": 101,
+   "polys": 1,
+   "points": 234
+  },
+  {
+   "case": "pen-curve-blunt",
+   "sketch_seed": 102,
+   "polys": 1,
+   "points": 284
+  },
+  {
+   "case": "pen-pieces",
+   "sketch_seed": 103,
+   "polys": 2,
+   "points": 462
+  },
+  {
+   "case": "arrow",
+   "sketch_seed": 104,
+   "polys": 3,
+   "points": 312
+  },
+  {
+   "case": "loose-rect",
+   "sketch_seed": 105,
+   "polys": 4,
+   "points": 712
+  },
+  {
+   "case": "rounded-rect",
+   "sketch_seed": 106,
+   "polys": 2,
+   "points": 626
+  },
+  {
+   "case": "pill",
+   "sketch_seed": 107,
+   "polys": 2,
+   "points": 504
+  },
+  {
+   "case": "loose-circle",
+   "sketch_seed": 108,
+   "polys": 2,
+   "points": 540
+  },
+  {
+   "case": "dot",
+   "sketch_seed": 109,
+   "polys": 1,
+   "points": 14
+  },
+  {
+   "case": "blob-bar",
+   "sketch_seed": 110,
+   "polys": 1,
+   "points": 1241
+  },
+  {
+   "case": "dashed-loop",
+   "sketch_seed": 111,
+   "polys": 28,
+   "points": 1872
+  },
+  {
+   "case": "underline",
+   "sketch_seed": 112,
+   "polys": 1,
+   "points": 190
+  },
+  {
+   "case": "check",
+   "sketch_seed": 113,
+   "polys": 1,
+   "points": 74
+  },
+  {
+   "case": "xmark",
+   "sketch_seed": 114,
+   "polys": 2,
+   "points": 104
+  },
+  {
+   "case": "wash",
+   "sketch_seed": 115,
+   "polys": 1,
+   "points": 20
+  },
+  {
+   "case": "knockout",
+   "sketch_seed": 116,
+   "polys": 1,
+   "points": 4
+  },
+  {
+   "case": "hatch",
+   "sketch_seed": 117,
+   "polys": 11,
+   "points": 746
+  },
+  {
+   "case": "seeded-by-name",
+   "sketch_seed": 7589,
+   "polys": 2,
+   "points": 508
+  }
+ ],
+ "calls_source": [
+  "(\"pen-straight\", 101, lambda k: k.pen([(0.5, 0.5), (2.5, 0.6)])),",
+  "    (\"pen-curve-blunt\", 102, lambda k: k.pen([(0.5, 1.0), (1.2, 0.6), (2.0, 1.1), (2.6, 0.7)], taper_in=0, taper_out=0)),",
+  "    (\"pen-pieces\", 103, lambda k: k.pen(pen.ellipse_pts(1.5, 1.0, 0.8, 0.4, start=180, sweep=395, n=10, seed=7), pieces=2)),",
+  "    (\"arrow\", 104, lambda k: k.arrow([(0.4, 1.0), (1.5, 0.85), (2.6, 1.0)], head=0.17)),",
+  "    (\"loose-rect\", 105, lambda k: k.loose_rect(0.5, 0.5, 2.5, 1.3)),",
+  "    (\"rounded-rect\", 106, lambda k: k.rounded_rect(0.5, 0.5, 2.7, 1.2, r=0.18, step=0.16)),",
+  "    (\"pill\", 107, lambda k: k.rounded_rect(0.5, 0.5, 2.3, 1.1, r=0.29, step=0.14)),",
+  "    (\"loose-circle\", 108, lambda k: k.loose_circle(1.5, 1.0, 1.0, 0.36, CH, 0.028)),",
+  "    (\"dot\", 109, lambda k: k.dot(1.0, 1.0, 0.13)),",
+  "    (\"blob-bar\", 110, lambda k: k.blob([(0.3, 0.96), (1.5, 0.95), (2.7, 0.96), (2.706, 1.0), (2.7, 1.04),",
+  "                                         (1.5, 1.045), (0.3, 1.04), (0.295, 1.0)])),",
+  "    (\"dashed-loop\", 111, lambda k: k.dashed_loop([(0.4, 0.4), (2.0, 0.35), (3.6, 0.45), (3.65, 1.5), (2.0, 1.6), (0.35, 1.5)], color=GR)),",
+  "    (\"underline\", 112, lambda k: k.underline(0.5, 2.0, 1.0)),",
+  "    (\"check\", 113, lambda k: k.check(1.0, 1.0)),",
+  "    (\"xmark\", 114, lambda k: k.xmark(1.0, 1.0)),",
+  "    (\"wash\", 115, lambda k: k.wash(0.5, 0.6, 2.5, 1.2)),",
+  "    (\"knockout\", 116, lambda k: k.knockout([(0.5, 0.5), (2.5, 0.5), (2.5, 1.3), (0.5, 1.3)])),",
+  "    (\"hatch\", 117, lambda k: k.hatch([(0.5, 0.5), (1.6, 0.5), (1.6, 1.2), (0.5, 1.2)])),",
+  "    (\"seeded-by-name\", seed_for(\"permit-portal:pay\"), lambda k: k.loose_circle(1.5, 1.0, 0.9, 0.34, CH, 0.028)),"
+ ]
+}

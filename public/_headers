@@ -1,0 +1,17 @@
+# Applies to static responses (Workers static assets). Verify after deploy:
+#   curl -sI https://draw.kyleschlaepfer.com/ | grep -i content-security
+#   curl -sI https://draw.kyleschlaepfer.com/embed/ | grep -i content-security
+# The playground can't be framed. The embed can be framed by any site (decision D2 in ARCHITECTURE.md);
+# for an allowlist, replace "frame-ancestors *" with "frame-ancestors https://kyleschlaepfer.com https://*.kyleschlaepfer.com".
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+/embed/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors *
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
