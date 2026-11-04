@@ -38,6 +38,12 @@ export interface Mounted {
   naturalWidth: number;
 }
 
+/** The scale below which the smallest label in a scene drops under 13 px. */
+export function minScale(sc: Scene): number {
+  const smallest = sc.texts.length ? Math.min(...sc.texts.map((t) => t.size)) : 22;
+  return 13 / smallest;
+}
+
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -48,7 +54,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 /** Build the scene, switching a right-running flow to top-down when it would shrink labels under 13 px. */
 export function sceneFor(d: Diagram, m: Measurer, containerWidth: number): Scene {
   let sc = buildScene(d, m);
-  if (d.claimed_diagram_type !== "use-case" && d.web.direction === "right" && containerWidth / (sc.w * PX) < 0.59) {
+  if (d.claimed_diagram_type !== "use-case" && d.web.direction === "right" && containerWidth / (sc.w * PX) < minScale(sc)) {
     sc = buildScene(d, m, { direction: "down" });
   }
   return sc;
@@ -72,8 +78,12 @@ export function mountFigure(host: HTMLElement, d: Diagram, m: Measurer, o: Figur
   figure.setAttribute("tabindex", "0");
   figure.setAttribute("aria-label", d.web.title);
   const stage = el("div", "fig-stage");
+  // legibility floor: the figure never shrinks so far that a label drops under 13 px; on a phone it scrolls sideways instead
+  const floorPx = Math.ceil(scene.w * PX * minScale(scene));
+  svg.style.minWidth = `${floorPx}px`;
   stage.appendChild(svg);
   figure.appendChild(stage);
+  if (floorPx > o.containerWidth) figure.appendChild(el("p", "note scroll-note", "wider than the screen: scroll sideways"));
 
   const steps = scene.steps;
   let step = 0;

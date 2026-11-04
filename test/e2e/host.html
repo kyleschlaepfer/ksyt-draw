@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>host page</title>
+    <style>
+      body { margin: 0; padding: 16px; font-family: sans-serif; }
+      figure { margin: 0 0 24px; }
+      .note { color: #606A63; }
+    </style>
+  </head>
+  <body>
+    <h1>A lesson page with two diagrams</h1>
+    {{FRAMES}}
+    <script type="module">
+      window.__messages = [];
+      window.addEventListener("message", (e) => { window.__messages.push({ origin: e.origin, data: e.data }); });
+      {{HOST_JS}}
+    </script>
+  </body>
+</html>
