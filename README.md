@@ -2,14 +2,14 @@
 
 Diagrams for kyleschlaepfer.com: write a few lines of text, get a use-case, activity or flowchart diagram in the same style as the videos, embeddable in any page, with the same notation check as the slide reviewer.
 
-**Status:** v1 scaffold. The pen engine port, build config and every test fixture are done and verified; the parser, linter, layout, embed and playground are specified and ready to build. See `BUILD_BRIEF.md`.
+**Status:** v1 built. Parser, linter, layout, SVG, QA, the embed page and the playground pass `npm test` (171) and `npm run test:e2e` (57). Deploy steps are at the end of `BUILD_BRIEF.md`.
 
 ## Start here
 
 1. Create a GitHub repo named `ksyt-draw` and put this folder's contents at its root.
-2. `npm install && npm test` (45 tests should pass).
-3. Open Claude Code in the repo and paste the prompt at the top of `BUILD_BRIEF.md`.
-4. When it's done: `npx wrangler login` once, then `npm run deploy`.
+2. `npm install && npm test`.
+3. `npx playwright install chromium` once, then `npm run test:e2e` (screenshots land in `test-results/`). Where the Playwright CDN is blocked, `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e` uses an installed Chrome.
+4. `npx wrangler login` once, then `npm run deploy`.
 
 ## Map
 

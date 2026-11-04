@@ -40,7 +40,9 @@ export function layoutFlow(d: Diagram, m: Measurer, direction: "down" | "right" 
   g.setGraph({ rankdir: vertical ? "LR" : "TB", nodesep: 48, ranksep: hasLabels ? 82 : 72, edgesep: 24, marginx: 0, marginy: 0 });
   g.setDefaultEdgeLabel(() => ({}));
   for (const [id, n] of nodes) g.setNode(id, { width: n.w * PX, height: n.h * PX });
-  for (const e of edges) g.setEdge(e.from, e.to, {}, e.id);
+  // dagre orders siblings by its DFS over successors in insertion order, which comes out mirrored;
+  // inserting the edges last-to-first keeps the author's file order left to right
+  for (const e of [...edges].reverse()) g.setEdge(e.from, e.to, {}, e.id);
   dagre.layout(g);
   for (const [id, n] of nodes) {
     const p = g.node(id);
