@@ -137,7 +137,13 @@ function placeLabel(m: Measurer, texts: TextEl[], obstacles: Poly[], own: Sketch
     return c;
   };
   const flipped: 1 | -1 = preferred === 1 ? -1 : 1;
-  const c = tryAt(preferred, 0.5) ?? tryAt(flipped, 0.5) ?? tryAt(preferred, 0.6) ?? tryAt(flipped, 0.6) ?? besideSegment(p0, p1, w, h, preferred);
+  // spec order first (preferred, flipped, 60%); then further along the segment before giving up
+  let c: Pt | null = null;
+  for (const along of [0.5, 0.6, 0.35, 0.25, 0.75]) {
+    c = tryAt(preferred, along) ?? tryAt(flipped, along);
+    if (c) break;
+  }
+  c = c ?? besideSegment(p0, p1, w, h, preferred);
   texts.push(textEl(m, edgeId + ":label", label, c[0], c[1] + h / 2 - bot / PX, SMALL_PX, { role: "ink-2", anchor: "middle", step }));
 }
 

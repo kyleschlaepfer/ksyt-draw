@@ -127,7 +127,7 @@ export function edgePoint(g: NodeGeom, toward: Pt, gap = 0.06): Pt {
     let a: Pt;
     if (Math.abs(ux) >= Math.abs(uy)) a = [g.cx + Math.sign(ux || 1) * 0.3 * h, top + 0.45 * h];
     else if (uy < 0) a = [g.cx, top];
-    else a = [g.cx, g.cy + hh];
+    else a = [g.cx, g.cy + hh + 0.05]; // below the role label, outside its clearance
     return [a[0] + ux * gap, a[1] + uy * gap];
   }
   if (g.shape === "diamond") t = 1 / (Math.abs(ux) / hw + Math.abs(uy) / hh);

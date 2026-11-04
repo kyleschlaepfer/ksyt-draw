@@ -3,8 +3,9 @@
  * outside at the sides, every edge straight.
  */
 import type { Diagram, DiagramNode } from "./model";
-import type { Measurer } from "./measure";
-import { nodeSize, type NodeGeom } from "./shapes";
+import { catmull, type Pt } from "./pen";
+import { PX, type Measurer } from "./measure";
+import { nodeSize, SMALL_PX, type NodeGeom } from "./shapes";
 import type { Layout, Route } from "./layout-flow";
 
 const COL_GAP = 1.1;
@@ -75,13 +76,58 @@ export function layoutUseCase(d: Diagram, m: Measurer): Layout {
     const pitch = (all.length ? Math.max(...all.map((g) => g.h)) : 0.6) + (linkedRows ? ROW_GAP_LINKED : ROW_GAP);
     const widest = (c: Column) => (c.items.length ? Math.max(...c.items.map((g) => g.w)) : 0);
     const wA = widest(colA), wB = widest(colB);
+    // a «include»/«extend» label between the columns needs its width plus clearance
+    let gap = COL_GAP;
+    for (const e of edges) {
+      if (e.kind !== "include" && e.kind !== "extend") continue;
+      if (colOf.get(e.from) !== colOf.get(e.to)) {
+        const lw = m.measure(`\u00ab${e.kind}\u00bb`, SMALL_PX, 300).adv / PX;
+        gap = Math.max(gap, lw + 0.35);
+      }
+    }
     const cxA = x0 + wA / 2;
-    const cxB = x0 + wA + COL_GAP + wB / 2;
+    const cxB = x0 + wA + gap + wB / 2;
     let maxRow = -1;
     for (const [row, g] of colA.rows) { g.cx = cxA; g.cy = row * pitch; maxRow = Math.max(maxRow, row); }
     for (const [row, g] of colB.rows) { g.cx = cxB; g.cy = row * pitch; maxRow = Math.max(maxRow, row); }
-    const x1 = colB.items.length ? x0 + wA + COL_GAP + wB : x0 + wA;
+    const x1 = colB.items.length ? x0 + wA + gap + wB : x0 + wA;
     return { x1, y1: all.length ? maxRow * pitch + pitch / 2 : 0 };
+  };
+
+  // a straight connector that would pass through a node it doesn't join bends around it
+  const bends = new Map<string, Pt>();
+  const bendsFor = (ids: string[]): Pt[] => {
+    const out: Pt[] = [];
+    const set = new Set(ids);
+    for (const e of edges) {
+      if (!set.has(e.from) || !set.has(e.to)) continue;
+      const a = nodes.get(e.from)!, b = nodes.get(e.to)!;
+      const blockers = ids.filter((id) => id !== e.from && id !== e.to).map((id) => nodes.get(id)!)
+        .filter((n) => segmentHitsBox([a.cx, a.cy], [b.cx, b.cy], n, 0.1));
+      if (!blockers.length) continue;
+      const L = Math.hypot(b.cx - a.cx, b.cy - a.cy) || 1;
+      const nx = -(b.cy - a.cy) / L, ny = (b.cx - a.cx) / L;
+      const mx = (a.cx + b.cx) / 2, my = (a.cy + b.cy) / 2;
+      let best: Pt | null = null;
+      const others = ids.map((id) => nodes.get(id)!).filter((n) => n !== a && n !== b);
+      for (const side of [1, -1]) {
+        // start just past the widest blocker, then widen until the curve clears every node
+        let off = 0;
+        for (const n of blockers) {
+          const proj = (n.cx - mx) * nx * side + (n.cy - my) * ny * side;
+          off = Math.max(off, proj + Math.hypot((n.w / 2) * nx, (n.h / 2) * ny) + 0.4);
+        }
+        for (let tries = 0; tries < 6; tries++, off += 0.2) {
+          const p: Pt = [mx + nx * side * off, my + ny * side * off];
+          if (curveClear([a.cx, a.cy], p, [b.cx, b.cy], others)) {
+            if (!best || off < Math.hypot(best[0] - mx, best[1] - my)) best = p;
+            break;
+          }
+        }
+      }
+      if (best) { bends.set(e.id, best); out.push(best); }
+    }
+    return out;
   };
 
   let bx0 = 0, bx1 = 0, by0 = 0, by1 = 0;
@@ -92,8 +138,10 @@ export function layoutUseCase(d: Diagram, m: Measurer): Layout {
       const x0 = cursorX + 0.4;
       const { x1 } = placeColumns(members, x0);
       const inside = members.map((n) => nodes.get(n.id)!);
+      const bendPts = bendsFor(members.map((n) => n.id));
       if (inside.length) {
-        const minX = Math.min(...inside.map((n) => n.cx - n.w / 2)), maxX = Math.max(...inside.map((n) => n.cx + n.w / 2));
+        const minX = Math.min(...inside.map((n) => n.cx - n.w / 2), ...bendPts.map((p) => p[0] - 0.1));
+        const maxX = Math.max(...inside.map((n) => n.cx + n.w / 2), ...bendPts.map((p) => p[0] + 0.1));
         const minY = Math.min(...inside.map((n) => n.cy - n.h / 2)), maxY = Math.max(...inside.map((n) => n.cy + n.h / 2));
         g.cx = (minX + maxX) / 2;
         g.w = maxX - minX + 0.8;
@@ -115,6 +163,7 @@ export function layoutUseCase(d: Diagram, m: Measurer): Layout {
   } else {
     const members = d.nodes.filter((n) => n.kind !== "actor" && n.kind !== "boundary");
     const r = placeColumns(members, 0);
+    bendsFor(members.map((n) => n.id));
     const inside = members.map((n) => nodes.get(n.id)!);
     bx0 = inside.length ? Math.min(...inside.map((n) => n.cx - n.w / 2)) : 0;
     bx1 = inside.length ? Math.max(...inside.map((n) => n.cx + n.w / 2)) : r.x1;
@@ -152,9 +201,40 @@ export function layoutUseCase(d: Diagram, m: Measurer): Layout {
     g.cy = n.at[1];
   }
 
-  const routes: Route[] = edges.map((e) => ({ edge: e, from: nodes.get(e.from)!, to: nodes.get(e.to)!, interior: [] }));
+  const routes: Route[] = edges.map((e) => ({
+    edge: e, from: nodes.get(e.from)!, to: nodes.get(e.to)!,
+    interior: bends.has(e.id) && !src.get(e.from)?.at && !src.get(e.to)?.at ? [bends.get(e.id)!] : [],
+  }));
   for (const b of boundaries) nodes.delete(b.id);
   return { nodes, routes, boundaries: boundaryGeoms, direction: "down" };
+}
+
+/** Does the smoothed curve through a, p, b stay 0.1 in clear of every node's outline? */
+function curveClear(a: Pt, p: Pt, b: Pt, nodes: NodeGeom[]): boolean {
+  const pts = catmull([a, p, b], 0.02);
+  for (const n of nodes) {
+    const rx = n.w / 2 + 0.1, ry = n.h / 2 + 0.1;
+    for (const [x, y] of pts) {
+      const dx = x - n.cx, dy = y - n.cy;
+      const hit = n.shape === "ellipse" ? (dx / rx) ** 2 + (dy / ry) ** 2 < 1 : Math.abs(dx) < rx && Math.abs(dy) < ry;
+      if (hit) return false;
+    }
+  }
+  return true;
+}
+
+/** Does the segment a-b cross the node's box (grown by pad)? */
+function segmentHitsBox(a: Pt, b: Pt, n: NodeGeom, pad: number): boolean {
+  const x0 = n.cx - n.w / 2 - pad, x1 = n.cx + n.w / 2 + pad, y0 = n.cy - n.h / 2 - pad, y1 = n.cy + n.h / 2 + pad;
+  let t0 = 0, t1 = 1;
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  for (const [p, q] of [[-dx, a[0] - x0], [dx, x1 - a[0]], [-dy, a[1] - y0], [dy, y1 - a[1]]]) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const r = q / p;
+    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+    else { if (r < t0) return false; if (r < t1) t1 = r; }
+  }
+  return t0 <= t1;
 }
 
 function push(m: Map<string, string[]>, k: string, v: string): void {
