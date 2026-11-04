@@ -42,7 +42,8 @@ export class ParseError extends Error {
 }
 
 /** Python repr() of a str, for the messages that use %r. */
-export function pyRepr(s: string): string {
+export function pyRepr(s: unknown): string {
+  if (typeof s !== "string") return String(s === undefined ? null : s).replace(/^null$/, "None");
   const q = s.includes("'") && !s.includes('"') ? '"' : "'";
   let out = q;
   for (const ch of s) {
