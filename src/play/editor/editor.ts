@@ -73,7 +73,8 @@ const theme = EditorView.theme({
   ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.5", overflow: "auto" },
   ".cm-content": { padding: "0.5rem 0", caretColor: "var(--ink)" },
   ".cm-line": { padding: "0 0.75rem 0 0.5rem" },
-  ".cm-gutters": { backgroundColor: "transparent", color: "var(--ink-2)", border: "0", borderRight: "1px dashed var(--rule)" },
+  // the numbers stay put while long lines scroll sideways, so they need the editor's own ground behind them
+  ".cm-gutters": { backgroundColor: "var(--page-2)", color: "var(--ink-2)", border: "0", borderRight: "1px dashed var(--rule)" },
   ".cm-lineNumbers .cm-gutterElement": { padding: "0 0.5rem 0 0.6rem", minWidth: "2.2em" },
   ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--wash) 45%, transparent)" },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--ink)", fontWeight: "700" },
@@ -81,7 +82,7 @@ const theme = EditorView.theme({
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--ink)", borderLeftWidth: "2px" },
   ".cm-matchingBracket": { backgroundColor: "var(--wash)", outline: "1px solid var(--accent)" },
   ".cm-selectionMatch": { backgroundColor: "color-mix(in srgb, var(--wash) 70%, transparent)" },
-  ".cm-linked": { backgroundColor: "color-mix(in srgb, var(--wash) 80%, transparent)", boxShadow: "inset 3px 0 0 var(--accent)" },
+  ".cm-linked": { backgroundColor: "color-mix(in srgb, var(--wash) 80%, transparent)", borderLeft: "3px solid var(--accent)", paddingLeft: "calc(0.5rem - 3px)" },
   ".cm-tooltip": { backgroundColor: "var(--page)", color: "var(--ink)", border: "1.5px solid var(--rule)", borderRadius: "6px", font: "0.95rem/1.4 var(--font-body)" },
   ".cm-tooltip.cm-tooltip-autocomplete > ul": { fontFamily: "var(--font-mono)", maxHeight: "16em" },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li": { padding: "0.2rem 0.6rem" },

@@ -86,9 +86,10 @@ main { display: block; padding-bottom: var(--s-8); }
   border: 1.5px dashed var(--terra); border-radius: 6px;
 }
 .stale-note .btn-quiet { min-height: 32px; }
-/* the part of the figure the cursor's line declares */
-.play-preview .is-linked path.k-ink, .play-preview .is-linked path.k-ink-2, .play-preview text.is-linked { fill: var(--accent); }
-.play-preview .is-linked path.ks-ink, .play-preview .is-linked path.ks-ink-2, .play-preview .is-linked ellipse.ks-ink { stroke: var(--accent); }
+/* the part of the figure the cursor's line declares: green, and also heavier and underlined, so it is not color alone */
+.play-preview .is-linked path.k-ink, .play-preview .is-linked path.k-ink-2 { fill: var(--accent); stroke: var(--accent); stroke-width: 1.3px; stroke-linejoin: round; }
+.play-preview text.is-linked { fill: var(--accent); text-decoration: underline; }
+.play-preview .is-linked path.ks-ink, .play-preview .is-linked path.ks-ink-2, .play-preview .is-linked ellipse.ks-ink { stroke: var(--accent); stroke-width: 3.2px; }
 .play-preview svg [data-name] { cursor: pointer; }
 
 /* ---------- the document bar: new, open, save, export ---------- */
@@ -289,7 +290,8 @@ main { display: block; padding-bottom: var(--s-8); }
   border: 1.5px solid var(--rule); border-radius: 6px; overflow: auto;
 }
 .export-dialog[open] { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(15rem, 1fr); gap: var(--s-2) var(--s-3); align-items: start; }
-.export-dialog::backdrop { background: color-mix(in srgb, var(--ink) 45%, transparent); }
+/* a veil of the page's own color: it quiets what is behind in light and in dark (an ink veil turns a dark page to fog) */
+.export-dialog::backdrop { background: color-mix(in srgb, var(--page) 78%, transparent); }
 .export-dialog h2 { grid-column: 1 / -1; font: 1.75rem/1.2 var(--font-hand); font-weight: 400; margin: 0; }
 .export-preview {
   grid-row: 2 / span 2; display: grid; place-items: center; min-height: 16rem; max-height: 62vh; overflow: auto; padding: var(--s-2);
