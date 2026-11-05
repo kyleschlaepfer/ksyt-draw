@@ -10,9 +10,9 @@ now. The evidence is real files, opened and looked at, not download notification
 
 ## 1. How the review was done
 
-1. `scripts/gallery.mjs` opens each of the 17 fixtures in the running app, opens the export dialog, and
+1. `scripts/gallery.mjs` opens each of the 18 fixtures in the running app, opens the export dialog, and
    downloads SVG, PNG and PDF in the sketch look and in the precision look, plus the SVG with its
-   letters as shapes. That is 136 files, all written by the same code a person's click runs.
+   letters as shapes. That is 144 files, all written by the same code a person's click runs.
 2. Each file's first bytes are checked, and the dialog's own layout check line is recorded
    (`gallery/report.json`).
 3. Each fixture gets a sheet: the files as images on a white page at 600 px (half a slide), 420 px (a
@@ -24,7 +24,7 @@ now. The evidence is real files, opened and looked at, not download notification
    - **pdf.js** (the PDF renderer in Firefox), which reported the fonts and the text in each PDF and
      drew the page.
 
-The layout check passing is not the bar. All 34 exports passed it before this review started, and
+The layout check passing is not the bar. All 34 exports of the 17 fixtures there were then passed it before this review started, and
 four of them still read badly. The findings in section 4 came from looking.
 
 ## 2. What was wrong in v1, and why
@@ -122,13 +122,30 @@ but none of them is known to read a web font embedded in an SVG, so the same sho
 - PNG and PDF never had this problem: PNG is pixels, and the PDF embeds a subset of each font, which
   pdf.js confirmed (`Kalam-Regular`, `AtkinsonHyperlegibleNext-Regular` and `-Bold`, none missing).
 
+### 4.5 Found later by the browser tests
+
+The export scenario in `test/e2e/flows.spec.ts` (T) downloads each format in both looks and checks the
+file against what the dialog said. It found that a 2x PNG could be one pixel off the size shown: the
+dialog doubled the whole-pixel size and the exporter rounded the doubled exact size (942 x 1840 shown,
+941 x 1839 saved). Both now start from the SVG's own whole-pixel size, and the test asserts the two
+agree exactly.
+
+### 4.6 Added after the review: lines from a shape to itself
+
+A line from a shape to itself used to be reported and not drawn, so it was missing from every export.
+It is now drawn round a free corner of the shape, or as a bracket on one free side of a box
+(`fixtures/v2/class-reflexive.ksd`, sheet in the gallery). Its sheet was looked at in both looks at the
+three widths: the multiplicities and role names stand outside the loop and nothing touches. The 34
+earlier SVG exports were regenerated after this change and came out byte for byte the same, so nothing
+else moved.
+
 ## 5. Formats as delivered
 
 | Format | What is in the file | Checked with |
 |---|---|---|
 | SVG, letters | paths with plain colors, real text, fonts embedded as WOFF2 with a fallback stack and `textLength` | Chromium; librsvg (shows the fallback problem in 4.4) |
 | SVG, shapes | the same, with each label as one path that keeps its words as its `<title>` | Chromium; librsvg (identical to the browser) |
-| PNG | the SVG rasterized at 1x to 4x of 96 px per inch | Chromium; pixel size asserted in the browser tests |
+| PNG | the SVG rasterized at 1x to 4x of 96 px per inch | Chromium; the browser tests assert the pixel size equals what the dialog showed, and that 2x is exactly twice 1x |
 | PDF | vector paths and real text in embedded font subsets; page fits the diagram, or US Letter, A4 or a 16:9 slide, never enlarged past natural size | pdf.js: one page, the right size in points, text extractable, fonts embedded |
 
 ## 6. What still reads less than well

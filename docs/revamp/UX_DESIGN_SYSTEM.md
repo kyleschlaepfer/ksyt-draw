@@ -10,7 +10,7 @@ Companion documents: `UI_PRESERVATION_CONTRACT.md` (what had to stay, what chang
 
 ## 1. Tokens and roles
 
-Every color on the new surfaces is a theme role from `reference/ksyt.css`. A search of `src/play/` for hex colors, gradients and `text-transform` finds none. The one `box-shadow` is noted in section 10.
+Every color on the new surfaces is a theme role from `reference/ksyt.css`. A search of `src/play/` for hex colors, gradients and `text-transform` finds none. There is no `box-shadow` either (the one the checkpoint had is gone; section 10).
 
 | Role | Light | Dark | Used on the new surfaces for |
 |---|---|---|---|
@@ -191,7 +191,7 @@ Overlay sizes are screen pixels whatever the zoom (`vector-effect: non-scaling-s
 - The middle button, or Space and drag, pans.
 - Touch: one finger on empty canvas pans, two fingers pinch. This is in the code and has not been run on a device.
 
-**Moving one shape moves one shape.** The others hold their place. When the diagram had to shift to make room, the status line says so ("added the actor; 3 other shapes hold their place").
+**Moving one shape moves one shape.** The others hold their place. When the diagram had to shift to make room, the status line says so ("added the actor; 3 others stay put"). The one exception keeps the picture readable: a shape the edit newly crowds is pushed over just far enough, and the status line says "made room: 1 shape moved over" (decision 6).
 
 ### 5.4 Editing text in place
 
@@ -214,9 +214,9 @@ What it shows depends on the selection:
 | Selection | Heading | Fields |
 |---|---|---|
 | nothing | diagram | type, title, id, runs, drawn as; under "more": checked as, narration, described as |
-| one shape | the kind's name | kind, text, id, "stands on the" left or right (actors), attributes and operations (classes), description, inside; place and size (x, y, width, height in inches; "let it find its own place", "fit to its text"); look (fill, color, weight); delete |
-| one line | line | what it means, label, multiplicities and roles, route, sides, reset route, reset label, swap ends; look; delete |
-| several | N selected | align, space evenly, same size, duplicate, delete |
+| one shape | the kind's name | kind, text, id, "stands on the" left or right (actors), attributes and operations (classes), description, inside; place and size (x, y, width, height in inches; "let it find its own place", "fit to its text"); build-up ("shows from step", a whole number, 0 is there from the start; open when the diagram has steps); look (fill, color, weight); delete |
+| one line | line | what it means, label, multiplicities and roles, route, sides, reset route, reset label, swap ends; build-up; look; delete |
+| several | N selected | align, space evenly, same size, build-up (empty with "mixed" when they differ), duplicate, delete |
 
 Rules the panel follows:
 
@@ -241,7 +241,7 @@ If there has never been a good version, the canvas gives way to the empty state 
 
 ## 6. The export dialog
 
-A native `<dialog class="export-dialog">` opened with `showModal()`, labelled by its heading "export". `--page` background, 1.5px `--rule` border, 6px radius. The backdrop is `--ink` at 45%. Two columns (preview 1.5, choices 1); one column under 48rem.
+A native `<dialog class="export-dialog">` opened with `showModal()`, labelled by its heading "export". `--page` background, 1.5px `--rule` border, 6px radius. The backdrop is a veil of `--page` at 78%, which quiets the page behind in light and in dark (an ink veil turned a dark page to fog). Two columns (preview 1.5, choices 1); one column under 48rem.
 
 **The preview is the file.** `.export-preview` shows the same SVG the download will hold, as an image (alt: "the picture this export will save"), on `--page-2` with a dashed `--rule` border. A see-through export is shown on `--page` with a dotted `--accent` border instead (`[data-ground="clear"]`), so it can be told from a white one.
 
@@ -256,10 +256,11 @@ A native `<dialog class="export-dialog">` opened with `showModal()`, labelled by
 | background | white; off-white page; none (see-through); chalkboard |
 | more: space around it | tight; normal; roomy |
 | more: PNG size | 1x; 2x "sharp on slides"; 3x; 4x "print" |
+| more: SVG text | letters "can be searched and retyped; other programs may swap the font"; shapes "looks the same in every program" |
 | more: PDF page | the diagram's own size; US Letter; A4; 16:9 slide |
 | more: which way up | landscape; portrait |
 
-"more" is a `<details>` (`.export-more`). Groups that do not apply to the chosen format are hidden: PNG size for PNG only, PDF page for PDF only, which way up only for a fixed PDF page.
+"more" is a `<details>` (`.export-more`). Groups that do not apply to the chosen format are hidden: PNG size for PNG only, SVG text for SVG only, PDF page for PDF only, which way up only for a fixed PDF page.
 
 Defaults: PNG, 2x, white, normal. Choices are remembered with the workspace.
 
@@ -275,7 +276,7 @@ Each view has one status line (`.play-status.note`, `aria-live="polite"`). It ha
 |---|---|
 | Write | "Use-case diagram, 8 nodes, 5 edges, notation check: pass" with the finding count in brackets and ", layout: N errors" when there are any |
 | Write, text broken | "line N: the parser's message" |
-| Draw | "notation check: pass" with the finding count in brackets |
+| Draw | "notation check: pass" with the finding count in brackets. Under it, when there are findings, "what the check found (N)" opens the list: severity, the problem, the smallest fix, and a "show it" button that selects what the finding is about on the canvas |
 
 Messages are short, lowercase, past tense, and say what happened and what it cost:
 
@@ -285,7 +286,8 @@ Messages are short, lowercase, past tense, and say what happened and what it cos
 | tidy the text | "tidied", "already tidy" |
 | tidy up kept | "tidied (undo puts it back the way you had it)" |
 | tidy up put back | "left as it was" |
-| add a shape | "added the actor; 2 other shapes hold their place" |
+| add a shape | "added the actor; 2 others stay put" |
+| an edit that crowds a neighbour | "connected; made room: 1 shape moved over" |
 | arm a shape | "click the canvas to place the actor (Shift+click keeps placing, Escape stops)" |
 | start a line | "drag to the shape this line goes to" |
 | Tab to a shape | its kind and its text: `actor "Customer"` |
@@ -392,26 +394,31 @@ One exception is known and is listed in section 10.
 
 These are in the code at the checkpoint. They are listed so the owner sees them here, not in the product.
 
-1. **The linked shape in the write figure is marked by color only.** `.play-preview .is-linked` sets fill and stroke to `--accent` and nothing else. The editor side has the bar; the figure side has no second signal.
-2. **One `box-shadow`.** `.cm-linked` in `editor.ts` draws its left bar with `box-shadow: inset 3px 0 0 var(--accent)`. It reads as a border, not a shadow, but it is the property the house rules name. A `border-left` would do the same job.
+1. **Fixed: the linked shape in the write figure was marked by color only.** `.play-preview .is-linked` now also draws a heavier outline and underlines the label.
+2. **Fixed: one `box-shadow`.** `.cm-linked` in `editor.ts` now draws its left bar with `border-left`.
 3. **A check mark character.** The armed palette button uses U+2713 as its second signal. It is a text character, not an icon pack and not an emoji. If it reads wrong beside Kalam, the pen underline would be the in-house alternative.
-4. **Undo keys in Draw need canvas focus.** Mod+Z with focus in the panel or the rail is the browser's own undo for that field, not the session's. The toolbar buttons always work.
-5. **Clicking a finding does not select the shape in Draw.** Findings show in Write (editor and figure). Draw shows only the count in its status line.
+4. **Fixed: undo keys in Draw needed canvas focus.** Mod+Z and Mod+Y now work anywhere in the draw view. In a text field that is being typed in they stay the field's own.
+5. **Fixed: Draw showed only a count of findings.** It now lists them under the status line, and "show it" selects the shapes a finding is about.
 6. **The canvas clipboard is in memory.** Copy and paste work inside Chalk, in one tab. They do not use the system clipboard.
 7. **No keyboard way to draw a line.** A line is made by dragging from a connection dot. The keyboard can place, move, edit and delete shapes, and edit a selected line, but cannot start one. The text is the keyboard's way to add a line.
 8. **Titles name Ctrl.** Button titles say "Ctrl+Z" and so on. The keys also work with Cmd; the titles do not say so.
+9. **Found in the dark and phone review and fixed.** The editor's line numbers had no ground of their own, so long lines ran under them when the editor scrolled sideways. The zoom buttons were 18 px wide (now at least 32). A figure wider than the screen and the reference's long code blocks scrolled sideways without being reachable from the keyboard (they take focus now).
+10. **The draw tab can't start a line from a shape back to itself.** Such lines are written in the text; Draw shows them and can bend, rename and delete them.
 
 ## 11. What was and was not verified
 
 Read from the code and the CSS: every class, string, size and key in this document.
 
-Covered by the browser tests at the checkpoint (78 passing, as recorded in `CONTINUE.MD`; not re-run for this document): the draw canvas driven by real pointer events, the export dialog, and the write view.
+Looked at, on a production build (2026-11-05):
+
+- **Screenshots.** `node scripts/capture-ui.mjs` takes write, draw and the syntax in light and dark at 1440, 820 and 390 px, plus a lanes diagram, a class diagram, a selected shape, a selected line, a linked line in write, a mistake in write, the export dialog and a selected shape on a phone. The 33 images are in `docs/revamp/after/`. Each kind of view was looked at in both themes; that review is what found items 9 and the foggy backdrop.
+- **Browser tests.** 102 passing: the draw canvas driven by real pointer events, the export dialog and its files, save and reopen, refresh and the back button, and the write view.
+- **Accessibility, by machine.** axe-core (WCAG 2.0 to 2.2 A and AA, and best practices) over write, draw with findings open, draw with a selection, the syntax, the export dialog and the embed, in light and dark at 1440 and 390 px. No contrast failures. What it still reports: the code editor's scroller as not focusable (it is: the editor's text takes focus and the arrow keys scroll it), and three page-level notes on the embed (no main landmark, no level-one heading, content outside landmarks) that are about a top-level page, not a figure inside a frame.
 
 Not verified:
 
-- **No screenshots were taken for this document.** After-screenshots come from `node scripts/look.mjs` and are not embedded here. Every description of how something looks is what the CSS says, not what an eye saw.
-- **Dark theme on the new surfaces.** All colors are theme roles, so dark should follow. The draw view and the export dialog were not looked at in dark for this document.
-- **Phone width on the draw view.** The breakpoints are in the CSS (56rem, 48rem, 34rem). How the canvas feels at phone width was not checked.
 - **Touch.** Pan and pinch are in the code. They have not been run on a device.
-- **Accessibility.** Roles, labels, live regions and focus handling are in the code as described. No screen reader pass and no contrast measurement of the new overlay colors (the 28% selection band, the 45% ghost, the 35% marquee) has been done.
+- **A screen reader.** Roles, labels, live regions and focus handling are in the code as described and pass axe. Nobody has listened to it.
+- **Firefox and Safari.** Everything above ran in Chromium.
 - **Reduced motion.** There is one transition and the global rule covers it. Not checked in a browser.
+- **How the 390 px draw view feels.** It works and nothing overlaps, but a diagram fitted into a phone-wide canvas is small (the permit example fits at 25%).

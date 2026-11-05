@@ -167,8 +167,10 @@ exactly as the author wrote it; otherwise that one line is replaced, removed or 
   changes ("that change can't be written as text"). The unit tests compare the re-parsed document
   with the intended one for every edit they make.
 - Every command must have a printer for what it changes.
-- Known limits (`CONTINUE.MD`): build-up steps cannot be edited from Draw; reorder exists only for
-  containers.
+- Build-up steps are edited from Draw the same way: a statement whose step changed gets a `step` line
+  before it and the step that was in force is put back after it; step lines left doing nothing are
+  dropped. A new shape still joins the step in force where its line is inserted.
+- Known limit: reorder exists only for containers.
 
 ## 4. One session and one undo history
 
@@ -199,8 +201,9 @@ the text, the last valid document parsed from it, its resolved geometry, and a s
 - Ctrl+Z in either view can undo an edit made in the other. A whole drag is one step.
 - Opening a file, a link or a template goes through `setText()` with its own label, so undo brings
   back what was there.
-- Known problem: Draw's undo keys work only while the canvas has the focus. After a click in the
-  properties panel, Ctrl+Z does nothing until the canvas is focused again.
+- The undo keys work anywhere in the draw view, not only on the canvas. A text field that is being
+  typed in keeps them for its own text. When a control goes away with the edit it made (a deleted
+  shape's "delete"), the canvas takes the focus.
 
 ## 5. Invalid text never blanks the figure, and makes Draw read-only
 
@@ -548,8 +551,8 @@ close.
 - Gaps today (`CONTINUE.MD`): pinch zoom and one-finger pan are written but have never been run on
   a touch device; no minimap; no generic grouping and no bring-forward or send-back (skipped on
   purpose: containment is the grouping these diagram types have, and shapes do not overlap); the
-  clipboard is in memory (`Canvas.clip`), not the system's; horizontal lanes have had no pointer
-  testing; accessibility has not been audited.
+  clipboard is in memory (`Canvas.clip`), not the system's. Horizontal lanes have a pointer test now, and accessibility has had
+  a machine audit (`TEST_MATRIX.md`).
 - This is the largest unreviewed decision in the revival.
 
 **Open question for the owner.** Is the purpose-built canvas acceptable, or should React Flow be
