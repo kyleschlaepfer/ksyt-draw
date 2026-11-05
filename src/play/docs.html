@@ -1,5 +1,7 @@
 <!-- The syntax reference. Static, authored content: no diagram text ever lands here.
-     House rules: no em dashes, sequential headings, Kalam for headings, body text in Atkinson. -->
+     House rules: no em dashes, sequential headings, Kalam for headings, body text in Atkinson.
+     test/docs.test.ts parses every example: a block that starts with "diagram" must be a clean file,
+     and a fragment marked data-ksd="<type>" must parse inside a diagram of that type. -->
 <nav class="docs-toc" aria-label="on this page">
   <p class="note">on this page</p>
   <ol>
@@ -8,9 +10,13 @@
     <li><a href="#d-nodes">nodes</a></li>
     <li><a href="#d-labels">ids, labels and options</a></li>
     <li><a href="#d-boundary">boundaries</a></li>
+    <li><a href="#d-lanes">partitions (swimlanes)</a></li>
     <li><a href="#d-edges">edges</a></li>
+    <li><a href="#d-classes">classes</a></li>
+    <li><a href="#d-describe">use-case descriptions</a></li>
     <li><a href="#d-steps">build-up steps</a></li>
-    <li><a href="#d-examples">three complete examples</a></li>
+    <li><a href="#d-layout-block">the layout block</a></li>
+    <li><a href="#d-examples">five complete examples</a></li>
     <li><a href="#d-good">writing a diagram that teaches</a></li>
     <li><a href="#d-check">the notation check</a></li>
     <li><a href="#d-layout">the layout check</a></li>
@@ -44,9 +50,10 @@ notify -&gt; done</code></pre>
   <p><button type="button" class="btn-quiet" data-example="flowchart">load this in the playground</button></p>
   <ul>
     <li>One statement per line. Blank lines are ignored. A line starting with <code>#</code> is a comment.</li>
-    <li>Leading and trailing spaces don't matter, so indent however you like. Indenting the inside of a boundary is a habit, not a rule.</li>
+    <li>Leading and trailing spaces don't matter, so indent however you like. Indenting the inside of a block is a habit, not a rule.</li>
     <li>Header lines come first, then nodes and edges in any order. Once the first node or edge appears, header words stop being special.</li>
-    <li>The parser is strict on purpose. A line it can't read stops the whole diagram and tells you the line number, so a typo never becomes a wrong picture.</li>
+    <li>Some things open a block: a line ending in <code>{</code>, then the lines inside, then <code>}</code> on its own line. Boundaries, partitions, classes with members, use-case descriptions and the layout block all work this way.</li>
+    <li>The parser is strict on purpose. A line it can't read is an error, never a guess. The playground marks every bad line and keeps showing the last version that could be read, so a typo never becomes a wrong picture.</li>
   </ul>
 </section>
 
@@ -56,13 +63,15 @@ notify -&gt; done</code></pre>
   <table class="table">
     <thead><tr><th>line</th><th>required</th><th>what it does</th></tr></thead>
     <tbody>
-      <tr><td><code>diagram flowchart</code><br><code>diagram activity</code><br><code>diagram use-case</code></td><td>yes, first line</td><td>The kind of diagram you claim to be drawing. The notation check grades against this claim, so a use-case diagram that is really a flow gets called out rather than quietly redrawn.</td></tr>
+      <tr><td><code>diagram flowchart</code><br><code>diagram activity</code><br><code>diagram use-case</code><br><code>diagram class</code></td><td>yes, first line</td><td>The kind of diagram you claim to be drawing. The notation check grades against this claim, so a use-case diagram that is really a flow gets called out rather than quietly redrawn.</td></tr>
       <tr><td><code>title &lt;text&gt;</code></td><td>yes</td><td>What the figure shows: its finding, not its topic. "After review, a request takes exactly one of two paths" beats "Approval process". It becomes the SVG title, the default iframe title, and the first thing a screen reader announces.</td></tr>
       <tr><td><code>id &lt;slug&gt;</code></td><td>no (default <code>diagram</code>)</td><td>A name for this diagram: letters, digits, <code>-</code> and <code>_</code>, starting with a letter. It prefixes every element's wobble seed, so two diagrams with different ids never share stroke shapes, and it names the downloaded SVG.</td></tr>
-      <tr><td><code>profile strict-uml</code><br><code>profile uml-inspired</code><br><code>profile general-diagram</code></td><td>no</td><td>How strictly UML rules apply. Flowcharts default to <code>general-diagram</code>; activity and use-case diagrams default to <code>uml-inspired</code>. <code>strict-uml</code> raises some findings a level (a directed association becomes major, a missing initial node becomes minor); <code>general-diagram</code> skips the UML-only rules entirely.</td></tr>
+      <tr><td><code>profile strict-uml</code><br><code>profile uml-inspired</code><br><code>profile general-diagram</code></td><td>no</td><td>How strictly UML rules apply. Flowcharts default to <code>general-diagram</code>; activity, use-case and class diagrams default to <code>uml-inspired</code>. <code>strict-uml</code> raises some findings a level (a directed association becomes major, a missing initial node becomes minor); <code>general-diagram</code> skips the UML-only rules entirely.</td></tr>
       <tr><td><code>desc &lt;text&gt;</code></td><td>no</td><td>The text alternative, written the way you'd describe the picture to someone who can't see it. When it's missing, one is generated from the structure. Either way it appears under "describe this figure".</td></tr>
       <tr><td><code>narration &lt;text&gt;</code></td><td>no, repeatable</td><td>The words this diagram goes with in the lesson. Several <code>narration</code> lines are joined with a space. The notation check reads it: "either" and "depending on" mean a choice, "at the same time" and "in parallel" mean a fork, and "X includes Y" settles which way an «include» should point.</td></tr>
-      <tr><td><code>direction down</code><br><code>direction right</code></td><td>no (default <code>down</code>)</td><td>Which way a flowchart or activity diagram runs. On a phone, a right-running flow switches to top-down by itself when its labels would get too small. Use-case diagrams ignore this.</td></tr>
+      <tr><td><code>direction down</code><br><code>direction right</code></td><td>no (default <code>down</code>)</td><td>Which way a flowchart, an activity diagram or a class diagram runs. On a phone, a right-running figure switches to top-down by itself when its labels would get too small. Use-case diagrams ignore this. When the diagram has partitions, the lanes decide instead (see the next line).</td></tr>
+      <tr><td><code>lanes vertical</code><br><code>lanes horizontal</code></td><td>no</td><td>Which way partitions run. <code>vertical</code> makes the lanes columns, with the flow running down. <code>horizontal</code> makes them rows, with the flow running right. Without this line, <code>direction down</code> gives columns and <code>direction right</code> gives rows. It does nothing in a diagram with no partitions.</td></tr>
+      <tr><td><code>look sketch</code><br><code>look precision</code></td><td>no (default <code>sketch</code>)</td><td>How the figure is drawn. <code>sketch</code> is the pen style of the videos. <code>precision</code> is crisp lines and the prose font, for reports. Every position, size and route is the same in both. An embed link or an export can ask for the other look without changing the file.</td></tr>
       <tr><td><code>legend &lt;text&gt;</code></td><td>no</td><td>Says what your arrows mean when you deliberately use one stroke for two meanings. It silences the mixed-meaning rule; it doesn't draw anything.</td></tr>
     </tbody>
   </table>
@@ -71,7 +80,7 @@ notify -&gt; done</code></pre>
 
 <section id="d-nodes">
   <h2>nodes</h2>
-  <pre><code>&lt;kind&gt; &lt;id&gt; ["label"] [left|right] [at X Y]</code></pre>
+  <pre><code>&lt;kind&gt; &lt;id&gt; ["label"] [left|right] [at X Y] [size W H]</code></pre>
   <p>Kind, then a unique id, then an optional quoted label and options. Which kinds are available depends on the diagram type.</p>
   <h3>flowchart</h3>
   <table class="table">
@@ -98,6 +107,7 @@ notify -&gt; done</code></pre>
       <tr><td><code>fork</code>, <code>join</code></td><td>a thick bar. A fork splits into paths that all happen; a join waits for all of them</td><td>none</td></tr>
     </tbody>
   </table>
+  <p>The kinds with no default label are drawn without text, so a label written on one is not shown.</p>
   <h3>use-case</h3>
   <table class="table">
     <thead><tr><th>kind</th><th>drawn as</th><th>default label</th></tr></thead>
@@ -106,6 +116,15 @@ notify -&gt; done</code></pre>
       <tr><td><code>use-case</code> (or <code>usecase</code>)</td><td>an ellipse with a verb phrase inside</td><td>the id, as words</td></tr>
     </tbody>
   </table>
+  <h3>class</h3>
+  <table class="table">
+    <thead><tr><th>kind</th><th>drawn as</th><th>default label</th></tr></thead>
+    <tbody>
+      <tr><td><code>class</code></td><td>a box with the name at the top, then the attributes, then the operations</td><td>the id, as typed</td></tr>
+      <tr><td><code>interface</code></td><td>the same box with «interface» above the name</td><td>the id, as typed</td></tr>
+    </tbody>
+  </table>
+  <p>These two have a line format of their own, with members inside a block. See <a href="#d-classes">classes</a>.</p>
   <h3>any diagram</h3>
   <table class="table">
     <thead><tr><th>kind</th><th>drawn as</th><th>default label</th></tr></thead>
@@ -113,7 +132,7 @@ notify -&gt; done</code></pre>
       <tr><td><code>note</code></td><td>graphite handwriting with no box around it</td><td>the id, as words</td></tr>
     </tbody>
   </table>
-  <p>Mixing kinds across families (a <code>process</code> in a use-case diagram, say) is allowed by the parser and reported by the notation check, because sometimes the lesson is about the mistake.</p>
+  <p>Mixing kinds across families (a <code>process</code> in a use-case diagram, say) is allowed by the parser and reported by the notation check, because sometimes the lesson is about the mistake. Two things are not allowed: <code>class</code> and <code>interface</code> only exist in class diagrams, and <code>start</code> and <code>end</code> don't exist in use-case or class diagrams.</p>
 </section>
 
 <section id="d-labels">
@@ -121,7 +140,7 @@ notify -&gt; done</code></pre>
   <h3>ids</h3>
   <ul>
     <li>A letter, then letters, digits, <code>-</code> or <code>_</code>: <code>review</code>, <code>pay-fee</code>, <code>step_2</code>.</li>
-    <li>Unique within the file, boundaries included. A repeat is an error, not a replacement, because ids are also what the strokes are seeded from.</li>
+    <li>Unique within the file, boundaries, partitions and classes included. A repeat is an error, not a replacement, because ids are also what the strokes are seeded from.</li>
     <li>Ids are what edges refer to, so keep them short and typeable. The label is what the reader sees.</li>
   </ul>
   <h3>labels</h3>
@@ -129,7 +148,7 @@ notify -&gt; done</code></pre>
     <li>Double quotes: <code>action pay "pay the fee"</code>.</li>
     <li><code>\n</code> breaks a line inside a node: <code>process check "check the\npaperwork"</code>.</li>
     <li><code>\"</code> puts a quote inside a label; <code>\\</code> is a backslash.</li>
-    <li>Leave the label off and the id becomes the label with <code>-</code> and <code>_</code> turned into spaces: <code>action order-laptop</code> reads "order laptop".</li>
+    <li>Leave the label off and the id becomes the label with <code>-</code> and <code>_</code> turned into spaces: <code>action order-laptop</code> reads "order laptop". A class keeps its id exactly as typed.</li>
     <li>No em dashes.</li>
   </ul>
   <h3>options after the label</h3>
@@ -137,17 +156,19 @@ notify -&gt; done</code></pre>
     <thead><tr><th>option</th><th>meaning</th></tr></thead>
     <tbody>
       <tr><td><code>left</code> or <code>right</code></td><td>Which side of the system an actor stands on. Default <code>left</code>. Only actors use it.</td></tr>
-      <tr><td><code>at X Y</code></td><td>Pin the node's center at X, Y inches, overriding the automatic layout for that node only. Edges touching a pinned node run straight. This is how the draw tab saves a drag, so a placed node is still just text.</td></tr>
+      <tr><td><code>at X Y</code></td><td>Pin the node's center at X, Y inches, overriding the automatic layout for that node only. A <code>place</code> line in <a href="#d-layout-block">the layout block</a> does the same from the end of the file, and that is where the draw tab saves a drag. A node that already has <code>at</code> on its own line keeps it there.</td></tr>
+      <tr><td><code>size W H</code></td><td>Fix the node's width and height in inches instead of sizing it to its text. Both must be above zero. The label wraps inside. A <code>size</code> line in the layout block does the same.</td></tr>
     </tbody>
   </table>
-  <pre><code>actor clerk "Permit clerk" right
-process review "review request" at 4 2.5</code></pre>
+  <pre data-ksd="use-case"><code>actor clerk "Permit clerk" right
+process review "review request" at 4 2.5
+process file "file the form" at 4 4 size 2.2 0.8</code></pre>
 </section>
 
 <section id="d-boundary">
   <h2>boundaries</h2>
   <p>A use-case diagram puts its use cases inside the system they belong to. A <code>boundary</code> line opens a block: an id, the system's name in quotes, an opening brace, then the use cases, then a closing brace on its own line.</p>
-  <pre><code>boundary portal "Permit portal" {
+  <pre data-ksd="use-case"><code>boundary portal "Permit portal" {
   use-case apply "apply for permit"
   use-case pay "pay fee"
 }</code></pre>
@@ -157,6 +178,51 @@ process review "review request" at 4 2.5</code></pre>
     <li>Actors go outside. The parser will let you put one inside, and the notation check reports it (<code>UC-ACTOR-INSIDE</code>), which is the right behavior when the lesson is about why actors go outside.</li>
     <li>A use case left outside any boundary draws in a column to the right of it and is reported (<code>UC-OUTSIDE-BOUNDARY</code>).</li>
   </ul>
+</section>
+
+<section id="d-lanes">
+  <h2>partitions (swimlanes)</h2>
+  <p>An activity diagram can say who does each step. A <code>partition</code> line opens a block, written like a boundary: an id, the participant's name in quotes, an opening brace, the nodes that participant does, then a closing brace on its own line. Each partition is drawn as a lane with its name in a header.</p>
+  <pre data-ksd="activity"><code>partition customer "Customer" {
+  start begin
+  action place "place order"
+}
+partition sales "Sales" {
+  action check "check payment"
+  end done
+}
+
+begin -&gt; place
+place -&gt; check
+check -&gt; done</code></pre>
+  <ul>
+    <li><code>lane</code> and <code>swimlane</code> mean the same as <code>partition</code>. Tidy writes <code>partition</code>.</li>
+    <li>Partitions belong to activity diagrams and flowcharts. In a use-case or class diagram they are an error.</li>
+    <li>Lanes are drawn in file order. Where a node is declared decides its lane; edges can go anywhere in the file and cross lanes freely.</li>
+    <li>One level only. A partition can't hold another partition or a boundary, and a boundary can't hold a partition.</li>
+    <li>The partition's id counts as an id, so no node can reuse it.</li>
+    <li>Once a diagram has partitions, every node belongs in one. The check reports a node left outside (<code>ACT-PARTITION-OUTSIDE</code>; notes are let off), a lane with nothing in it (<code>ACT-PARTITION-EMPTY</code>) and a diagram with a single lane (<code>ACT-PARTITION-SINGLE</code>).</li>
+    <li>How wide a lane is and where the lanes start can be set in <a href="#d-layout-block">the layout block</a>, which is where the draw tab saves a dragged lane divider.</li>
+  </ul>
+  <h3>lanes as rows</h3>
+  <p>Lanes run along the flow. By default that means columns, read top to bottom. A <code>lanes horizontal</code> line in the header turns them into rows, read left to right.</p>
+  <pre><code>diagram activity
+id file-form
+title The clerk only files a form the resident has signed
+lanes horizontal
+
+partition resident "Resident" {
+  start begin
+  action sign "sign form"
+}
+partition clerk "Clerk" {
+  action file "file form"
+  end done
+}
+
+begin -&gt; sign
+sign -&gt; file
+file -&gt; done</code></pre>
 </section>
 
 <section id="d-edges">
@@ -173,22 +239,167 @@ process review "review request" at 4 2.5</code></pre>
       <tr><td><code>a ..&gt; b</code></td><td>a proposed or hypothetical path, as opposed to what actually happens</td><td>dashed arrow</td></tr>
     </tbody>
   </table>
+  <p>That table is for flowcharts, activity diagrams and use-case diagrams. Between classes the same strokes mean class relationships, and there are more of them: see <a href="#d-classes">classes</a>. <code>-include-&gt;</code> and <code>-extend-&gt;</code> are an error in a class diagram, and the class-only operators are an error everywhere else.</p>
   <h3>branch labels</h3>
   <p>Anything after a colon is the edge's label. Every exit from a decision needs one; the check won't pass a diamond with an unlabeled branch.</p>
-  <pre><code>ok -&gt; schedule : yes
+  <pre data-ksd="flowchart"><code>ok -&gt; schedule : yes
 ok -&gt; notify : no
 checked -&gt; refund : [approved]</code></pre>
   <p>Flowcharts say <code>yes</code> and <code>no</code>; activity diagrams use guards in square brackets. Labels sit beside the line, never on it, and move to the other side by themselves if something is in the way.</p>
   <h3>edge ids</h3>
   <p>Edges are numbered <code>e1</code>, <code>e2</code>, ... in file order. You'll see those ids in findings ("edge e2") and as <code>data-name</code> on the SVG groups.</p>
   <h3>edges to nothing</h3>
-  <p>An edge whose end names an id that was never declared is kept, not dropped: the parser adds a warning, the notation check reports <code>STRUCT-DANGLING-EDGE</code>, and the drawing skips it. Again, that's so a lesson can show the mistake.</p>
+  <p>An edge whose end names an id that was never declared is kept, not dropped: the parser adds a warning (<code>PARSE-UNKNOWN-NODE</code>), the notation check reports <code>STRUCT-DANGLING-EDGE</code>, and the drawing skips it. Again, that's so a lesson can show the mistake.</p>
+</section>
+
+<section id="d-classes">
+  <h2>classes</h2>
+  <p>A class diagram (<code>diagram class</code>) shows what things are made of and how they relate. Its nodes are classes and interfaces, and their lines carry a little more than other nodes do.</p>
+  <pre><code>[abstract] class|interface &lt;id&gt; ["label"] [&lt;&lt;stereotype&gt;&gt;] [at X Y] [size W H] [{]</code></pre>
+  <pre data-ksd="class"><code>class Square
+class Circle {
+  -radius: float
+  +area(): float
+}
+interface Drawable {
+  +draw(canvas: Canvas): void
+}
+abstract class Shape {
+  #origin: Point
+  +area(): float {abstract}
+}
+class Repo "Order repository" &lt;&lt;service&gt;&gt;</code></pre>
+  <ul>
+    <li><code>class</code> or <code>interface</code>, then an id. The id is the name on the box, exactly as typed: <code>LineItem</code> stays "LineItem". A quoted label after the id replaces it.</li>
+    <li><code>abstract</code> in front marks an abstract class. It is drawn with {abstract} under the name.</li>
+    <li>A stereotype goes after the label as <code>&lt;&lt;service&gt;&gt;</code>, or with real guillemets as «service», and is drawn above the name. Tidy writes the first spelling. An interface always shows «interface» there, so a stereotype of its own is kept in the text but not drawn.</li>
+    <li>A class with members ends its line with <code>{</code>, lists one member per line, and closes with <code>}</code> on its own line. A class without members is just its line, with no braces at all.</li>
+    <li><code>at X Y</code> and <code>size W H</code> work as on any node. <code>left</code> and <code>right</code> don't apply.</li>
+    <li>A <code>note</code> works here as in any diagram.</li>
+  </ul>
+
+  <h3>members</h3>
+  <pre><code>[+|-|#|~] &lt;name&gt;[: Type] [{static}] [{abstract}]
+[+|-|#|~] &lt;name&gt;(parameters)[: Type] [{static}] [{abstract}]</code></pre>
+  <p>The first form is an attribute, the second an operation; the parentheses make the difference. Attributes are drawn in the upper compartment and operations in the lower one, each in file order.</p>
+  <table class="table">
+    <thead><tr><th>mark</th><th>visibility</th></tr></thead>
+    <tbody>
+      <tr><td><code>+</code></td><td>public</td></tr>
+      <tr><td><code>-</code></td><td>private</td></tr>
+      <tr><td><code>#</code></td><td>protected</td></tr>
+      <tr><td><code>~</code></td><td>package</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li>The mark is optional. A member without one is drawn without one.</li>
+    <li>The name is one word. The type is whatever follows the colon, kept as written, so <code>-total: Money = 0</code> carries its default value along.</li>
+    <li>The parameters are whatever sits between the parentheses, kept as written: <code>+pay(amount: Money): Receipt</code>.</li>
+    <li><code>{static}</code> underlines the member. <code>{abstract}</code> is drawn after it. Either can be written before or after the member; tidy puts them at the end.</li>
+    <li>A space after the mark is fine (<code>+ name: String</code>), with one exception. A line that starts with <code>#</code> and a space is still a comment, so write a protected member tight: <code>#origin: Point</code>.</li>
+    <li>No em dashes.</li>
+  </ul>
+
+  <h3>relationships</h3>
+  <table class="table">
+    <thead><tr><th>write</th><th>meaning</th><th>drawn as</th></tr></thead>
+    <tbody>
+      <tr><td><code>a -- b</code></td><td>association: instances of a and b are linked</td><td>plain line</td></tr>
+      <tr><td><code>a --&gt; b</code> or <code>a -&gt; b</code></td><td>directed association: linked, and navigable toward b</td><td>plain line with an open arrowhead at b</td></tr>
+      <tr><td><code>a --|&gt; b</code></td><td>generalization: a is a kind of b. The triangle points at the parent</td><td>solid line with a hollow triangle at b</td></tr>
+      <tr><td><code>a ..|&gt; b</code></td><td>realization: a implements the interface b</td><td>dashed line with a hollow triangle at b</td></tr>
+      <tr><td><code>a o-- b</code></td><td>aggregation: a is a whole and b is one of its parts. The diamond sits on the whole</td><td>line with a hollow diamond at a</td></tr>
+      <tr><td><code>a *-- b</code></td><td>composition: b is a part that lives and dies with a</td><td>line with a filled diamond at a</td></tr>
+      <tr><td><code>a ..&gt; b</code></td><td>dependency: a uses b without holding a link to it</td><td>dashed line with an open arrowhead at b</td></tr>
+    </tbody>
+  </table>
+  <p>Four of these can be written from the other end. They mean the same with the ends swapped, and tidy rewrites them in the form above:</p>
+  <table class="table">
+    <thead><tr><th>write</th><th>same as</th></tr></thead>
+    <tbody>
+      <tr><td><code>a &lt;|-- b</code></td><td><code>b --|&gt; a</code>: b is a kind of a</td></tr>
+      <tr><td><code>a &lt;|.. b</code></td><td><code>b ..|&gt; a</code>: b implements a</td></tr>
+      <tr><td><code>a --o b</code></td><td><code>b o-- a</code>: b is the whole</td></tr>
+      <tr><td><code>a --* b</code></td><td><code>b *-- a</code>: b is the whole</td></tr>
+    </tbody>
+  </table>
+  <p>The automatic layout puts a parent ahead of its children (above them, when the diagram runs down) whichever way the line was written. A label after a colon names the relationship, as on any edge.</p>
+
+  <h3>multiplicities and role names</h3>
+  <p>Quoted text between an end and the operator belongs to that end. It says how many, what the end is called in the relationship, or both.</p>
+  <pre data-ksd="class"><code>Customer "1" -- "0..*" Order : places
+Order "1" *-- "1..* items" LineItem
+Team "0..1 lead" --&gt; "1" Person</code></pre>
+  <ul>
+    <li>A multiplicity is <code>*</code>, a number, or a range: <code>1</code>, <code>0..1</code>, <code>1..*</code>, <code>2..5</code>.</li>
+    <li>Words after the multiplicity are the role name: <code>"1..* items"</code>. Text that doesn't start with a multiplicity is all role name: <code>"owner"</code>.</li>
+    <li>The multiplicity is drawn on one side of the line's end and the role name on the other.</li>
+    <li>Either end can go without. The check asks for a multiplicity at both ends of every association (<code>CLASS-MULTIPLICITY</code>), because the story usually depends on how many.</li>
+    <li>Only class diagrams have these. Anywhere else they are an error.</li>
+  </ul>
+</section>
+
+<section id="d-describe">
+  <h2>use-case descriptions</h2>
+  <p>A use case can carry its written description: the goal, who starts it, the steps. A <code>describe</code> block holds it. Nothing in the block is drawn. It travels with the diagram, the draw tab shows it in the properties panel, and the check compares it with the picture.</p>
+  <pre><code>diagram use-case
+id permit-apply
+title A resident applies for a permit, and paying the fee is always part of it
+narration Apply for permit includes pay fee.
+
+actor resident "Resident"
+actor bank "Payment provider" right
+boundary portal "Permit portal" {
+  use-case apply "apply for permit"
+  use-case pay "pay fee"
+}
+
+resident -- apply
+bank -- pay
+apply -include-&gt; pay
+
+describe apply {
+  goal Get a permit without a visit to the office
+  primary resident
+  supporting Payment provider
+  trigger The resident opens the permit form
+  pre The resident has an account
+  main 1. The resident fills in the form
+  main 2. The resident pays the fee
+  main 3. The portal confirms the application
+  alt 2a. The payment fails: the portal keeps the form as a draft
+  post The application is waiting for review
+  related pay (include)
+}</code></pre>
+  <p>Each line inside is a field word, then text to the end of the line, with no quotes.</p>
+  <table class="table">
+    <thead><tr><th>field</th><th>how many</th><th>what it holds</th></tr></thead>
+    <tbody>
+      <tr><td><code>goal</code></td><td>one</td><td>what the actor wants out of it</td></tr>
+      <tr><td><code>primary</code></td><td>one</td><td>the actor who starts the use case, by id or by label. The check looks for that actor in the diagram and for its association with this use case (<code>UC-DESCRIBE-PRIMARY</code>)</td></tr>
+      <tr><td><code>supporting</code></td><td>one line each</td><td>another actor that takes part</td></tr>
+      <tr><td><code>trigger</code></td><td>one</td><td>the event that starts it. It shouldn't also appear as a <code>pre</code> line (<code>UC-DESCRIBE-TRIGGER</code>)</td></tr>
+      <tr><td><code>pre</code></td><td>one line each</td><td>something that already holds before it starts</td></tr>
+      <tr><td><code>main</code></td><td>one line each</td><td>a step of the main success scenario. Number the steps yourself. A description without any gets a suggestion (<code>UC-DESCRIBE-MAIN</code>)</td></tr>
+      <tr><td><code>alt</code></td><td>one line each</td><td>an alternative or an exception to a step</td></tr>
+      <tr><td><code>post</code></td><td>one line each</td><td>something that is true afterwards</td></tr>
+      <tr><td><code>related</code></td><td>one line each</td><td>another use case and how it relates</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li>Every field is optional and they can come in any order. Lines of the same field keep their order.</li>
+    <li>A field that takes one value and is written twice keeps the last one.</li>
+    <li>A field word needs text after it.</li>
+    <li>The block goes after the line that declares its use case, names a use case and nothing else, and each use case gets one block at most.</li>
+    <li>Only use-case diagrams have <code>describe</code>.</li>
+    <li>No em dashes.</li>
+  </ul>
 </section>
 
 <section id="d-steps">
   <h2>build-up steps</h2>
   <p>A diagram can reveal itself one click at a time, the way a slide builds while someone talks. Put a <code>step &lt;n&gt;</code> line in the file and everything after it, nodes and edges alike, belongs to that step until the next <code>step</code> line. Everything before the first <code>step</code> line is step 0 and is always shown.</p>
-  <pre><code>start begin
+  <pre data-ksd="activity"><code>start begin
 action accept "accept offer"
 begin -&gt; accept
 
@@ -214,11 +425,85 @@ first -&gt; done</code></pre>
     <li>Give each step one idea, in the order the narration introduces them. Steps are for when the order of parts is the lesson. A diagram said all at once doesn't need them.</li>
     <li>Step numbers don't have to be consecutive, but the controls count the highest one, so gaps just make empty clicks.</li>
     <li>Nothing ever advances by itself.</li>
+    <li>Steps are written here, in the text. The draw tab keeps them but doesn't change them.</li>
   </ul>
 </section>
 
+<section id="d-layout-block">
+  <h2>the layout block</h2>
+  <p>Everything so far says what the diagram means, and where things sit is worked out for you. When you move, resize, reroute or restyle something in the draw tab, that one choice is written as a line in a <code>layout</code> block at the end of the file. So the text is still the whole diagram: a link, an embed and a saved file all carry the arrangement.</p>
+  <pre><code>diagram flowchart
+id manual
+title A draft is reviewed and either published or sent back
+start begin
+process draft "write draft"
+decision ok "ready?"
+process publish "publish"
+end done
+
+begin -&gt; draft
+draft -&gt; ok
+ok -&gt; publish : yes
+ok -&gt; draft : no
+publish -&gt; done
+
+# layout: written by the draw view. Delete a line to hand that part back to automatic layout.
+layout {
+  place publish 3.4 3.2
+  size publish 1.8 0.7
+  place done 3.4 4.5
+  route ok -&gt; draft elbow from left to left via -0.9 3.03, -0.9 1.6
+  style ok -&gt; publish color accent weight bold
+  style publish fill wash
+}</code></pre>
+  <ul>
+    <li>The draw tab writes this block and keeps it current. You can edit it by hand; you rarely need to.</li>
+    <li>Delete a line and that one thing goes back to automatic layout. Delete the whole block and the whole diagram does.</li>
+    <li>Anything the block doesn't name is still placed for you.</li>
+    <li>It opens with <code>layout {</code> and closes with <code>}</code> on its own line, and it can't sit inside another block.</li>
+    <li>Numbers are inches, with decimals. X runs right and Y runs down.</li>
+    <li>A line that names something the file doesn't declare is kept, with a warning (<code>LAYOUT-UNKNOWN-REF</code>), and does nothing. Renaming a node by hand never breaks the file.</li>
+  </ul>
+
+  <h3>lines about nodes</h3>
+  <table class="table">
+    <thead><tr><th>line</th><th>meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>place &lt;id&gt; X Y</code></td><td>Pin the node's center at X, Y. The same as <code>at X Y</code> on the node's own line; a node takes one or the other, once.</td></tr>
+      <tr><td><code>size &lt;id&gt; W H</code></td><td>The node's width and height, in place of the size its text asks for. Both above zero.</td></tr>
+      <tr><td><code>style &lt;id&gt; [fill F] [color C] [weight W]</code></td><td>How the node is drawn. At least one of the three. <code>fill</code> is <code>none</code> (see-through), <code>page</code> (the page color, the default) or <code>wash</code> (a pale tint). <code>color</code> and <code>weight</code> are listed below.</td></tr>
+      <tr><td><code>lane &lt;id&gt; &lt;thickness&gt;</code></td><td>A partition's thickness across the flow: the width of a column lane, the height of a row lane. Above zero. Without it the lane is as thick as its contents need.</td></tr>
+      <tr><td><code>pool [at X Y] [length L]</code></td><td>The lanes as a group. <code>at</code> is the corner where the first lane starts. <code>length</code> is how far the lanes run along the flow, at least; they still grow to hold what is in them.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>lines about edges</h3>
+  <table class="table">
+    <thead><tr><th>line</th><th>meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>route a -&gt; b straight|elbow [from &lt;side&gt;] [to &lt;side&gt;] [via X Y, X Y]</code></td><td>The edge's path. <code>straight</code> runs point to point; <code>elbow</code> runs in right-angled segments. <code>from</code> and <code>to</code> say which side of each node it leaves and arrives at: <code>top</code>, <code>right</code>, <code>bottom</code> or <code>left</code>. <code>via</code> lists the points it passes through, separated by commas, and comes last.</td></tr>
+      <tr><td><code>label a -&gt; b &lt;t&gt; &lt;dx&gt; &lt;dy&gt;</code></td><td>Where the edge's label sits: <code>t</code> is how far along the path, from 0 at the start to 1 at the end, and <code>dx</code>, <code>dy</code> move it off that point, in inches.</td></tr>
+      <tr><td><code>style a -&gt; b [color C] [weight W]</code></td><td>How the edge is drawn. At least one of the two.</td></tr>
+    </tbody>
+  </table>
+  <p>Colors are the theme's pens, never a hex value, so a styled diagram still follows light and dark: <code>ink</code> (the default), <code>ink-2</code> (graphite), <code>accent</code>, <code>accent-strong</code> and <code>terra</code>. Weights are <code>thin</code>, <code>normal</code> and <code>bold</code>.</p>
+
+  <h3>naming an edge</h3>
+  <p>A layout line points at an edge by writing it again: its two ends and its operator, without the label. When several edges join the same two nodes with the same operator, <code>#2</code> after the ends picks the second one in file order, <code>#3</code> the third.</p>
+  <pre data-ksd="flowchart"><code>process a
+process b
+a -&gt; b : first try
+a -&gt; b : second try
+
+layout {
+  route a -&gt; b #2 elbow from right to right
+  label a -&gt; b 0.5 -0.6 0
+}</code></pre>
+  <p>The first line routes the second edge around the right-hand side. The second moves the first edge's label to the left of the middle of its line.</p>
+</section>
+
 <section id="d-examples">
-  <h2>three complete examples</h2>
+  <h2>five complete examples</h2>
   <h3>a flowchart with a decision</h3>
   <pre><code>diagram flowchart
 id approval
@@ -272,6 +557,41 @@ first -&gt; done</code></pre>
   <p><button type="button" class="btn-quiet" data-example="activity">load this in the playground</button></p>
   <p>Change "at the same time" in the narration to "either orders the laptop or prints the badge" and the check will flag the fork: a fork means both happen.</p>
 
+  <h3>an activity diagram with swimlanes</h3>
+  <pre><code>diagram activity
+id order-lanes
+title The warehouse only ships after the customer's payment clears
+narration The customer places an order and pays. Sales checks the payment. If it clears, the warehouse packs and ships the order; otherwise sales cancels it.
+
+partition customer "Customer" {
+  start begin
+  action place "place order"
+  action pay "pay"
+  end done
+}
+partition sales "Sales" {
+  action check "check payment"
+  decision cleared "payment cleared?"
+  action cancel "cancel order"
+  flow-final stop
+}
+partition warehouse "Warehouse" {
+  action pack "pack order"
+  action ship "ship order"
+}
+
+begin -&gt; place
+place -&gt; pay
+pay -&gt; check
+check -&gt; cleared
+cleared -&gt; pack : [yes]
+cleared -&gt; cancel : [no]
+cancel -&gt; stop
+pack -&gt; ship
+ship -&gt; done</code></pre>
+  <p><button type="button" class="btn-quiet" data-example="lanes">load this in the playground</button></p>
+  <p>Move the <code>action pack</code> line below the last closing brace and the check reports <code>ACT-PARTITION-OUTSIDE</code>: a step outside every lane has no owner.</p>
+
   <h3>a use-case diagram with include and extend</h3>
   <pre><code>diagram use-case
 id permit-portal
@@ -295,16 +615,49 @@ apply -include-&gt; pay
 waiver -extend-&gt; pay</code></pre>
   <p><button type="button" class="btn-quiet" data-example="use-case">load this in the playground</button></p>
   <p>Swap the include line to <code>pay -include-&gt; apply</code> and the check reports <code>UC-INCLUDE-DIRECTION</code> with high confidence, because the narration says which way it goes.</p>
+
+  <h3>a class diagram with an interface and inheritance</h3>
+  <pre><code>diagram class
+id shapes
+title Every shape can report its area; circles and rectangles are kinds of shape
+
+interface Drawable {
+  +draw(canvas: Canvas): void
+}
+abstract class Shape {
+  #origin: Point
+  +area(): float {abstract}
+  +moveTo(p: Point): void
+}
+class Circle {
+  -radius: float
+  +area(): float
+}
+class Rectangle {
+  -width: float
+  -height: float
+  +area(): float
+}
+class Square
+
+Shape ..|&gt; Drawable
+Circle --|&gt; Shape
+Rectangle --|&gt; Shape
+Square --|&gt; Rectangle</code></pre>
+  <p><button type="button" class="btn-quiet" data-example="class">load this in the playground</button></p>
+  <p>Change <code>Shape ..|&gt; Drawable</code> to <code>Shape --|&gt; Drawable</code> and the check reports <code>CLASS-GENERALIZATION-INTERFACE</code>: a class implements an interface, it doesn't inherit from one.</p>
 </section>
 
 <section id="d-good">
   <h2>writing a diagram that teaches</h2>
   <ul>
     <li><strong>Title the finding.</strong> The title is the sentence a reader should take away. If you can't write it, the diagram may not need to exist.</li>
-    <li><strong>Pick the type by the claim.</strong> Steps with choices are an activity diagram or a flowchart. Who uses the system for which goals is a use-case diagram. A use-case diagram has no order and no decisions; if you find yourself drawing "then" between ovals, it's a flow.</li>
+    <li><strong>Pick the type by the claim.</strong> Steps with choices are an activity diagram or a flowchart. Who uses the system for which goals is a use-case diagram. What things are made of and how they relate is a class diagram. A use-case diagram has no order and no decisions; if you find yourself drawing "then" between ovals, it's a flow.</li>
     <li><strong>Paste the narration in.</strong> The check reads it. It's the cheapest way to catch a fork where the script says "either", or an «include» pointing the wrong way.</li>
     <li><strong>Label every branch.</strong> An unlabeled exit from a diamond is the most common mistake in student flowcharts, and the check won't pass it.</li>
     <li><strong>Use cases are verb phrases.</strong> "place order", not "orders". A one-word noun gets a suggestion.</li>
+    <li><strong>Lanes are for hand-offs.</strong> Use partitions when who does a step is part of the lesson. One lane on its own says nothing.</li>
+    <li><strong>Say how many.</strong> An association between classes usually matters because of its multiplicities. Write them at both ends.</li>
     <li><strong>Keep it to about eight nodes.</strong> More than that, split it, or use steps so each click has one idea.</li>
     <li><strong>Don't draw what the lesson doesn't say.</strong> No actors, forks or boundaries added to look more formal.</li>
     <li><strong>A wrong diagram on purpose is fine.</strong> Write it, leave the check panel off on the lesson page, and let the narration do the correcting. The check is for you, not the reader.</li>
@@ -325,6 +678,7 @@ waiver -extend-&gt; pay</code></pre>
   </table>
   <p>Each finding has a severity, a rule id, where it is, what's wrong, why it matters, and the smallest fix. The check never stops the drawing; a blocked diagram still renders. In the playground the panel is always on; in an embed it's off unless the page asks for it.</p>
   <p>Before grading, the check works out what family the structure actually looks like (flow, use case, data, and so on) from the kinds of nodes and edges, and compares that with the claimed type.</p>
+  <p>Partitions, class members, class relationships and use-case descriptions are newer than the slide reviewer. Their rules are checked here, by the same conventions, until the reviewer has them too.</p>
 
   <h3>claim and family</h3>
   <table class="table">
@@ -344,6 +698,7 @@ waiver -extend-&gt; pay</code></pre>
     <tbody>
       <tr><td><code>STRUCT-DANGLING-EDGE</code></td><td>major</td><td>An edge end that names no node.</td></tr>
       <tr><td><code>STRUCT-ISOLATED</code></td><td>minor</td><td>A node nothing connects to, in a diagram that has edges.</td></tr>
+      <tr><td><code>STRUCT-SELF-LINE</code></td><td>minor</td><td>An edge from a node to itself. Those aren't drawn yet, and a relationship that isn't drawn can't be read.</td></tr>
     </tbody>
   </table>
 
@@ -366,6 +721,17 @@ waiver -extend-&gt; pay</code></pre>
     </tbody>
   </table>
 
+  <h3>partitions</h3>
+  <p>These only run when the diagram has at least one partition.</p>
+  <table class="table">
+    <thead><tr><th>rule</th><th>severity</th><th>what it catches</th></tr></thead>
+    <tbody>
+      <tr><td><code>ACT-PARTITION-OUTSIDE</code></td><td>minor (major under strict-uml)</td><td>A node outside every partition. Partitions say who does each thing, so a node outside them has no owner. Notes are let off. Skipped under <code>general-diagram</code>, which is what a flowchart gets unless it says otherwise.</td></tr>
+      <tr><td><code>ACT-PARTITION-EMPTY</code></td><td>suggestion</td><td>A partition with nothing in it, which reads as a participant who does nothing.</td></tr>
+      <tr><td><code>ACT-PARTITION-SINGLE</code></td><td>suggestion</td><td>Only one partition. Lanes earn their space by showing a hand-off.</td></tr>
+    </tbody>
+  </table>
+
   <h3>use-case diagrams</h3>
   <table class="table">
     <thead><tr><th>rule</th><th>severity</th><th>what it catches</th></tr></thead>
@@ -378,12 +744,29 @@ waiver -extend-&gt; pay</code></pre>
       <tr><td><code>UC-EXTEND-DIRECTION</code></td><td>major</td><td>An «extend» pointing from the base to the extension.</td></tr>
       <tr><td><code>UC-DEPENDENCY-STYLE</code></td><td>minor</td><td>An include or extend that isn't a dashed, directed arrow. The parser always draws them right, so you'll only see this from a hand-written spec.</td></tr>
       <tr><td><code>UC-LABEL-VERB</code></td><td>suggestion</td><td>A one-word use case that isn't a verb ("orders").</td></tr>
+      <tr><td><code>UC-DESCRIBE-PRIMARY</code></td><td>minor</td><td>A description's <code>primary</code> names someone who isn't an actor in the diagram, or an actor with no line to this use case. Medium confidence.</td></tr>
+      <tr><td><code>UC-DESCRIBE-MAIN</code></td><td>suggestion</td><td>A description with no <code>main</code> lines. The numbered steps are what a reader comes to it for.</td></tr>
+      <tr><td><code>UC-DESCRIBE-TRIGGER</code></td><td>minor</td><td>A description whose <code>trigger</code> is repeated as a <code>pre</code>. A trigger is an event; a precondition is a state that already holds.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>class diagrams</h3>
+  <table class="table">
+    <thead><tr><th>rule</th><th>severity</th><th>what it catches</th></tr></thead>
+    <tbody>
+      <tr><td><code>CLASS-MULTIPLICITY</code></td><td>minor (major under strict-uml)</td><td>An association without a multiplicity at both ends. Medium confidence.</td></tr>
+      <tr><td><code>CLASS-GENERALIZATION-CYCLE</code></td><td>major</td><td>Classes that inherit from each other in a circle. A class can't be a kind of its own descendant.</td></tr>
+      <tr><td><code>CLASS-GENERALIZATION-INTERFACE</code></td><td>minor</td><td>A class joined to an interface with <code>--|&gt;</code>. A class implements an interface, so the line is <code>..|&gt;</code>. Skipped under <code>general-diagram</code>.</td></tr>
+      <tr><td><code>CLASS-REALIZATION-TARGET</code></td><td>minor (major under strict-uml)</td><td>A <code>..|&gt;</code> pointing at something that isn't an interface. Skipped under <code>general-diagram</code>.</td></tr>
+      <tr><td><code>CLASS-ABSTRACT-OPERATION</code></td><td>minor (major under strict-uml)</td><td>A member marked <code>{abstract}</code> in a class that isn't <code>abstract</code>. Skipped under <code>general-diagram</code>.</td></tr>
+      <tr><td><code>CLASS-DUPLICATE-MEMBER</code></td><td>minor</td><td>The same member listed twice in one class: same name, parameters and type.</td></tr>
+      <tr><td><code>CLASS-GENERALIZATION-STYLE</code></td><td>minor</td><td>Inheritance drawn without a hollow triangle. The parser always draws it right, so you'll only see this from a hand-written spec.</td></tr>
     </tbody>
   </table>
 
   <h3>other families</h3>
-  <p>The check also carries the rules for ERDs, class, sequence, state, DFD and causal diagrams, because it's the same reviewer the videos use. The text format can't write those families yet, so you'll only meet these ids when the future editor exports them.</p>
-  <p class="docs-rules"><code>ERD-CARDINALITY-MISSING</code> <code>ERD-MN-NEEDS-JUNCTION</code> <code>ERD-MN-CONCEPTUAL</code> <code>ERD-PK-MISSING</code> <code>ERD-JUNCTION-SIDE</code> <code>CLASS-GENERALIZATION-STYLE</code> <code>CLASS-MULTIPLICITY</code> <code>SEQ-MESSAGE-ORDER</code> <code>SEQ-NOT-LIFELINE</code> <code>STATE-TRANSITION-EVENT</code> <code>STATE-NAMED-AS-ACTION</code> <code>DFD-BLACK-HOLE</code> <code>DFD-MIRACLE</code> <code>DFD-STORE-TO-STORE</code> <code>DFD-EXTERNAL-TO-STORE</code> <code>DFD-EXTERNAL-TO-EXTERNAL</code> <code>DFD-UNLABELED-FLOW</code> <code>CAUSAL-UNLABELED</code></p>
+  <p>The check also carries the rules for ERDs, sequence, state, DFD and causal diagrams, because it's the same reviewer the videos use. The text format can't write those families yet, so you'll only meet these ids when the format grows to cover them.</p>
+  <p class="docs-rules"><code>ERD-CARDINALITY-MISSING</code> <code>ERD-MN-NEEDS-JUNCTION</code> <code>ERD-MN-CONCEPTUAL</code> <code>ERD-PK-MISSING</code> <code>ERD-JUNCTION-SIDE</code> <code>SEQ-MESSAGE-ORDER</code> <code>SEQ-NOT-LIFELINE</code> <code>STATE-TRANSITION-EVENT</code> <code>STATE-NAMED-AS-ACTION</code> <code>DFD-BLACK-HOLE</code> <code>DFD-MIRACLE</code> <code>DFD-STORE-TO-STORE</code> <code>DFD-EXTERNAL-TO-STORE</code> <code>DFD-EXTERNAL-TO-EXTERNAL</code> <code>DFD-UNLABELED-FLOW</code> <code>CAUSAL-UNLABELED</code></p>
 </section>
 
 <section id="d-layout">
@@ -399,35 +782,122 @@ waiver -extend-&gt; pay</code></pre>
       <tr><td><code>PHONE_LEGIBILITY</code></td><td>warning</td><td>A label that would fall under 13 px on a narrow screen. The figure refuses to shrink that far and scrolls sideways instead.</td></tr>
     </tbody>
   </table>
-  <p>The layout is automatic and you can't fix a collision by hand in v1, short of pinning a node with <code>at</code>. A long label, a shorter one, or a step split usually clears it.</p>
+  <p>The layout is automatic until you say otherwise. A shorter label or a step split usually clears a collision. When it doesn't, drag the shape, the line or the label in the draw tab, which writes the fix into <a href="#d-layout-block">the layout block</a>.</p>
 </section>
 
 <section id="d-errors">
   <h2>errors</h2>
-  <p>A parse error stops rendering and shows the line number and the message. These are all of them.</p>
+  <p>A line the parser can't read is an error, and the message says which line. The playground underlines every bad line and keeps the last good figure on screen; an embed shows the first error in place of the figure. These are all of them.</p>
+
+  <h3>the header</h3>
   <table class="table">
     <thead><tr><th>message</th><th>fix</th></tr></thead>
     <tbody>
-      <tr><td>the first line must be: diagram flowchart | activity | use-case</td><td>Put the <code>diagram</code> line first, before the title.</td></tr>
-      <tr><td>unknown diagram type '...' (flowchart, activity, use-case)</td><td>Only those three, spelled that way. Sequence, state, class and ERD aren't in the text format yet.</td></tr>
+      <tr><td>the first line must be: diagram flowchart | activity | use-case | class</td><td>Put the <code>diagram</code> line first, before the title.</td></tr>
+      <tr><td>unknown diagram type '...' (flowchart, activity, use-case, class)</td><td>Only those four, spelled that way. Sequence, state and ERD aren't in the text format yet.</td></tr>
       <tr><td>diagram declared twice</td><td>One <code>diagram</code> line per file.</td></tr>
       <tr><td>a diagram needs a title: one line saying what it shows (its finding, not its topic)</td><td>Add a <code>title</code> line in the header.</td></tr>
       <tr><td>id must be a slug (letters, digits, - or _)</td><td>The diagram id can't have spaces or punctuation.</td></tr>
       <tr><td>unknown profile '...'</td><td><code>strict-uml</code>, <code>uml-inspired</code> or <code>general-diagram</code>.</td></tr>
       <tr><td>direction is down or right</td><td>Those two words only.</td></tr>
-      <tr><td>em dash in '...' (house rule: no em dashes)</td><td>Use a comma, a colon, or two sentences.</td></tr>
-      <tr><td>unknown kind '...'</td><td>Check the tables under nodes. A header word after the first node (a late <code>title</code> line, say) shows up as this too: move it up.</td></tr>
-      <tr><td>duplicate id '...'</td><td>Every id once, boundaries included.</td></tr>
+      <tr><td>lanes is vertical or horizontal</td><td>Those two words only.</td></tr>
+      <tr><td>look is sketch or precision</td><td>Those two words only.</td></tr>
+      <tr><td>em dash in '...' (house rule: no em dashes)</td><td>Use a comma, a colon, or two sentences. This one can come from any line with text in it, not only the header.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>nodes and blocks</h3>
+  <table class="table">
+    <thead><tr><th>message</th><th>fix</th></tr></thead>
+    <tbody>
+      <tr><td>unknown kind '...'</td><td>Check the tables under nodes. A header word after the first node (a late <code>title</code> line, say) shows up as this too: move it up. So does <code>class</code> or <code>interface</code> outside a class diagram.</td></tr>
+      <tr><td>duplicate id '...'</td><td>Every id once, boundaries, partitions and classes included.</td></tr>
       <tr><td>start/end don't exist in use-case diagrams</td><td>Use-case diagrams have no order, so no start or end.</td></tr>
-      <tr><td>unknown option '...' (left, right, at X Y)</td><td>After the label only <code>left</code>, <code>right</code> or <code>at X Y</code> are allowed. A label without quotes shows up as this.</td></tr>
+      <tr><td>start/end don't exist in class diagrams</td><td>Neither do class diagrams.</td></tr>
+      <tr><td>unknown option '...' (left, right, at X Y)</td><td>After the label only <code>left</code>, <code>right</code>, <code>at X Y</code> or <code>size W H</code> are allowed. A label without quotes shows up as this.</td></tr>
       <tr><td>at takes two numbers in inches: at X Y</td><td><code>at 3 1.5</code>, decimals allowed, negatives allowed.</td></tr>
+      <tr><td>size takes two numbers in inches: size W H</td><td><code>size 2 0.8</code>, both above zero.</td></tr>
       <tr><td>step takes a whole number</td><td><code>step 1</code>, not <code>step one</code> or <code>step 1.5</code>.</td></tr>
       <tr><td>boundary syntax: boundary &lt;id&gt; "title" {</td><td>The title in quotes and the brace on the same line.</td></tr>
-      <tr><td>boundaries can't nest</td><td>Close the first one before opening another.</td></tr>
-      <tr><td>} without an open boundary</td><td>A stray closing brace.</td></tr>
+      <tr><td>boundaries can't nest</td><td>Close the first one before opening another. A boundary inside a partition gets this too.</td></tr>
+      <tr><td>boundaries don't exist in class diagrams</td><td>A boundary is the system box of a use-case diagram. Take it out and leave the classes.</td></tr>
+      <tr><td>partition syntax: partition &lt;id&gt; "name" {</td><td>The name in quotes and the brace on the same line. The same goes for <code>lane</code> and <code>swimlane</code>.</td></tr>
+      <tr><td>partitions belong to activity diagrams and flowcharts</td><td>A use-case or class diagram has no lanes.</td></tr>
+      <tr><td>partitions can't nest</td><td>Close the first one before opening another. A partition inside a boundary gets this too.</td></tr>
+      <tr><td>} without an open boundary</td><td>A stray closing brace. It also follows a line that should have opened a block and had a mistake in it.</td></tr>
       <tr><td>boundary '...' is never closed with }</td><td>Add the closing brace on its own line.</td></tr>
-      <tr><td>can't read this line</td><td>It's neither a node, an edge, a step, nor a boundary. Usually a missing space around an operator, or a node without a kind.</td></tr>
+      <tr><td>partition '...' is never closed with }</td><td>The same, for a partition.</td></tr>
+      <tr><td>can't read this line</td><td>It's neither a node, an edge, a step, nor the start of a block. Usually a missing space around an operator, or a node without a kind.</td></tr>
       <tr><td>empty diagram</td><td>The file has no lines besides comments.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>edges</h3>
+  <table class="table">
+    <thead><tr><th>message</th><th>fix</th></tr></thead>
+    <tbody>
+      <tr><td>--|&gt; belongs to class diagrams</td><td>The message names the operator you wrote. The triangle and diamond operators only mean something between classes.</td></tr>
+      <tr><td>-include-&gt; belongs to use-case diagrams</td><td><code>-include-&gt;</code> and <code>-extend-&gt;</code> can't join classes.</td></tr>
+      <tr><td>multiplicities and role names at a line's ends belong to class diagrams</td><td>Take the quoted text off the ends, or make it the edge's label after a colon.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>classes</h3>
+  <table class="table">
+    <thead><tr><th>message</th><th>fix</th></tr></thead>
+    <tbody>
+      <tr><td>unknown option '...' (&lt;&lt;stereotype&gt;&gt;, at X Y, size W H)</td><td>After a class's label only those are allowed. A member written on the class's own line shows up as this: members go on their own lines.</td></tr>
+      <tr><td>can't read this member: write + name: Type or + name(params): Type</td><td>A member's name is one word, its parentheses close, and only a colon and a type may follow them. A <code>step</code> line or an edge inside a class block shows up as this too.</td></tr>
+      <tr><td>class '...' is never closed with }</td><td>Add the closing brace on its own line. The message says class for an interface as well.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>use-case descriptions</h3>
+  <table class="table">
+    <thead><tr><th>message</th><th>fix</th></tr></thead>
+    <tbody>
+      <tr><td>describe syntax: describe &lt;use-case id&gt; {</td><td>The id, then the brace, on the same line, and nothing after the brace.</td></tr>
+      <tr><td>describe belongs to use-case diagrams</td><td>Only a use-case diagram has descriptions.</td></tr>
+      <tr><td>describe names '...', which isn't declared above it</td><td>Move the block below the use case's line, or correct the id.</td></tr>
+      <tr><td>resident is not a use case</td><td>The message names the id you wrote. A description belongs to a use case, not to an actor or a boundary.</td></tr>
+      <tr><td>apply is described twice</td><td>One block per use case. Merge the two.</td></tr>
+      <tr><td>unknown description field '...' (goal, primary, supporting, trigger, pre, main, alt, post, related)</td><td>Each line in the block starts with one of those words.</td></tr>
+      <tr><td>main needs some text after it</td><td>The message names the field. Write its text, or delete the line.</td></tr>
+      <tr><td>describe is never closed with }</td><td>Add the closing brace on its own line.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>the layout block</h3>
+  <table class="table">
+    <thead><tr><th>message</th><th>fix</th></tr></thead>
+    <tbody>
+      <tr><td>the layout block can't sit inside another block</td><td>Close the boundary, partition or class first. The block goes at the end of the file.</td></tr>
+      <tr><td>unknown layout line '...' (place, size, lane, pool, route, label, style)</td><td>Each line in the block starts with one of those words.</td></tr>
+      <tr><td>place syntax: place &lt;id&gt; X Y</td><td>An id and two numbers, nothing more.</td></tr>
+      <tr><td>size syntax: size &lt;id&gt; W H</td><td>An id and two numbers above zero.</td></tr>
+      <tr><td>lane syntax: lane &lt;id&gt; &lt;thickness&gt;</td><td>A partition's id and one number above zero.</td></tr>
+      <tr><td>pool syntax: pool [at X Y] [length L]</td><td><code>at</code> takes two numbers; <code>length</code> takes one, above zero.</td></tr>
+      <tr><td>route syntax: route a -&gt; b straight|elbow [from &lt;side&gt;] [to &lt;side&gt;] [via X Y, X Y]</td><td>The kind comes right after the edge. Sides are <code>top</code>, <code>right</code>, <code>bottom</code>, <code>left</code>. <code>via</code> comes last, with a comma between points.</td></tr>
+      <tr><td>route syntax: route a -&gt; b ...</td><td>The line doesn't name an edge. Write its two ends with the operator between them.</td></tr>
+      <tr><td>label syntax: label a -&gt; b &lt;t&gt; &lt;dx&gt; &lt;dy&gt;</td><td>Exactly three numbers after the edge.</td></tr>
+      <tr><td>label syntax: label a -&gt; b ...</td><td>The line doesn't name an edge.</td></tr>
+      <tr><td>line style syntax: style a -&gt; b [color ink|ink-2|accent|accent-strong|terra] [weight thin|normal|bold]</td><td>A word and its value, in pairs. An edge has no <code>fill</code>.</td></tr>
+      <tr><td>style syntax: style &lt;id&gt; [fill none|page|wash] [color ...] [weight thin|normal|bold]</td><td>A word and its value, in pairs, with at least one pair.</td></tr>
+      <tr><td>layout is never closed with }</td><td>Add the closing brace on its own line.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>warnings</h3>
+  <p>A warning doesn't stop anything. The figure is drawn and the line is left as you wrote it.</p>
+  <table class="table">
+    <thead><tr><th>code</th><th>message</th><th>what happens</th></tr></thead>
+    <tbody>
+      <tr><td><code>PARSE-UNKNOWN-NODE</code></td><td>'...' isn't declared, so this line has a loose end</td><td>The edge is kept and not drawn, and the notation check reports <code>STRUCT-DANGLING-EDGE</code>.</td></tr>
+      <tr><td><code>LAYOUT-UNKNOWN-REF</code></td><td>layout names '...', which isn't declared; the line is kept but does nothing</td><td>A layout line about a node that isn't in the file.</td></tr>
+      <tr><td><code>LAYOUT-UNKNOWN-REF</code></td><td>layout names the line a -&gt; b, which isn't declared; the line is kept but does nothing</td><td>A layout line about an edge that isn't in the file.</td></tr>
+      <tr><td><code>LAYOUT-UNKNOWN-REF</code></td><td>layout names the line a -&gt; b #2, which isn't declared; the line is kept but does nothing</td><td>The file has no second edge like that one.</td></tr>
+      <tr><td><code>LAYOUT-UNKNOWN-REF</code></td><td>publish is placed twice; the line is kept but does nothing</td><td>The node already has a place, from an earlier <code>place</code> line or from <code>at</code> on its own line. The first one counts.</td></tr>
+      <tr><td><code>LAYOUT-UNKNOWN-REF</code></td><td>publish is not a partition; the line is kept but does nothing</td><td>A <code>lane</code> line can only name a partition.</td></tr>
     </tbody>
   </table>
 </section>
@@ -436,7 +906,7 @@ waiver -extend-&gt; pay</code></pre>
   <h2>putting it on a page</h2>
   <p>The whole diagram travels in the link. Nothing is stored on a server; the text is compressed into the part of the URL after <code>#</code>, which browsers never send anywhere.</p>
   <h3>the embed link</h3>
-  <pre><code>https://chalk.kyleschlaepfer.com/embed/#v=1&amp;d=&lt;compressed text&gt;&amp;id=permit-portal&amp;step=0&amp;theme=auto&amp;lint=0&amp;qa=0&amp;tools=1</code></pre>
+  <pre><code>https://chalk.kyleschlaepfer.com/embed/#v=1&amp;d=&lt;compressed text&gt;&amp;id=permit-portal&amp;step=0&amp;theme=auto&amp;lint=0&amp;qa=0&amp;tools=1&amp;look=sketch</code></pre>
   <table class="table">
     <thead><tr><th>parameter</th><th>values</th><th>default</th><th>meaning</th></tr></thead>
     <tbody>
@@ -448,6 +918,7 @@ waiver -extend-&gt; pay</code></pre>
       <tr><td><code>lint</code></td><td><code>0</code>, <code>1</code></td><td><code>0</code></td><td>show the notation check under the figure</td></tr>
       <tr><td><code>qa</code></td><td><code>0</code>, <code>1</code></td><td><code>0</code></td><td>add the layout check (turns <code>lint</code> on too)</td></tr>
       <tr><td><code>tools</code></td><td><code>0</code>, <code>1</code></td><td><code>1</code></td><td>the "open in playground" and "download SVG" footer</td></tr>
+      <tr><td><code>look</code></td><td><code>sketch</code>, <code>precision</code></td><td>the diagram's own <code>look</code> line</td><td>draw the figure in this look, whatever the file says. Leave it off and the file decides</td></tr>
     </tbody>
   </table>
   <h3>any page</h3>
@@ -457,16 +928,18 @@ waiver -extend-&gt; pay</code></pre>
   <pre><code>import permitPortal from "../../diagrams/permit-portal.ksd?raw";
 &lt;DiagramEmbed ksd={permitPortal} caption="Paying the fee is always part of applying." /&gt;</code></pre>
   <h3>download SVG</h3>
-  <p>The downloaded file stands on its own: colors for light and dark are inside it, and Kalam is embedded, so it looks the same in a document or a slide as it does here.</p>
+  <p>The downloaded file stands on its own: its colors and background are written into it, in the look and theme on screen, and its fonts are embedded, so it looks the same in a document or a slide as it does here.</p>
 </section>
 
 <section id="d-limits">
   <h2>what it won't do yet</h2>
   <ul>
-    <li>Only three families: flowchart, activity, use-case. Sequence, state, class and ERD have their rules in the check already; the text format for them comes with the editor.</li>
+    <li>Four families: flowchart, activity, use-case and class. Sequence, state and ERD have their rules in the check already; the text format for them comes later.</li>
     <li>No freehand drawing, ever. Shapes are predefined and the pen only renders them.</li>
-    <li>The draw tab places, names, connects and drags shapes, and writes the result back as this text. The first drag pins every shape where it is (an <code>at</code> line each), so the picture stops rearranging itself; "let it find its own place" unpins one.</li>
-    <li>No swimlanes, no notes attached to a specific node, no colors. One pen, one accent, by design.</li>
+    <li>The draw tab places, names, connects, resizes and drags shapes, and writes the result back as this text. What you arrange by hand goes into the layout block. "let it find its own place" hands one shape back to the automatic layout, and "tidy up" hands back as many as you choose.</li>
+    <li>No edge from a node to itself. It parses, the check reports it, and nothing is drawn.</li>
+    <li>No lanes inside lanes, and no notes attached to a specific node.</li>
+    <li>No colors of your own. A <code>style</code> line picks from the theme's pens, by design.</li>
     <li>No saving to an account. The link is the file.</li>
   </ul>
 </section>

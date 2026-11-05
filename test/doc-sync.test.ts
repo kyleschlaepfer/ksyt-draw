@@ -231,6 +231,22 @@ describe("formatSource", () => {
     const messy = '# c\ndiagram use-case\ntitle t\nactor   a   "A"\nboundary b "B" {\nuse-case   u\n      # inner\n}\n\na   --   u\n';
     expect(formatSource(parseSource(messy))).toBe('# c\ndiagram use-case\ntitle t\nactor a "A"\nboundary b "B" {\n  use-case u\n  # inner\n}\n\na -- u\n');
   });
+  it("a class written with an empty block stays a valid file: tidy takes both braces, a Draw edit does too, and a first member reuses the block", () => {
+    const EMPTY = "diagram class\ntitle t\nclass A {\n}\nclass B\nA -- B\n";
+    const tidy = formatSource(parseSource(EMPTY));
+    expect(tidy).toBe("diagram class\ntitle t\nclass A\nclass B\nA -- B\n");
+    expect(parseSource(tidy).diagnostics).toEqual([]);
+    expect(edit(EMPTY, (d) => cmd.setLabel(d, uidOf(d, "A"), "Account"))).toBe('diagram class\ntitle t\nclass A "Account"\nclass B\nA -- B\n');
+    expect(edit(EMPTY, (d) => cmd.patchNode(d, uidOf(d, "A"), { members: [{ kind: "attribute", visibility: "+", name: "id", type: "int" }] })))
+      .toBe("diagram class\ntitle t\nclass A {\n  +id: int\n}\nclass B\nA -- B\n");
+    // and an edit elsewhere leaves the empty block exactly as the author wrote it
+    expect(edit(EMPTY, (d) => cmd.setLabel(d, uidOf(d, "B"), "Bank"))).toBe('diagram class\ntitle t\nclass A {\n}\nclass B "Bank"\nA -- B\n');
+  });
+  it("a label written on a fork, a merge or a start is not drawn but is never dropped from the text", () => {
+    const SRC = 'diagram activity\ntitle t\nstart   begin "go"\nfork split "both"\naction a "A"\naction b "B"\nbegin -> split\nsplit -> a\nsplit -> b\n';
+    expect(formatSource(parseSource(SRC))).toBe(SRC.replace("start   begin", "start begin"));
+    expect(edit(SRC, (d) => cmd.renameId(d, uidOf(d, "split"), "both"))).toContain('fork both "both"\n');
+  });
   it("a file with a mistake is only re-indented", () => {
     expect(formatSource(parseSource("diagram flowchart\ntitle t\n   widget x\n"))).toBe("diagram flowchart\ntitle t\nwidget x\n");
   });

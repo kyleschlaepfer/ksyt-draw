@@ -69,6 +69,66 @@ clerk -- review
 apply -include-> pay
 waiver -extend-> pay
 `,
+  lanes: `diagram activity
+id order-lanes
+title The warehouse only ships after the customer's payment clears
+narration The customer places an order and pays. Sales checks the payment. If it clears, the warehouse packs and ships the order; otherwise sales cancels it.
+
+partition customer "Customer" {
+  start begin
+  action place "place order"
+  action pay "pay"
+  end done
+}
+partition sales "Sales" {
+  action check "check payment"
+  decision cleared "payment cleared?"
+  action cancel "cancel order"
+  flow-final stop
+}
+partition warehouse "Warehouse" {
+  action pack "pack order"
+  action ship "ship order"
+}
+
+begin -> place
+place -> pay
+pay -> check
+check -> cleared
+cleared -> pack : [yes]
+cleared -> cancel : [no]
+cancel -> stop
+pack -> ship
+ship -> done
+`,
+  class: `diagram class
+id shapes
+title Every shape can report its area; circles and rectangles are kinds of shape
+
+interface Drawable {
+  +draw(canvas: Canvas): void
+}
+abstract class Shape {
+  #origin: Point
+  +area(): float {abstract}
+  +moveTo(p: Point): void
+}
+class Circle {
+  -radius: float
+  +area(): float
+}
+class Rectangle {
+  -width: float
+  -height: float
+  +area(): float
+}
+class Square
+
+Shape ..|> Drawable
+Circle --|> Shape
+Rectangle --|> Shape
+Square --|> Rectangle
+`,
 };
 
 export const DEFAULT_EXAMPLE = EXAMPLES["use-case"];

@@ -79,6 +79,20 @@ describe("error recovery and ranges", () => {
 });
 
 describe("v2 syntax", () => {
+  it("the new header words don't shadow a v1 node called look or lanes", () => {
+    // v1 read this file; its body starts with a line from a node named like a v2 header word
+    const p = parseSource("diagram flowchart\ntitle t\nlook -> buy\nprocess look\nprocess buy\nlanes -> look\nprocess lanes\n");
+    expect(p.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(p.doc!.edges.map((e) => `${e.from}>${e.to}`)).toEqual(["look>buy", "lanes>look"]);
+    expect(p.doc!.meta.look).toBeUndefined();
+    // with one value they are still the header words, and a wrong value is still reported
+    expect(parseSource("diagram flowchart\ntitle t\nlook precision\nprocess a\n").doc!.meta.look).toBe("precision");
+    expect(parseSource("diagram flowchart\ntitle t\nlook fancy\nprocess a\n").diagnostics[0].message).toBe("look is sketch or precision");
+  });
+  it("a boundary in a class diagram is refused instead of silently losing its classes", () => {
+    const p = parseSource('diagram class\ntitle t\nboundary b "B" {\n  class A\n}\n');
+    expect(p.diagnostics.filter((d) => d.severity === "error").map((d) => [d.line, d.message])).toEqual([[3, "boundaries don't exist in class diagrams"]]);
+  });
   for (const f of v2Files) {
     it(`${f} parses clean`, () => {
       const p = parseSource(read(V2, f));

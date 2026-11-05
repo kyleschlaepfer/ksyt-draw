@@ -72,7 +72,8 @@ export function printDecl(n: DocNode, type: ChalkDoc["meta"]["type"]): string {
   else if (type === "activity" && n.kind === "initial") kind = "start";
   else if (type === "activity" && n.kind === "final") kind = "end";
   let line = `${kind} ${n.id}`;
-  if (label !== null && !UNLABELED.has(n.kind) && label !== defaultLabel(n.kind, n.id)) line += ` ${quote(label)}`;
+  // a fork, a merge or a start draws no label, but one the author wrote stays in the text
+  if (label !== null && label !== defaultLabel(n.kind, n.id)) line += ` ${quote(label)}`;
   if (n.side) line += ` ${n.side}`;
   return line + inline;
 }

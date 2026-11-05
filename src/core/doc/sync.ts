@@ -114,7 +114,11 @@ export function syncSource(prev: ParsedSource, next: ChalkDoc): string {
       killNodeLines(n.uid);
       insertInto(n.parent, (ind) => nodeLines(n, ind));
     } else {
-      if (printDecl(was, old.meta.type) !== printDecl(n, type)) setText(d, printDecl(n, type));
+      if (printDecl(was, old.meta.type) !== printDecl(n, type)) {
+        setText(d, printDecl(n, type));
+        // a class written with an empty block: its line is printed without the brace, so the brace's partner goes too
+        if (CLASSIFIERS.has(n.kind) && !opensBlock(was) && !opensBlock(n)) kill(closeOf(n.uid));
+      }
       if (CLASSIFIERS.has(n.kind)) {
         const a = (was.members ?? []).map(printMember), b = (n.members ?? []).map(printMember);
         const rows = owned(n.uid, "member");
@@ -274,6 +278,11 @@ export function formatSource(p: ParsedSource): string {
     const s = p.stmts.find((x) => x.line === i);
     const raw = p.lines[i].trim();
     if (!s) { out.push(raw); continue; }
+    // an empty class block is tidied away: the class line loses its brace, so this line must go with it
+    if (d && s.kind === "close" && s.owner) {
+      const n = d.nodes.find((x) => x.uid === s.owner);
+      if (n && CLASSIFIERS.has(n.kind) && !opensBlock(n)) continue;
+    }
     const ind = "  ".repeat(s.depth);
     let text = raw;
     if (d && s.owner) {

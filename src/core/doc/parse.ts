@@ -271,7 +271,8 @@ export function parseSource(text: string): ParsedSource {
       push("meta", { key: "diagram" });
       continue;
     }
-    if ((HEADER.includes(word) || HEADER_V2.includes(word)) && !seenBody) {
+    // the v2 header words take exactly one value; anything else (`look -> buy`) is a body line, as it was in v1
+    if ((HEADER.includes(word) || (HEADER_V2.includes(word) && !/\s/.test(val))) && !seenBody) {
       const s = push("meta", { key: word });
       if (word === "diagram") { err(ln, "diagram declared twice"); s.kind = "bad"; }
       else if (word === "id") {
@@ -480,6 +481,8 @@ export function parseSource(text: string): ParsedSource {
       const m = BLOCK_RE.exec(val);
       if (!m) { err(ln, 'boundary syntax: boundary <id> "title" {'); push("bad"); continue; }
       if (container()) { err(ln, "boundaries can't nest"); push("bad"); blocks.push({ type: "container", id: m[1], kind: "boundary", line: ln, uid: "" }); continue; }
+      // a class diagram has no way to draw one, and its classes would silently leave it
+      if (claimed === "class") { err(ln, "boundaries don't exist in class diagrams", word); push("bad"); blocks.push({ type: "container", id: m[1], kind: "boundary", line: ln, uid: "" }); continue; }
       const bid = m[1], btitle = unquote(m[2]);
       if (!noEmDash(btitle, ln)) { push("bad"); blocks.push({ type: "container", id: bid, kind: "boundary", line: ln, uid: "" }); continue; }
       const uid = newUid();
