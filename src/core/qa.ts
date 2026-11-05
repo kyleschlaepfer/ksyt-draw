@@ -22,22 +22,33 @@ export interface QaOptions {
 
 type Zone = [number, number, number, number]; // raster px, [x0, y0, x1, y1)
 
-function rasterize(mask: Uint8Array, zone: Zone, poly: Poly, k: number, value: 0 | 1): void {
-  const [zx0, zy0, zx1, zy1] = zone;
-  const zw = zx1 - zx0;
+/** A polygon in raster px with its bounds, worked out once: every label asks about every polygon. */
+interface Shape { xs: Float64Array; ys: Float64Array; x0: number; y0: number; x1: number; y1: number }
+
+function shapeOf(poly: Poly, k: number): Shape {
   const n = poly.length;
   const xs = new Float64Array(n), ys = new Float64Array(n);
-  let py0 = Infinity, py1 = -Infinity, px0 = Infinity, px1 = -Infinity;
+  let y0 = Infinity, y1 = -Infinity, x0 = Infinity, x1 = -Infinity;
   for (let i = 0; i < n; i++) {
     xs[i] = poly[i][0] * k;
     ys[i] = poly[i][1] * k;
-    if (ys[i] < py0) py0 = ys[i];
-    if (ys[i] > py1) py1 = ys[i];
-    if (xs[i] < px0) px0 = xs[i];
-    if (xs[i] > px1) px1 = xs[i];
+    if (ys[i] < y0) y0 = ys[i];
+    if (ys[i] > y1) y1 = ys[i];
+    if (xs[i] < x0) x0 = xs[i];
+    if (xs[i] > x1) x1 = xs[i];
   }
-  if (px1 < zx0 || px0 > zx1 || py1 < zy0 || py0 > zy1) return;
-  const rowFrom = Math.max(zy0, Math.floor(py0)), rowTo = Math.min(zy1 - 1, Math.ceil(py1));
+  return { xs, ys, x0, y0, x1, y1 };
+}
+
+const reaches = (s: Shape, zone: Zone): boolean => !(s.x1 < zone[0] || s.x0 > zone[2] || s.y1 < zone[1] || s.y0 > zone[3]);
+
+function rasterize(mask: Uint8Array, zone: Zone, shape: Shape, value: 0 | 1): void {
+  if (!reaches(shape, zone)) return;
+  const [zx0, zy0, zx1, zy1] = zone;
+  const zw = zx1 - zx0;
+  const { xs, ys } = shape;
+  const n = xs.length;
+  const rowFrom = Math.max(zy0, Math.floor(shape.y0)), rowTo = Math.min(zy1 - 1, Math.ceil(shape.y1));
   const cross: number[] = [];
   for (let y = rowFrom; y <= rowTo; y++) {
     const yc = y + 0.5;
@@ -78,8 +89,8 @@ export function checkScene(sc: Scene, o: QaOptions = {}): QaReport {
     }
   }
   const polys = sc.elements.map((el) => el.paints.flatMap(paintPolys));
-  const inkOf: Poly[][] = polys.map((ps) => ps.filter((p) => p.ink).map((p) => p.poly));
-  const koOf: Poly[][] = polys.map((ps) => ps.filter((p) => p.knock).map((p) => p.poly));
+  const inkOf: Shape[][] = polys.map((ps) => ps.filter((p) => p.ink).map((p) => shapeOf(p.poly, k)));
+  const koOf: Shape[][] = polys.map((ps) => ps.filter((p) => p.knock).map((p) => shapeOf(p.poly, k)));
 
   for (const t of sc.texts) {
     const [bx0, by0, bx1, by1] = t.box;
@@ -93,13 +104,18 @@ export function checkScene(sc: Scene, o: QaOptions = {}): QaReport {
     if (zw <= 0 || zh <= 0) continue;
     const owner = t.owner ?? "";
     const mask = new Uint8Array(zw * zh);
+    // the knockouts that come anywhere near this label, with the element each belongs to
+    const near: Array<[number, Shape]> = [];
+    for (let j = 0; j < sc.elements.length; j++) for (const p of koOf[j]) if (reaches(p, zone)) near.push([j, p]);
     for (let i = 0; i < sc.elements.length; i++) {
       const name = sc.elements[i].name;
       if (name === owner || allowed(name, t.name) || allowed(name, owner)) continue;
-      if (!inkOf[i].length) continue;
+      const ink = inkOf[i].filter((p) => reaches(p, zone));
+      // ink that stays clear of the label's zone can't touch it
+      if (!ink.length) continue;
       mask.fill(0);
-      for (const p of inkOf[i]) rasterize(mask, zone, p, k, 1);
-      for (let j = i + 1; j < sc.elements.length; j++) for (const p of koOf[j]) rasterize(mask, zone, p, k, 0);
+      for (const p of ink) rasterize(mask, zone, p, 1);
+      for (const [j, p] of near) if (j > i) rasterize(mask, zone, p, 0);
       let hits = 0;
       for (let q = 0; q < mask.length; q++) hits += mask[q];
       if (hits > 2 * scale) errors.push(`LINE_THROUGH_TEXT ${name} crosses or touches ${pyRepr(t.s)}`);

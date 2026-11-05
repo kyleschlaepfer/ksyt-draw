@@ -132,6 +132,9 @@ export function mountWrite(panel: HTMLElement, app: App): WriteView {
   }
 
   function render(): void {
+    // while another view is showing, the figure waits: shown() draws it for the document there is by then,
+    // so an edit in draw does not pay for a figure nobody is looking at
+    if (panel.hidden) { renderedHidden = true; return; }
     const d = session.doc;
     const bad = firstError(session.parsed);
     stale.hidden = session.inSync || !d;
