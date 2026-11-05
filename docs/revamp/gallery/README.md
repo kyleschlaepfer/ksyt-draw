@@ -18,6 +18,7 @@ The script also writes each PNG (shown on the sheets) and each SVG with its lett
 | [activity-decision-merge](activity-decision-merge.sheet.png) | [sketch svg](activity-decision-merge.sketch.svg), [sketch pdf](activity-decision-merge.sketch.pdf), [precision svg](activity-decision-merge.precision.svg), [precision pdf](activity-decision-merge.precision.pdf) | 663 x 877 px, 6.9 x 9.1 in. Smallest text 20px. Layout check: pass. |
 | [activity-lanes](activity-lanes.sheet.png) | [sketch svg](activity-lanes.sketch.svg), [sketch pdf](activity-lanes.sketch.pdf), [precision svg](activity-lanes.precision.svg), [precision pdf](activity-lanes.precision.pdf) | 1043 x 1136 px, 10.9 x 11.8 in. Smallest text 20px. Layout check: pass. |
 | [class-orders](class-orders.sheet.png) | [sketch svg](class-orders.sketch.svg), [sketch pdf](class-orders.sketch.pdf), [precision svg](class-orders.precision.svg), [precision pdf](class-orders.precision.pdf) | 471 x 920 px, 4.9 x 9.6 in. Smallest text 20px. Layout check: pass. |
+| [class-reflexive](class-reflexive.sheet.png) | [sketch svg](class-reflexive.sketch.svg), [sketch pdf](class-reflexive.sketch.pdf), [precision svg](class-reflexive.precision.svg), [precision pdf](class-reflexive.precision.pdf) | 322 x 654 px, 3.4 x 6.8 in. Smallest text 20px. Layout check: pass. |
 | [class-shapes](class-shapes.sheet.png) | [sketch svg](class-shapes.sketch.svg), [sketch pdf](class-shapes.sketch.pdf), [precision svg](class-shapes.precision.svg), [precision pdf](class-shapes.precision.pdf) | 396 x 772 px, 4.1 x 8.0 in. Smallest text 20px. Layout check: pass. |
 | [dense](dense.sheet.png) | [sketch svg](dense.sketch.svg), [sketch pdf](dense.sketch.pdf), [precision svg](dense.precision.svg), [precision pdf](dense.precision.pdf) | 1757 x 2372 px, 18.3 x 24.7 in. Smallest text 20px. Layout check: pass. |
 | [flow-branched](flow-branched.sheet.png) | [sketch svg](flow-branched.sketch.svg), [sketch pdf](flow-branched.sketch.pdf), [precision svg](flow-branched.precision.svg), [precision pdf](flow-branched.precision.pdf) | 799 x 962 px, 8.3 x 10.0 in. Smallest text 20px. Layout check: pass. |
@@ -71,6 +72,10 @@ The script also writes each PNG (shown on the sheets) and each SVG with its lett
 ## class-orders
 
 ![class-orders at three widths](class-orders.sheet.png)
+
+## class-reflexive
+
+![class-reflexive at three widths](class-reflexive.sheet.png)
 
 ## class-shapes
 

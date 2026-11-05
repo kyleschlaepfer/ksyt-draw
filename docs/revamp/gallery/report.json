@@ -5,7 +5,7 @@
    "sketch": {
     "files": {
      "svg": 107013,
-     "png": 92297,
+     "png": 91996,
      "pdf": 27611
     },
     "facts": "485 x 583 px, 5.1 x 6.1 in. Smallest text 22px. Layout check: pass."
@@ -14,7 +14,7 @@
     "files": {
      "svg": 21305,
      "png": 63719,
-     "pdf": 3997
+     "pdf": 3996
     },
     "facts": "484 x 584 px, 5.0 x 6.1 in. Smallest text 18.9px. Layout check: pass."
    }
@@ -26,16 +26,16 @@
    "sketch": {
     "files": {
      "svg": 109472,
-     "png": 106859,
-     "pdf": 29609
+     "png": 107426,
+     "pdf": 29610
     },
     "facts": "429 x 711 px, 4.5 x 7.4 in. Smallest text 22px. Layout check: pass."
    },
    "precision": {
     "files": {
      "svg": 22180,
-     "png": 73821,
-     "pdf": 4483
+     "png": 73840,
+     "pdf": 4484
     },
     "facts": "428 x 712 px, 4.5 x 7.4 in. Smallest text 18.9px. Layout check: pass."
    }
@@ -48,7 +48,7 @@
     "files": {
      "svg": 51679,
      "png": 49071,
-     "pdf": 11728
+     "pdf": 11729
     },
     "facts": "250 x 364 px, 2.6 x 3.8 in. Smallest text 22px. Layout check: pass."
    },
@@ -68,7 +68,7 @@
    "sketch": {
     "files": {
      "svg": 102919,
-     "png": 164646,
+     "png": 165417,
      "pdf": 32331
     },
     "facts": "541 x 810 px, 5.6 x 8.4 in. Smallest text 20px. Layout check: pass."
@@ -76,8 +76,8 @@
    "precision": {
     "files": {
      "svg": 23091,
-     "png": 115760,
-     "pdf": 4750
+     "png": 114808,
+     "pdf": 4748
     },
     "facts": "527 x 807 px, 5.5 x 8.4 in. Smallest text 17.2px. Layout check: pass."
    }
@@ -89,7 +89,7 @@
    "sketch": {
     "files": {
      "svg": 91027,
-     "png": 134867,
+     "png": 135027,
      "pdf": 27791
     },
     "facts": "541 x 630 px, 5.6 x 6.6 in. Smallest text 22px. Layout check: pass."
@@ -97,7 +97,7 @@
    "precision": {
     "files": {
      "svg": 21989,
-     "png": 94512,
+     "png": 94816,
      "pdf": 4384
     },
     "facts": "527 x 629 px, 5.5 x 6.6 in. Smallest text 18.9px. Layout check: pass."
@@ -111,7 +111,7 @@
     "files": {
      "svg": 109905,
      "png": 100459,
-     "pdf": 25712
+     "pdf": 25710
     },
     "facts": "367 x 594 px, 3.8 x 6.2 in. Smallest text 20px. Layout check: pass."
    },
@@ -139,7 +139,7 @@
    "precision": {
     "files": {
      "svg": 19716,
-     "png": 66440,
+     "png": 66366,
      "pdf": 4155
     },
     "facts": "747 x 206 px, 7.8 x 2.1 in. Smallest text 17.2px. Layout check: pass."
@@ -160,7 +160,7 @@
    "precision": {
     "files": {
      "svg": 22723,
-     "png": 133941,
+     "png": 133912,
      "pdf": 5574
     },
     "facts": "508 x 573 px, 5.3 x 6.0 in. Smallest text 17.2px. Layout check: pass."
@@ -173,8 +173,8 @@
    "sketch": {
     "files": {
      "svg": 151856,
-     "png": 215120,
-     "pdf": 43916
+     "png": 215798,
+     "pdf": 43915
     },
     "facts": "1005 x 463 px, 10.5 x 4.8 in. Smallest text 20px. Layout check: pass."
    },
@@ -182,7 +182,7 @@
     "files": {
      "svg": 22991,
      "png": 181061,
-     "pdf": 5504
+     "pdf": 5505
     },
     "facts": "997 x 451 px, 10.4 x 4.7 in. Smallest text 17.2px. Layout check: pass."
    }
@@ -202,7 +202,7 @@
    "precision": {
     "files": {
      "svg": 23214,
-     "png": 143748,
+     "png": 142801,
      "pdf": 5034
     },
     "facts": "662 x 878 px, 6.9 x 9.1 in. Smallest text 17.2px. Layout check: pass."
@@ -223,8 +223,8 @@
    "precision": {
     "files": {
      "svg": 27703,
-     "png": 217248,
-     "pdf": 5852
+     "png": 216817,
+     "pdf": 5853
     },
     "facts": "1041 x 1134 px, 10.8 x 11.8 in. Smallest text 17.2px. Layout check: pass."
    }
@@ -236,18 +236,39 @@
    "sketch": {
     "files": {
      "svg": 123226,
-     "png": 236221,
-     "pdf": 39450
+     "png": 231344,
+     "pdf": 39451
     },
     "facts": "471 x 920 px, 4.9 x 9.6 in. Smallest text 20px. Layout check: pass."
    },
    "precision": {
     "files": {
      "svg": 44471,
-     "png": 142810,
+     "png": 143117,
      "pdf": 8374
     },
     "facts": "461 x 909 px, 4.8 x 9.5 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "class-reflexive",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 78982,
+     "png": 138382,
+     "pdf": 22825
+    },
+    "facts": "322 x 654 px, 3.4 x 6.8 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 42252,
+     "png": 85266,
+     "pdf": 7037
+    },
+    "facts": "314 x 646 px, 3.3 x 6.7 in. Smallest text 17.2px. Layout check: pass."
    }
   }
  },
@@ -265,7 +286,7 @@
    "precision": {
     "files": {
      "svg": 41827,
-     "png": 120209,
+     "png": 119986,
      "pdf": 7828
     },
     "facts": "384 x 761 px, 4.0 x 7.9 in. Smallest text 17.2px. Layout check: pass."
@@ -278,7 +299,7 @@
    "sketch": {
     "files": {
      "svg": 624257,
-     "png": 744412,
+     "png": 747079,
      "pdf": 194043
     },
     "facts": "1757 x 2372 px, 18.3 x 24.7 in. Smallest text 20px. Layout check: pass."
@@ -299,7 +320,7 @@
    "sketch": {
     "files": {
      "svg": 142551,
-     "png": 254924,
+     "png": 254392,
      "pdf": 47699
     },
     "facts": "799 x 962 px, 8.3 x 10.0 in. Smallest text 20px. Layout check: pass."
@@ -307,7 +328,7 @@
    "precision": {
     "files": {
      "svg": 26232,
-     "png": 182581,
+     "png": 182387,
      "pdf": 5445
     },
     "facts": "788 x 959 px, 8.2 x 10.0 in. Smallest text 17.2px. Layout check: pass."
@@ -329,7 +350,7 @@
     "files": {
      "svg": 21377,
      "png": 77513,
-     "pdf": 4175
+     "pdf": 4174
     },
     "facts": "549 x 509 px, 5.7 x 5.3 in. Smallest text 17.2px. Layout check: pass."
    }
@@ -341,7 +362,7 @@
    "sketch": {
     "files": {
      "svg": 148842,
-     "png": 203276,
+     "png": 201721,
      "pdf": 42720
     },
     "facts": "953 x 424 px, 9.9 x 4.4 in. Smallest text 20px. Layout check: pass."
@@ -349,8 +370,8 @@
    "precision": {
     "files": {
      "svg": 22834,
-     "png": 167667,
-     "pdf": 5482
+     "png": 172469,
+     "pdf": 5481
     },
     "facts": "948 x 413 px, 9.9 x 4.3 in. Smallest text 17.2px. Layout check: pass."
    }
