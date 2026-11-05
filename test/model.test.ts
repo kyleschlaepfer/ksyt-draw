@@ -247,9 +247,16 @@ describe("diagnostics", () => {
     expect(rulesV2(d)[0].problem).toBe("Bob is the primary actor in the description but isn't linked to this use case.");
     expect(rulesV2(parseDoc(fixture("v2/usecase-described.ksd")))).toEqual([]);
   });
-  it("a line from a shape to itself is reported, not silently dropped", () => {
-    const d = parseDoc("diagram class\ntitle t\nclass A\nA -- A\n");
-    expect(rulesV2(d)[0]).toMatchObject({ rule_id: "STRUCT-SELF-LINE", nodes: ["A"] });
+  it("a line from a shape to itself is reported only where it can't be true", () => {
+    const self = (text: string) => rulesV2(parseDoc(text)).filter((f) => f.rule_id === "STRUCT-SELF-LINE");
+    // a class associated with itself and a step that repeats are good notation
+    expect(self("diagram class\ntitle t\nclass A\nA -- A\nA o-- A\n")).toEqual([]);
+    expect(self("diagram activity\ntitle t\nstart s\naction a\nend e\ns -> a\na -> a : again\na -> e\n")).toEqual([]);
+    expect(self("diagram class\ntitle t\nclass A\nA ..> A\n")[0]).toMatchObject({ severity: "major", nodes: ["A"], problem: "A class can't depend on itself." });
+    const uc = self("diagram use-case\ntitle t\nactor a\nuse-case u\na -- u\nu -include-> u\na -- a\n");
+    expect(uc.map((f) => f.problem)).toEqual(["A use case can't include itself.", "This line joins a shape to itself."]);
+    // a class that is its own parent is the cycle rule's
+    expect(rulesV2(parseDoc("diagram class\ntitle t\nclass A\nA --|> A\n")).map((f) => f.rule_id)).toEqual(["CLASS-GENERALIZATION-CYCLE"]);
   });
   it("every finding names its elements and the line to underline", () => {
     const p = parseSource(fixture("diagrams/flow-unlabeled.ksd"));

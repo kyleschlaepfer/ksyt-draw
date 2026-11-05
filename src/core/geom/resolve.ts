@@ -10,8 +10,8 @@ import { CONTAINERS } from "../doc/types";
 import { LINE, NODE_PX, PX, SMALL_PX, type Measurer } from "../measure";
 import { catmull } from "../pen";
 import { layoutNodes } from "./layout";
-import { pathLength, pointAt, routeEdge, type RouteInput, type TakenRoute } from "./route";
-import { ACTOR_H, CLASS_PAD_X, boxOf, contains, type NodeGeom, type Pt } from "./shape";
+import { LOOP_CORNERS, loopRoute, loopSpread, pathLength, pointAt, routeEdge, type RouteInput, type TakenRoute } from "./route";
+import { ACTOR_H, CLASS_PAD_X, SIDES, boxOf, contains, type NodeGeom, type Pt } from "./shape";
 
 export type TextRole = "ink" | "ink-2" | "accent" | "accent-strong" | "terra";
 
@@ -339,6 +339,7 @@ function placeEdgeTexts(m: Measurer, e: DocEdge, g: EdgeGeom, from: NodeGeom, ob
     const items: Array<[string, string, 1 | -1]> = [];
     if (ad.mult) items.push(["mult", ad.mult, 1]);
     if (ad.role) items.push(["role", ad.role, -1]);
+    let stacked = 0, outer: 1 | -1 | 0 = 0;
     for (const [what, s, side] of items) {
       const [w, h] = size(s, 400);
       const endDir = pointAt(path, end === "from" ? 0.001 : 0.999).dir;
@@ -350,7 +351,21 @@ function placeEdgeTexts(m: Measurer, e: DocEdge, g: EdgeGeom, from: NodeGeom, ob
       // the same side of the line at both ends, seen from the page: mirror the travel direction at the far end
       const sd: 1 | -1 = end === "from" ? side : (-side as 1 | -1);
       let c = besideAt(p, dir, w, h, sd, clear);
-      if (obs.cost(rectAt(c, w, h)) > 0) {
+      if (g.from === g.to) {
+        // a line back to its own shape: both texts stand outside the loop, one after the other along the end's
+        // run, the multiplicity nearest the shape. The loop turns away from that side, so there is room past it.
+        const tip = end === "from" ? path[0] : path[path.length - 1];
+        const away: Pt = end === "from" ? endDir : [-endDir[0], -endDir[1]];
+        const ext = Math.abs(endDir[0]) * w + Math.abs(endDir[1]) * h;
+        const q: Pt = [tip[0] + away[0] * (0.09 + stacked + ext / 2), tip[1] + away[1] * (0.09 + stacked + ext / 2)];
+        if (!outer) {
+          const mid: Pt = [g.points.reduce((a, r) => a + r[0], 0) / g.points.length, g.points.reduce((a, r) => a + r[1], 0) / g.points.length];
+          const far = (r: Pt): number => Math.hypot(r[0] - mid[0], r[1] - mid[1]);
+          outer = far(besideAt(q, endDir, w, h, 1, clear)) >= far(besideAt(q, endDir, w, h, -1, clear)) ? 1 : -1;
+        }
+        c = besideAt(q, endDir, w, h, outer, clear);
+        stacked += ext + (Math.abs(endDir[0]) > 0.5 ? 0.08 : 0.06);
+      } else if (obs.cost(rectAt(c, w, h)) > 0) {
         const alt = besideAt(p, dir, w, h, -sd as 1 | -1, clear);
         if (obs.cost(rectAt(alt, w, h)) < obs.cost(rectAt(c, w, h))) c = alt;
       }
@@ -475,15 +490,21 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
   const out: EdgeGeom[] = [];
   // where the lines before this one run, so a later line keeps out of their channels
   const taken: TakenRoute[] = [];
-  for (const e of d.edges) {
+  // every side a line is attached to, whichever way it points: a shape's line to itself goes where there is room
+  const used = new Map<string, Partial<Record<Side, number>>>();
+  // lines from a shape to itself are routed after the rest, so they can see which corners are free
+  for (const loops of [false, true]) for (const e of d.edges) {
     const from = nodes.get(e.from), to = nodes.get(e.to);
-    if (!from || !to || from === to || from.shape === "container" || from.shape === "lane" || to.shape === "container" || to.shape === "lane") continue;
+    if (!from || !to || from.shape === "container" || from.shape === "lane" || to.shape === "container" || to.shape === "lane") continue;
+    const loop = from === to;
+    if (loop !== loops) continue;
     const k = pairKey(e), n = pairCount.get(k) ?? 1, i = pairSeen.get(k) ?? 0;
     pairSeen.set(k, i + 1);
     if (only && !only.has(e.uid)) {
       const was = known?.get(e.uid);
       if (was) {
         note(leaves, e.from, was.fromSide); note(arrives, e.to, was.toSide);
+        note(used, e.from, was.fromSide); note(used, e.to, was.toSide);
         if (was.routeKind === "elbow") taken.push({ points: was.points, from: e.from, to: e.to });
       }
       continue;
@@ -493,7 +514,8 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
     if (lateral && e.from > e.to) lateral = -lateral;
     const [gapFrom, gapTo] = gaps(e.kind);
     const bend = !e.route ? bends.get(e.uid) : undefined;
-    const kind = e.route?.kind ?? (type === "use-case" ? "straight" : "elbow");
+    // a line from a shape to itself can only go round a corner
+    const kind = loop ? "elbow" : e.route?.kind ?? (type === "use-case" ? "straight" : "elbow");
     // elbow lines between the same two shapes take different sides instead of running side by side
     if (kind === "elbow") lateral = 0;
     const pf: RouteInput["prefer"] = {};
@@ -502,7 +524,15 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
       if (to.cy + to.h / 2 < from.cy - from.h / 2) { pf.from = "top"; pf.to = "bottom"; }
       else if (to.cy - to.h / 2 > from.cy + from.h / 2) { pf.from = "bottom"; pf.to = "top"; }
     }
-    const r = routeEdge({
+    let corner: readonly [Side | undefined, Side | undefined] = [e.route?.from, e.route?.to];
+    if (loop && !corner[0] && !corner[1]) {
+      // a free corner first; failing that, a bracket on one free side beats a corner that shares a side with another line
+      const busy = used.get(e.from) ?? {};
+      const cost = (c: readonly [Side, Side]): number => (c[0] === c[1] ? 2 * (busy[c[0]] ?? 0) + 0.5 : (busy[c[0]] ?? 0) + (busy[c[1]] ?? 0));
+      const spots: Array<readonly [Side, Side]> = [...LOOP_CORNERS, ...SIDES.filter((s) => loopSpread(from, s)).map((s) => [s, s] as const)];
+      corner = spots.sort((a, b) => cost(a) - cost(b))[0];
+    }
+    const r = loop && !e.route?.via?.length ? loopRoute(from, gapFrom, gapTo, i, corner[0], corner[1]) : routeEdge({
       from, to, kind, gapFrom, gapTo, flow, lateral, prefer: pf, taken,
       // bars take lines on both faces by design, and an undirected line has no leaving end
       ...(e.directed ? { sideCost: { from: from.shape === "bar" ? {} : costs(arrives, e.from), to: to.shape === "bar" ? {} : costs(leaves, e.to) } } : {}),
@@ -511,6 +541,7 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
       ...(e.route?.via ? { via: e.route.via.map((p) => [p[0], p[1]] as Pt) } : bend ? { via: [bend] } : {}),
     });
     if (e.directed) { note(leaves, e.from, r.fromSide); note(arrives, e.to, r.toSide); }
+    note(used, e.from, r.fromSide); note(used, e.to, r.toSide);
     if (kind === "elbow") taken.push({ points: r.points, from: e.from, to: e.to });
     out.push({
       uid: e.uid, id: e.id, kind: e.kind, from: e.from, to: e.to, points: r.points, smooth: !!bend, routeKind: kind, manual: !!e.route,
@@ -518,5 +549,6 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
       ...(e.style ? { style: e.style } : {}),
     });
   }
-  return out;
+  const order = new Map(d.edges.map((e, i) => [e.uid, i]));
+  return out.sort((a, b) => order.get(a.uid)! - order.get(b.uid)!);
 }

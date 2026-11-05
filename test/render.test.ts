@@ -449,6 +449,61 @@ describe("portable svg (the export)", () => {
   });
 });
 
+describe("a line from a shape to itself", () => {
+  const loopOf = (g: Geometry, id: string, nth = 0) => g.edges.filter((e) => e.from === id && e.to === id)[nth];
+  const square = (pts: Array<[number, number]>): boolean => pts.every((p, i) => !i || Math.abs(p[0] - pts[i - 1][0]) < 1e-9 || Math.abs(p[1] - pts[i - 1][1]) < 1e-9);
+  it("goes round a corner of the shape, clear of it, and the frame grows to hold it", () => {
+    const g = geo("diagram class\ntitle t\nclass A\nA -- A : knows\n");
+    const e = loopOf(g, "A"), a = g.nodes.get("A")!;
+    expect([e.fromSide, e.toSide]).toEqual(["right", "top"]);
+    expect(e.points.length).toBe(5);
+    expect(square(e.points)).toBe(true);
+    expect(hits(e.points, [a], { from: a, to: a })).toBe(0);
+    for (const p of e.points.slice(1, -1)) expect(contains(a, p[0], p[1], 0.2)).toBe(false);
+    expect(g.bounds[2]).toBeGreaterThan(a.cx + a.w / 2 + 0.3);
+    expect(g.bounds[1]).toBeLessThan(a.cy - a.h / 2 - 0.3);
+  });
+  it("takes a corner no other line uses, and a second loop takes another", () => {
+    const g = geo("diagram class\ntitle t\nclass A\nclass B\nB -- A\nA -- A : one\nA -- A : two\n");
+    const into = g.edges.find((e) => e.from === "B")!;
+    expect(into.toSide).toBe("top");
+    const one = loopOf(g, "A", 0), two = loopOf(g, "A", 1);
+    expect([one.fromSide, one.toSide]).not.toContain("top");
+    expect([one.fromSide, one.toSide].join()).not.toBe([two.fromSide, two.toSide].join());
+  });
+  it("stands as a bracket on one free side when the corners all touch a busy side", () => {
+    const g = geos.get("class-reflexive.ksd")!;
+    const e = loopOf(g, "Employee");
+    expect([e.fromSide, e.toSide]).toEqual(["right", "right"]);
+    expect(e.points.length).toBe(4);
+    expect(square(e.points)).toBe(true);
+    // an ellipse has one place on each side, so it keeps to corners
+    const uc = geo("diagram use-case\ntitle t\nactor a\nuse-case u\na -- u\nu -include-> u\n");
+    const l = loopOf(uc, "u");
+    expect(l.fromSide).not.toBe(l.toSide);
+  });
+  it("multiplicities and role names stand outside the loop", () => {
+    const g = geos.get("class-reflexive.ksd")!;
+    for (const id of ["Employee", "Folder"]) {
+      const e = loopOf(g, id);
+      const xs = e.points.map((p) => p[0]), ys = e.points.map((p) => p[1]);
+      const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+      const ends = g.texts.filter((t) => t.owner === e.id && /-(mult|role)$/.test(t.name ?? ""));
+      expect(ends.length).toBe(4);
+      for (const t of ends) expect(t.x > box[0] + 0.05 && t.x < box[2] - 0.05 && t.cy > box[1] + 0.05 && t.cy < box[3] - 0.05, t.s).toBe(false);
+    }
+  });
+  it("the author's sides and corners are kept, and a looped shape gets room in the ranking", () => {
+    const g = geo("diagram class\ntitle t\nclass A\nA -- A\nlayout {\n  route A -- A elbow from left to bottom\n}\n");
+    const e = loopOf(g, "A");
+    expect([e.fromSide, e.toSide]).toEqual(["left", "bottom"]);
+    const plain = geo("diagram flowchart\ntitle t\nprocess a\nprocess b\nprocess c\na -> b\na -> c\n");
+    const loopy = geo("diagram flowchart\ntitle t\nprocess a\nprocess b\nprocess c\na -> b\na -> c\nb -> b : again\n");
+    const gap = (x: Geometry) => Math.abs(x.nodes.get("b")!.cx - x.nodes.get("c")!.cx);
+    expect(gap(loopy)).toBeGreaterThan(gap(plain) + 0.2);
+  });
+});
+
 describe("resolving part of a drag", () => {
   it("re-routing only the moved shape's lines gives what a full pass gives for them", () => {
     const d = docs.get("flow-branched.ksd")!;

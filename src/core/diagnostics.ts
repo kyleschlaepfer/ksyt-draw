@@ -62,9 +62,23 @@ export function rulesV2(d: ChalkDoc): RuleFinding[] {
   const name = (id: string): string => (byId.get(id)?.label ?? id).replace(/\n/g, " ");
 
   for (const e of d.edges) {
-    if (e.from === e.to && byId.has(e.from)) {
-      add("minor", "STRUCT-SELF-LINE", `${name(e.from)} -> ${name(e.to)}`, "This line joins a shape to itself, and Chalk doesn't draw those yet.",
-        "A relationship that isn't drawn can't be read.", "Leave it out, or show the repeat with a decision that loops back.", { nodes: [e.from], edges: [e.uid] });
+    // a line from a shape to itself is drawn, and some are good notation (a class associated with itself, a step
+    // that repeats). These are the ones that say something that can't be true. A class that is its own parent is
+    // left to CLASS-GENERALIZATION-CYCLE.
+    if (e.from !== e.to || !byId.has(e.from)) continue;
+    const loc = `${name(e.from)} -> ${name(e.to)}`, about = { nodes: [e.from], edges: [e.uid] };
+    const fix = "Point the line at the other shape, or take it out.";
+    if (d.meta.type === "use-case") {
+      if (e.kind === "include" || e.kind === "extend") {
+        add("major", "STRUCT-SELF-LINE", loc, `A use case can't ${e.kind} itself.`,
+          "Include and extend relate two different use cases: one borrows behavior from the other, or adds to it.", fix, about);
+      } else {
+        add("major", "STRUCT-SELF-LINE", loc, "This line joins a shape to itself.",
+          "In a use-case diagram a line says an actor takes part in a use case, or relates two different use cases.", fix, about);
+      }
+    } else if (d.meta.type === "class" && (e.kind === "realization" || e.kind === "dependency")) {
+      add("major", "STRUCT-SELF-LINE", loc, `A class can't ${e.kind === "realization" ? "realize" : "depend on"} itself.`,
+        "The line says one classifier implements or needs another.", fix, about);
     }
   }
 

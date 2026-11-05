@@ -486,5 +486,47 @@ export function routeEdge(inp: RouteInput): RouteResult {
   return elbowAuto(inp);
 }
 
+/** How far a line from a shape to itself stands off the shape. */
+export const LOOP = 0.4;
+/** The corners a shape's own lines go round, in the order they are used: each is a side to leave from and a side to come back to. */
+export const LOOP_CORNERS: ReadonlyArray<readonly [Side, Side]> = [["right", "top"], ["bottom", "right"], ["left", "bottom"], ["top", "left"]];
+
+/** How far from a side's middle each end of a loop on that one side sits, or 0 when the side has no room for two ends. */
+export function loopSpread(g: NodeGeom, side: Side): number {
+  const s = Math.min(slideRoom(g, side), (side === "top" || side === "bottom" ? g.w : g.h) / 4);
+  return s >= 0.15 ? s : 0;
+}
+
+/**
+ * A line from a shape to itself: out of one side, round the corner, back into the next side. When both
+ * ends are on one side (a box whose other sides are busy) it is a bracket standing on that side. `nth` is
+ * how many such lines the shape already has, so each takes its own corner (and a wider turn after four).
+ */
+export function loopRoute(g: NodeGeom, gapFrom: number, gapTo: number, nth = 0, fromSide?: Side, toSide?: Side): RouteResult {
+  const adjacent = (a: Side, b: Side): boolean => a !== b && NORMAL[a][0] * NORMAL[b][0] + NORMAL[a][1] * NORMAL[b][1] === 0;
+  let [fs, ts]: readonly [Side, Side] = LOOP_CORNERS[nth % LOOP_CORNERS.length];
+  if (fromSide && toSide && adjacent(fromSide, toSide)) { fs = fromSide; ts = toSide; }
+  else if (fromSide) { const c = LOOP_CORNERS.find((x) => x[0] === fromSide)!; fs = c[0]; ts = c[1]; }
+  else if (toSide) { const c = LOOP_CORNERS.find((x) => x[1] === toSide)!; fs = c[0]; ts = c[1]; }
+  const reach = LOOP + 0.25 * Math.floor(nth / LOOP_CORNERS.length);
+  const nf = NORMAL[fs], nt = NORMAL[ts];
+  if (fromSide && fromSide === toSide && loopSpread(g, fromSide)) {
+    const s = loopSpread(g, fromSide), upright = fromSide === "left" || fromSide === "right";
+    const a = sideAnchor(g, fromSide, -s, gapFrom), b = sideAnchor(g, fromSide, s, gapTo);
+    const out = (p: Pt): Pt => (upright ? [g.cx + nf[0] * (g.w / 2 + reach), p[1]] : [p[0], g.cy + nf[1] * (g.h / 2 + reach)]);
+    return { points: [a, out(a), out(b), b], fromSide, toSide: fromSide, blocked: false };
+  }
+  // on a box the two ends slide toward the corner, so the loop hugs it instead of spanning half the shape
+  const toward = (side: Side, other: Pt): number => {
+    const along = side === "top" || side === "bottom" ? other[0] : other[1];
+    return along * Math.min(slideRoom(g, side), (side === "top" || side === "bottom" ? g.w : g.h) / 4);
+  };
+  const a = sideAnchor(g, fs, toward(fs, nt), gapFrom), b = sideAnchor(g, ts, toward(ts, nf), gapTo);
+  const corner: Pt = [g.cx + (nf[0] + nt[0]) * (g.w / 2 + reach), g.cy + (nf[1] + nt[1]) * (g.h / 2 + reach)];
+  const sideways = fs === "left" || fs === "right";
+  const points: Pt[] = sideways ? [a, [corner[0], a[1]], corner, [b[0], corner[1]], b] : [a, [a[0], corner[1]], corner, [corner[0], b[1]], b];
+  return { points, fromSide: fs, toSide: ts, blocked: false };
+}
+
 /** The interior corners of a route, which is what a hand-bent elbow line stores. */
 export const interior = (pts: Pt[]): Pt[] => pts.slice(1, -1);

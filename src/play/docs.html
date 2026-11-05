@@ -246,6 +246,10 @@ file -&gt; done</code></pre>
 ok -&gt; notify : no
 checked -&gt; refund : [approved]</code></pre>
   <p>Flowcharts say <code>yes</code> and <code>no</code>; activity diagrams use guards in square brackets. Labels sit beside the line, never on it, and move to the other side by themselves if something is in the way.</p>
+  <h3>a line back to the same shape</h3>
+  <p>Both ends of an edge can name the same node. The line leaves one side, goes round a corner of the shape and comes back in the next side; on a box whose corners are busy it stands on one free side instead. A class associated with itself is the usual case:</p>
+  <pre data-ksd="class"><code>Employee "0..1 manager" -- "* reports" Employee : manages</code></pre>
+  <p>In a flowchart or an activity diagram it reads as a step that repeats. The check reports the ones that can't be true (<code>STRUCT-SELF-LINE</code>): a use case that includes itself, a class that realizes itself. The draw tab shows these lines and lets you bend, rename and delete them, but they are started here, in the text.</p>
   <h3>edge ids</h3>
   <p>Edges are numbered <code>e1</code>, <code>e2</code>, ... in file order. You'll see those ids in findings ("edge e2") and as <code>data-name</code> on the SVG groups.</p>
   <h3>edges to nothing</h3>
@@ -698,7 +702,7 @@ Square --|&gt; Rectangle</code></pre>
     <tbody>
       <tr><td><code>STRUCT-DANGLING-EDGE</code></td><td>major</td><td>An edge end that names no node.</td></tr>
       <tr><td><code>STRUCT-ISOLATED</code></td><td>minor</td><td>A node nothing connects to, in a diagram that has edges.</td></tr>
-      <tr><td><code>STRUCT-SELF-LINE</code></td><td>minor</td><td>An edge from a node to itself. Those aren't drawn yet, and a relationship that isn't drawn can't be read.</td></tr>
+      <tr><td><code>STRUCT-SELF-LINE</code></td><td>major</td><td>A line from a shape to itself that can't be true: a use case that includes or extends itself, any other self line in a use-case diagram, a class that realizes or depends on itself. A class associated with itself and a step that repeats are fine, and they're drawn round a corner of the shape.</td></tr>
     </tbody>
   </table>
 
@@ -937,7 +941,7 @@ Square --|&gt; Rectangle</code></pre>
     <li>Four families: flowchart, activity, use-case and class. Sequence, state and ERD have their rules in the check already; the text format for them comes later.</li>
     <li>No freehand drawing, ever. Shapes are predefined and the pen only renders them.</li>
     <li>The draw tab places, names, connects, resizes and drags shapes, and writes the result back as this text. What you arrange by hand goes into the layout block. "let it find its own place" hands one shape back to the automatic layout, and "tidy up" hands back as many as you choose.</li>
-    <li>No edge from a node to itself. It parses, the check reports it, and nothing is drawn.</li>
+    <li>The draw tab can't start a line from a shape back to itself. Write it in the text; after that it can be bent, renamed and deleted like any other line.</li>
     <li>No lanes inside lanes, and no notes attached to a specific node.</li>
     <li>No colors of your own. A <code>style</code> line picks from the theme's pens, by design.</li>
     <li>No saving to an account. The link is the file.</li>

@@ -1,0 +1,19 @@
+# Lines from a class back to itself: a reflexive association and a tree that holds itself
+diagram class
+id org-tree
+title An employee reports to another employee, and a folder holds folders
+desc Class diagram. Employee is associated with itself: each employee has at most one manager and any number of reports. Folder is composed of folders. A team is staffed by employees, and an employee owns folders.
+
+class Team
+class Employee {
+  +name: String
+  +hire(): void
+}
+class Folder {
+  +name: String
+}
+
+Team "1" o-- "1..*" Employee : staffed by
+Employee "0..1 manager" -- "* reports" Employee : manages
+Folder "0..1 parent" *-- "* children" Folder : holds
+Employee "1 owner" -- "*" Folder : owns

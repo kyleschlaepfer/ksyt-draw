@@ -31,6 +31,8 @@ export const LANE_GAP = 0.4;
 export const LANE_MIN = 1.8;
 /** how far past a decision's corner its answer must stand for the line to leave the corner and turn once */
 const CORNER_REACH = 0.3;
+/** Added to the width and height the ranking sees for a shape that has a line back to itself. */
+const LOOP_ROOM = 0.5;
 
 const place = (g: NodeGeom, n: DocNode): void => { if (n.place) { g.cx = n.place.x; g.cy = n.place.y; } };
 
@@ -66,11 +68,14 @@ function layoutFlow(d: ChalkDoc, m: Measurer, dirIn: "down" | "right"): Placemen
         g.setDefaultEdgeLabel(() => ({}));
         for (const [id, n] of nodes) {
           const extra = room.get(id) ?? 0;
-          g.setNode(id, { width: (n.w + (vertical ? 0 : extra)) * PX, height: (n.h + (vertical ? extra : 0)) * PX });
+          // a shape with a line back to itself needs room round it for the loop
+          const loop = edges.some((e) => e.from === id && e.to === id) ? LOOP_ROOM : 0;
+          g.setNode(id, { width: (n.w + loop + (vertical ? 0 : extra)) * PX, height: (n.h + loop + (vertical ? extra : 0)) * PX });
         }
         // dagre orders siblings by its DFS over successors in insertion order, which comes out mirrored;
         // inserting the edges last-to-first keeps the author's file order left to right
         for (const e of [...edges].reverse()) {
+          if (e.from === e.to) continue;
           // a parent sits above its children whichever way the line was written
           const up = e.kind === "generalization" || e.kind === "realization";
           g.setEdge(up ? e.to : e.from, up ? e.from : e.to, {}, e.uid);
