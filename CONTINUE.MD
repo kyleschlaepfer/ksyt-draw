@@ -1,11 +1,11 @@
 # CONTINUE: Chalk (KSyt-Draw)
 
-## Now: immersive draw (2026-11-05, branch `feat/immersive-draw`, local only)
+## Now: immersive draw (2026-11-05, released)
 
 The authoritative assignment is `prompts/CHALK_OPUS_UX_HANDOFF_2026-11-05.md`: make draw feel like
 a diagramming application rather than an editor set into a page, keeping Chalk's look. It is
-implemented and committed on `feat/immersive-draw` (from `a237b02`). **Not pushed, not merged, not
-deployed**: the owner reviews first.
+implemented on `feat/immersive-draw` (from `a237b02`), fast-forwarded to `main` as `1d6f8f2` and
+live at https://chalk.kyleschlaepfer.com (a push to `main` deploys; the build was live about a minute later).
 
 Read, in order: `docs/revamp/IMMERSIVE_DRAW_REPORT.md` (acceptance matrix, files, commands, manual
 QA script), `docs/revamp/IMMERSIVE_DRAW_UX_AUDIT.md` (issues, causes, remedies, before/after
