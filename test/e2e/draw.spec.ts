@@ -30,6 +30,13 @@ test.describe("placing and editing shapes", () => {
     await page.mouse.click(spot[0], spot[1]);
     const d1 = await box(page, "decision1");
     expect(near(d1.cx, spot[0]) && near(d1.cy, spot[1])).toBe(true);
+    // The library remains armed so several empty shapes can be laid out before any are named.
+    await expect(page.locator('.draw-shape[data-kind="decision"]')).toHaveAttribute("aria-pressed", "true");
+    const spot2: [number, number] = [cv.x + cv.width / 2, cv.y + cv.height / 2];
+    await page.mouse.click(spot2[0], spot2[1]);
+    const d2 = await box(page, "decision2");
+    expect(near(d2.cx, spot2[0]) && near(d2.cy, spot2[1])).toBe(true);
+    await page.keyboard.press("Escape");
     await expect(page.locator('.draw-shape[data-kind="decision"]')).toHaveAttribute("aria-pressed", "false");
     // nothing that was already there moved, and nothing was renamed
     const after = await inspect(page);
@@ -38,7 +45,7 @@ test.describe("placing and editing shapes", () => {
       expect(now.id).toBe(n.id);
       expect(Math.abs(now.x - n.x) + Math.abs(now.y - n.y), `${n.id} moved`).toBeLessThan(0.002);
     }
-    expect(after.text).toContain('action action1 "action 1"');
+    expect(after.text).toContain('action action1 ""');
     // a drop outside the canvas adds nothing
     await drag(page, [item.x + 10, item.y + 10], [cv.x + 300, cv.y + cv.height + 60]);
     expect((await inspect(page)).nodes.length).toBe(after.nodes.length);
@@ -140,7 +147,13 @@ test.describe("placing and editing shapes", () => {
 
   test("C: dragging at several zoom levels moves the shape with the pointer, keeps the view still and re-routes its lines live", async ({ page }) => {
     await openTool(page, ACTIVITY, "draw");
-    for (const presses of [0, 2, -4]) {
+    await page.getByRole("button", { name: "library" }).click();
+    await page.getByRole("button", { name: "properties hide" }).click();
+    for (const presses of [0, 2, -2]) {
+      // Exercise each zoom from the same document position rather than eventually dragging
+      // beyond the clipped viewport of the deliberately docked canvas workspace.
+      await openTool(page, ACTIVITY, "draw");
+      await page.locator("#draw-zoom").click();
       for (let i = 0; i < Math.abs(presses); i++) await page.getByRole("button", { name: presses > 0 ? "zoom in" : "zoom out" }).click();
       const z = await zoom(page);
       const b = await box(page, "pay"), other = await box(page, "review");
@@ -149,16 +162,16 @@ test.describe("placing and editing shapes", () => {
       let mid = "";
       // Alt switches snapping off, so the shape goes exactly where the pointer does
       await page.keyboard.down("Alt");
-      await drag(page, [b.cx, b.cy], [b.cx + 140, b.cy + 30], {
+      await drag(page, [b.cx, b.cy], [b.cx + 80, b.cy + 30], {
         hold: async () => { mid = await page.locator('.layer-edges g[data-name="e2"]').innerHTML(); },
       });
       await page.keyboard.up("Alt");
       const after = await node(page, "pay");
-      // 140 px on screen is 140 / zoom px in the document
-      expect(near((after.x - before.x) * 96 * z, 140, 3), `zoom ${z}: moved ${(after.x - before.x) * 96 * z}px`).toBe(true);
+      // 80 px on screen is 80 / zoom px in the document
+      expect(near((after.x - before.x) * 96 * z, 80, 3), `zoom ${z}: moved ${(after.x - before.x) * 96 * z}px`).toBe(true);
       expect(near((after.y - before.y) * 96 * z, 30, 3)).toBe(true);
       const now = await box(page, "pay");
-      expect(near(now.cx, b.cx + 140, 3)).toBe(true);
+      expect(near(now.cx, b.cx + 80, 3)).toBe(true);
       // the view did not jump: a shape that was not dragged is where it was
       const still = await box(page, "review");
       expect(near(still.cx, other.cx, 0.6) && near(still.cy, other.cy, 0.6)).toBe(true);
@@ -211,6 +224,20 @@ test.describe("placing and editing shapes", () => {
 });
 
 test.describe("lines", () => {
+  test("relationship tools can be completed entirely from the keyboard", async ({ page }) => {
+    await openTool(page, 'diagram activity\ntitle Keyboard connector\n\naction one ""\naction two ""\n', "draw");
+    await page.getByRole("button", { name: "control flow", exact: true }).click();
+    await expect(canvas(page)).toBeFocused();
+    await page.keyboard.press("ArrowRight"); // keyboard entry selects the first shape
+    await page.keyboard.press("Enter");      // source
+    await expect(status(page)).toContainText("choose the target");
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Enter");      // target
+    await expect(status(page)).toContainText("connected");
+    expect(await getText(page)).toContain("one -> two");
+    await expect(page.getByRole("button", { name: "control flow", exact: true })).toHaveAttribute("aria-pressed", "false");
+  });
+
   test("E: drag from a port to another shape: a live preview, a highlighted target, and a line attached to both outlines", async ({ page }) => {
     await openTool(page, ACTIVITY, "draw");
     const cv = (await canvas(page).boundingBox())!;
@@ -249,11 +276,13 @@ test.describe("lines", () => {
     expect(line.fromSide).toBe("right");
     // the new line is selected, ready for its label
     await expect(page.locator(".draw-inspector h2")).toHaveText("line");
-    // a line can't join a shape to itself, and says so
+    // the same port gesture can make a self-link entirely in Draw
     await page.mouse.move(from.cx, from.cy);
     const again = (await page.locator('.overlay .port[data-port="top"]').boundingBox())!;
     await drag(page, [again.x + 6, again.y + 6], [from.cx, from.cy + 4]);
-    expect((await inspect(page)).edges.length).toBe(4);
+    const withLoop = await inspect(page);
+    expect(withLoop.edges.length).toBe(5);
+    expect(withLoop.edges.some((e) => e.from === "review" && e.to === "review" && e.points.length >= 4)).toBe(true);
     await page.screenshot({ path: "test-results/draw-connected.png" });
   });
 
@@ -357,15 +386,40 @@ test.describe("lines", () => {
   });
 });
 
+test.describe("class compartments", () => {
+  test("attributes and operations can be added and edited directly on the class", async ({ page }) => {
+    await openTool(page, ksdOf("class-orders"), "draw");
+    await clickNode(page, "Customer");
+    await page.locator('.quick-add[data-add-member="attribute"]').click();
+    await expect(inline(page)).toHaveValue("+attribute1: Type");
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.type("+sku: String");
+    await page.keyboard.press("Enter");
+    expect(await getText(page)).toContain("+sku: String");
+
+    await clickNode(page, "Customer");
+    await canvas(page).focus();
+    await page.keyboard.press("Alt+o");
+    await expect(inline(page)).toHaveValue("+operation1(): Type");
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.type("+find(id: String): Product");
+    await page.keyboard.press("Enter");
+    expect(await getText(page)).toContain("+find(id: String): Product");
+    await expect(page.locator('.layer-texts text[data-name="Customer:m3"]')).toHaveText("+sku: String");
+    await expect(page.locator('.layer-texts text[data-name="Customer:m4"]')).toHaveText("+find(id: String): Product");
+  });
+});
+
 test.describe("swimlanes", () => {
   test("I: build three lanes, put actions in them, and connect across lanes: membership is real and the geometry agrees", async ({ page }) => {
     await openTool(page, "diagram activity\ntitle Who does what\n\nstart begin\n", "draw");
     const cv = (await canvas(page).boundingBox())!;
     // three partitions, from the palette
+    await page.locator('.draw-shape[data-kind="partition"]').click();
     for (let i = 0; i < 3; i++) {
-      await page.locator('.draw-shape[data-kind="partition"]').click();
       await page.mouse.click(cv.x + 300, cv.y + 300);
     }
+    await page.keyboard.press("Escape");
     let state = await inspect(page);
     expect(state.nodes.filter((n) => n.kind === "partition").map((n) => n.id)).toEqual(["lane1", "lane2", "lane3"]);
     // name them in place
@@ -388,7 +442,7 @@ test.describe("swimlanes", () => {
     }
     state = await inspect(page);
     expect(state.nodes.filter((n) => n.kind === "action").map((n) => [n.id, n.parent])).toEqual([["action1", "lane1"], ["action2", "lane2"], ["action3", "lane3"]]);
-    expect(state.text).toMatch(/partition lane1 "Customer" \{\n {2}action action1 "action 1"\n\}/);
+    expect(state.text).toMatch(/partition lane1 "Customer" \{\n {2}action action1 ""\n\}/);
     // each action is drawn inside its own lane
     for (const n of state.nodes.filter((x) => x.kind === "action")) {
       const lane = state.nodes.find((x) => x.id === n.parent)!;
@@ -417,10 +471,15 @@ test.describe("swimlanes", () => {
 
   test("J: drag a lane divider and move an action to another lane: lanes shift together, membership follows, lines stay attached", async ({ page }) => {
     await openTool(page, ksdOf("activity-lanes"), "draw");
+    // Return the optional side zones while manipulating a wide three-lane pool.
+    await page.getByRole("button", { name: "library" }).click();
+    await page.getByRole("button", { name: "properties hide" }).click();
+    await page.getByRole("button", { name: "fit", exact: true }).click();
     const before = await inspect(page);
     const customer = before.nodes.find((n) => n.id === "customer")!;
-    const edgeX = customer.x + customer.w / 2;
-    const at = await toPage(page, [edgeX, customer.y]);
+    const customerUid = before.nodes.find((n) => n.id === "customer")!.uid;
+    const divider = (await page.locator(`.divider[data-divider="${customerUid}"]`).boundingBox())!;
+    const at: [number, number] = [divider.x + divider.width / 2, divider.y + divider.height / 2];
     const z = await zoom(page);
     await drag(page, at, [at[0] + 90, at[1]]);
     let now = await inspect(page);

@@ -108,6 +108,32 @@ main { display: block; padding-bottom: var(--s-8); }
 .menu-item:hover, .menu-item:focus-visible { background: var(--wash); }
 .menu-item:disabled { color: var(--ink-2); cursor: default; background: none; }
 .menu-hint { font: var(--text-sm)/1.3 var(--font-body); color: var(--ink-2); }
+.type-dialog {
+  width: min(46rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: var(--s-3); color: var(--ink); background: var(--page);
+  border: 1.5px solid var(--rule); border-radius: 6px;
+}
+.type-dialog[open] { display: grid; gap: var(--s-2); }
+.type-dialog::backdrop { background: color-mix(in srgb, var(--page) 72%, transparent); }
+.type-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.type-dialog h2 { margin: 0; font: 400 1.75rem/1.2 var(--font-hand); }
+.type-dialog > .note { margin: 0; }
+.type-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); }
+.type-choice {
+  display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: var(--s-2); align-items: center; text-align: left;
+  min-height: 7rem; padding: var(--s-2); color: var(--ink); background: var(--page-2); border: 1.5px solid var(--rule); border-radius: 6px; cursor: pointer;
+}
+.type-choice:hover, .type-choice:focus-visible { border-color: var(--accent); background: var(--wash); }
+.type-choice-words { display: grid; gap: 0.25rem; }
+.type-choice-words strong { font: 400 var(--hand)/1.15 var(--font-hand); }
+.type-choice-words .note { font-size: var(--text-sm); }
+.type-preview { display: block; position: relative; width: 4.6rem; height: 3.4rem; border: 1.7px solid currentColor; }
+.type-preview-flowchart { border-radius: 1.7rem; }
+.type-preview-activity { width: 3.7rem; height: 3.7rem; transform: rotate(45deg) scale(0.72); }
+.type-preview-use-case { border-radius: 50%; }
+.type-preview-class::before, .type-preview-class::after { content: ""; position: absolute; left: 0; right: 0; border-top: 1.5px solid currentColor; }
+.type-preview-class::before { top: 32%; }
+.type-preview-class::after { top: 66%; }
+@media (max-width: 36rem) { .type-choices { grid-template-columns: 1fr; } }
 .play-status { min-height: 1.6em; margin: 0; }
 .play-preview { min-width: 0; }
 .play-preview figure.fig > .fig-stage { justify-content: flex-start; }
@@ -153,9 +179,14 @@ main { display: block; padding-bottom: var(--s-8); }
   .docs-body .table tr { border-bottom: 1px solid var(--rule); padding-bottom: 0.5rem; }
 }
 
-/* ---------- draw: the shapes down the left like a list, the canvas taking the rest ---------- */
-.draw-editor { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr); gap: var(--s-3); align-items: start; }
-@media (max-width: 56rem) { .draw-editor { grid-template-columns: 1fr; } }
+/* ---------- draw: a collapsible library, a dominant canvas and a docked inspector ---------- */
+.draw-editor { display: grid; grid-template-columns: 13rem minmax(0, 1fr) auto; gap: var(--s-2); align-items: start; }
+.draw-editor.library-collapsed { grid-template-columns: 0 minmax(0, 1fr) auto; }
+.draw-editor.library-collapsed .draw-side { display: none; }
+.draw-side { grid-column: 1; }
+.draw-main { grid-column: 2; }
+.draw-inspector { grid-column: 3; }
+@media (max-width: 56rem) { .draw-editor, .draw-editor.library-collapsed { grid-template-columns: 1fr; } }
 .draw-side { display: grid; gap: var(--s-3); }
 @media (max-width: 56rem) { .draw-side { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--s-2); } }
 .draw-sec { display: grid; gap: var(--s-1); align-content: start; padding-top: var(--s-2); border-top: 1px dashed var(--rule); }
@@ -173,20 +204,37 @@ main { display: block; padding-bottom: var(--s-8); }
 .draw-field input:focus-visible, .draw-field select:focus-visible, .draw-field textarea:focus-visible, .member-row input:focus-visible { border-color: var(--accent); }
 .draw-check { display: flex; align-items: center; gap: 0.5rem; min-height: 40px; font: var(--hand-sm)/1.2 var(--font-hand); }
 .draw-check input { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
-.draw-palette { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.draw-palette { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
 .draw-shape {
-  font: var(--hand-sm)/1 var(--font-hand); color: var(--ink); background: var(--page-2); cursor: grab;
-  border: 1.5px solid transparent; border-radius: 0.55em 0.8em 0.6em 0.75em / 0.8em 0.55em 0.75em 0.6em;
-  padding: 0 0.8rem; min-height: 44px; touch-action: none; user-select: none;
+  display: grid; place-items: center; align-content: center; gap: 0.2rem; min-width: 0;
+  font: 300 1rem/1.05 var(--font-body); color: var(--ink); background: var(--page-2); cursor: grab;
+  border: 1.5px solid var(--rule); border-radius: 6px;
+  padding: 0.4rem 0.25rem; min-height: 78px; touch-action: none; user-select: none;
   transition: background-color var(--dur-fast) var(--ease-out);
 }
+.draw-shape > span { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.palette-glyph, .relation-glyph { overflow: visible; stroke: currentColor; stroke-width: 1.7; fill: none; vector-effect: non-scaling-stroke; }
+.palette-glyph .glyph-fill, .relation-glyph .glyph-fill { fill: currentColor; }
 .draw-shape:hover { background: var(--wash); }
 .draw-shape:active { cursor: grabbing; }
-/* the armed shape is told by an outline and a mark as well as its color */
+/* the armed shape is told by words and an outline as well as color */
 .draw-shape[aria-pressed="true"] { background: var(--wash); border-color: var(--accent); }
-.draw-shape[aria-pressed="true"]::before { content: "\2713\00a0"; }
+.draw-shape[aria-pressed="true"]::after { content: "placing"; font: 700 0.72rem/1 var(--font-body); }
+.relation-palette { display: grid; gap: 0.35rem; }
+.draw-relation-tool {
+  display: grid; grid-template-columns: 3rem minmax(0, 1fr); align-items: center; gap: 0.35rem; width: 100%;
+  color: var(--ink); background: var(--page-2); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.35rem 0.45rem;
+  font: 300 0.95rem/1.1 var(--font-body); text-align: left; cursor: crosshair;
+}
+.draw-relation-tool:hover { background: var(--wash); }
+.draw-relation-tool[aria-pressed="true"] { border-color: var(--accent); background: var(--wash); font-weight: 700; }
 
 .draw-main { min-width: 0; display: grid; gap: var(--s-1); }
+.draw-context { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); min-width: 0; }
+.draw-context-words { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; min-width: 0; }
+.draw-type { font: 400 var(--hand)/1.15 var(--font-hand); }
+.draw-title { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draw-context .btn-quiet { min-height: 36px; flex: none; }
 .draw-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--s-2); }
 .draw-toolbar .btn-quiet { min-height: 40px; min-width: 32px; }
 .draw-toolbar .btn-quiet[aria-pressed="true"] { color: var(--ink); position: relative; }
@@ -201,7 +249,7 @@ main { display: block; padding-bottom: var(--s-8); }
 /* the stage holds the canvas, the floating properties panel and the in-place text field */
 .draw-stage { position: relative; min-width: 0; }
 .draw-canvas {
-  position: relative; height: clamp(30rem, 74vh, 64rem); overflow: hidden; touch-action: none; cursor: default;
+  position: relative; height: clamp(34rem, 78vh, 68rem); overflow: hidden; touch-action: none; cursor: default;
   background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px; user-select: none; -webkit-user-select: none;
 }
 .draw-canvas:focus-visible { outline-offset: 2px; border-color: var(--accent); }
@@ -209,6 +257,7 @@ main { display: block; padding-bottom: var(--s-8); }
 .draw-canvas .grid-dot { fill: var(--rule); }
 .draw-canvas.is-panning { cursor: grabbing; }
 .draw-canvas.is-placing { cursor: copy; }
+.draw-canvas.is-connecting { cursor: crosshair; }
 .draw-canvas.is-waiting { cursor: default; }
 .draw-stage.is-readonly .draw-canvas { border-style: dashed; }
 .draw-canvas .layer-texts { pointer-events: none; }
@@ -244,6 +293,10 @@ main { display: block; padding-bottom: var(--s-8); }
 .draw-canvas .preview.is-bad { stroke: var(--terra-ink); stroke-dasharray: 2 5; }
 .draw-canvas .target { fill: none; stroke: var(--accent); stroke-width: 2.5px; pointer-events: none; }
 .draw-canvas .target.is-bad { stroke: var(--terra-ink); stroke-dasharray: 3 4; }
+.draw-canvas .quick-add { cursor: pointer; }
+.draw-canvas .quick-add rect { fill: var(--page); stroke: var(--accent-strong); stroke-width: 1.5px; }
+.draw-canvas .quick-add:hover rect { fill: var(--wash); }
+.draw-canvas .quick-add text { fill: var(--ink); stroke: none; font: 13px var(--font-body); pointer-events: none; }
 
 /* the in-place text field: the shape's own text, where it is, in its own handwriting */
 .draw-inline {
@@ -253,16 +306,19 @@ main { display: block; padding-bottom: var(--s-8); }
 .draw-inline-center { text-align: center; }
 .draw-inline-left { text-align: left; }
 
-/* the properties panel floats over the canvas corner so the canvas keeps its width */
+/* The contextual inspector is a docked third zone. Collapsing it returns space to the canvas. */
 .draw-inspector {
-  position: absolute; z-index: 4; top: 0.6rem; right: 0.6rem; width: 17.5rem; max-width: calc(100% - 1.2rem); max-height: calc(100% - 1.2rem);
+  position: static; width: 18rem; max-width: 28vw; max-height: clamp(34rem, 78vh, 68rem);
   display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px;
 }
 .inspector-head { display: flex; justify-content: flex-end; padding: 0 0.6rem; border-bottom: 1px dashed var(--rule); }
 .inspector-toggle { min-height: 36px; font-weight: 300; color: var(--ink-2); }
 .inspector-toggle::after { content: "hide"; margin-left: 0.5em; font-size: 0.8em; }
 .draw-inspector.is-collapsed .inspector-toggle::after { content: "show"; }
-.draw-inspector.is-collapsed { width: auto; }
+.draw-inspector.is-collapsed { width: 3.25rem; max-width: 3.25rem; }
+.draw-inspector.is-collapsed .inspector-head { padding: 0; justify-content: center; }
+.draw-inspector.is-collapsed .inspector-toggle { padding-inline: 0.25rem; font-size: 0; }
+.draw-inspector.is-collapsed .inspector-toggle::after { margin-left: 0; font-size: 0.8rem; }
 .draw-inspector.is-collapsed .inspector-head { border-bottom: 0; }
 .draw-inspector.is-collapsed .inspector-body { display: none; }
 .inspector-body { overflow: auto; padding: 0.6rem 0.75rem 0.75rem; display: grid; gap: 0.6rem; align-content: start; }
@@ -276,8 +332,9 @@ main { display: block; padding-bottom: var(--s-8); }
 .member-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.2rem 0.5rem; align-items: center; }
 .member-row input { width: 100%; min-width: 0; color: var(--ink); background: var(--page-2); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.3rem 0.45rem; min-height: 36px; }
 @media (max-width: 56rem) {
-  /* on narrow screens the panel sits under the canvas instead of over it */
-  .draw-inspector { position: static; width: auto; max-width: none; max-height: none; margin-top: var(--s-1); }
+  .draw-editor.library-collapsed .draw-side { display: none; }
+  .draw-side, .draw-main, .draw-inspector { grid-column: 1; }
+  .draw-inspector, .draw-inspector.is-collapsed { width: auto; max-width: none; max-height: none; margin-top: var(--s-1); }
   .draw-canvas { height: clamp(24rem, 62vh, 40rem); }
 }
 .draw-proposal { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); padding: 0.4rem 0.75rem; border: 1.5px dashed var(--accent); border-radius: 6px; }

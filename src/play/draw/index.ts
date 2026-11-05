@@ -14,8 +14,9 @@ import { locate, review, type RuleFinding } from "../../core/diagnostics";
 import { sortFindings, statusWords } from "../../core/lint";
 import { svgElementFrom } from "../../embed/figure";
 import shrugSvg from "../art/shrug-neutral.svg?raw";
-import { aftermath, button, el, menuButton, type App } from "../app";
+import { TYPE_NAME, aftermath, button, el, menuButton, type App } from "../app";
 import { Canvas, type EditTarget } from "./canvas";
+import { svg } from "./dom";
 import { Inspector } from "./inspector";
 import { InlineEditor } from "./inline-edit";
 
@@ -40,11 +41,57 @@ function paletteFor(type: DiagramType): PaletteItem[] {
   return kinds.map((kind) => ({ kind, word: HELP[kind][0], help: HELP[kind][1] }));
 }
 
+/** Small recognizable previews. They are controls, not alternate rendering geometry. */
+function paletteGlyph(kind: cmd.PaletteKind): SVGSVGElement {
+  const out = svg("svg", { class: "palette-glyph", viewBox: "0 0 48 34", width: 48, height: 34 });
+  out.setAttribute("aria-hidden", "true");
+  const line = (x1: number, y1: number, x2: number, y2: number) => svg("line", { x1, y1, x2, y2 });
+  if (kind === "actor") out.append(svg("circle", { cx: 24, cy: 7, r: 4 }), line(24, 11, 24, 22), line(15, 15, 33, 15), line(24, 22, 17, 31), line(24, 22, 31, 31));
+  else if (kind === "use-case") out.append(svg("ellipse", { cx: 24, cy: 17, rx: 20, ry: 11 }));
+  else if (kind === "decision" || kind === "merge") out.append(svg("path", { d: "M24 3 L44 17 L24 31 L4 17 Z" }));
+  else if (kind === "start" || kind === "initial") out.append(svg("circle", { cx: 24, cy: 17, r: 7, class: "glyph-fill" }));
+  else if (kind === "end" || kind === "final") out.append(svg("circle", { cx: 24, cy: 17, r: 9 }), svg("circle", { cx: 24, cy: 17, r: 5, class: "glyph-fill" }));
+  else if (kind === "flow-final") out.append(svg("circle", { cx: 24, cy: 17, r: 8 }), line(18, 11, 30, 23), line(30, 11, 18, 23));
+  else if (kind === "fork" || kind === "join") out.append(svg("rect", { x: 7, y: 14, width: 34, height: 6, rx: 2, class: "glyph-fill" }));
+  else if (kind === "io") out.append(svg("path", { d: "M10 5 H43 L37 29 H4 Z" }));
+  else if (kind === "terminator" || kind === "action") out.append(svg("rect", { x: 5, y: 6, width: 38, height: 22, rx: kind === "action" ? 7 : 11 }));
+  else if (kind === "note") out.append(svg("path", { d: "M9 4 H35 L41 10 V30 H9 Z M35 4 V10 H41" }));
+  else if (kind === "boundary" || kind === "partition") out.append(svg("rect", { x: 4, y: 4, width: 40, height: 26 }), line(kind === "partition" ? 15 : 4, 4, kind === "partition" ? 15 : 44, kind === "partition" ? 30 : 10));
+  else if (kind === "class" || kind === "interface") out.append(svg("rect", { x: 6, y: 3, width: 36, height: 28 }), line(6, 13, 42, 13), line(6, 22, 42, 22), ...(kind === "interface" ? [svg("text", { x: 24, y: 11, "text-anchor": "middle" })] : []));
+  else out.append(svg("rect", { x: 5, y: 6, width: 38, height: 22, rx: 2 }));
+  return out;
+}
+
+function relationGlyph(op: string): SVGSVGElement {
+  const out = svg("svg", { class: "relation-glyph", viewBox: "0 0 48 18", width: 48, height: 18 });
+  out.setAttribute("aria-hidden", "true");
+  const dashed = op.startsWith("..") || op.includes("include") || op.includes("extend");
+  const shaft = (x1 = 5, x2 = 43) => svg("line", { x1, y1: 9, x2, y2: 9, ...(dashed ? { "stroke-dasharray": "4 3" } : {}) });
+  if (op.endsWith("|>")) {
+    out.append(shaft(5, 35), svg("path", { d: "M35 3 L44 9 L35 15 Z" }));
+  } else if (op.startsWith("o--") || op.startsWith("*--")) {
+    out.append(svg("path", { d: "M4 9 L10 4 L16 9 L10 14 Z", ...(op.startsWith("*--") ? { class: "glyph-fill" } : {}) }), shaft(16, 44));
+  } else if (op === "--") {
+    out.append(shaft());
+  } else {
+    out.append(shaft(5, 38), svg("path", { d: "M37 5 L43 9 L37 13" }));
+  }
+  return out;
+}
+
 export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; shown(): void; say(msg: string): void } {
   const { session } = app;
   // ---------- layout ----------
   const rail = el("div", "draw-side");
   const main = el("div", "draw-main");
+  const context = el("div", "draw-context");
+  const contextWords = el("div", "draw-context-words");
+  const contextType = el("strong", "draw-type");
+  const contextTitle = el("span", "draw-title");
+  contextWords.append(contextType, contextTitle);
+  const changeType = button("btn-quiet", "change type", "start a new diagram in another notation; undo restores this one");
+  changeType.addEventListener("click", () => document.getElementById("new-diagram")?.click());
+  context.append(contextWords, changeType);
   const toolbar = el("div", "draw-toolbar");
   toolbar.setAttribute("role", "toolbar");
   toolbar.setAttribute("aria-label", "drawing tools");
@@ -59,7 +106,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
   // what the check found, each finding a way to the shapes it is about
   const found = el("details", "draw-findings");
   found.hidden = true;
-  main.append(toolbar, banner, stage, proposal, status, found);
+  main.append(context, toolbar, banner, stage, proposal, status, found);
   panel.replaceChildren(rail, main);
 
   let sayTimer = 0;
@@ -86,14 +133,9 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     relation: () => relation,
   });
   const inspector = new Inspector({ say, canvas, app });
-  stage.append(canvas.root, inspector.root);
-  // the panel floats over the canvas's right edge on wide screens; fit keeps the diagram out from under it
-  const inset = (): void => {
-    const floating = getComputedStyle(inspector.root).position === "absolute" && !inspector.root.classList.contains("is-collapsed");
-    canvas.insetRight = floating ? inspector.root.offsetWidth + 20 : 0;
-  };
-  inspector.root.addEventListener("click", () => requestAnimationFrame(inset));
-  window.addEventListener("resize", inset);
+  stage.append(canvas.root);
+  panel.appendChild(inspector.root);
+  canvas.insetRight = 0;
 
   // undo and redo work from anywhere in the view, not only on the canvas: after a click in the panel or the
   // palette, or when the control that was clicked is gone and nothing has the focus, the keys still mean
@@ -114,15 +156,16 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
 
   // ---------- the palette ----------
   const shapes = el("section", "draw-sec");
-  shapes.append(el("h2", undefined, "shapes"), el("p", "note", "drag one onto the canvas, or click it and then click where it goes"));
+  shapes.append(el("h2", undefined, "shape library"), el("p", "note", "drag a symbol in, or choose it and click the canvas"));
   const palette = el("div", "draw-palette");
   shapes.appendChild(palette);
   const lines = el("section", "draw-sec");
+  const relPalette = el("div", "relation-palette");
   const relSel = el("select");
   relSel.id = "draw-relation";
   const relField = el("label", "draw-field");
-  relField.append(el("span", undefined, "new lines are"), relSel);
-  lines.append(el("h2", undefined, "lines"), el("p", "note", "point at a shape, then drag from one of its dots to another shape"), relField);
+  relField.append(el("span", undefined, "port drags use"), relSel);
+  lines.append(el("h2", undefined, "relationships"), el("p", "note", "choose a line and then choose its source and target, or drag a shape's connection dot"), relPalette, relField);
   relSel.addEventListener("change", () => { relation = relSel.value || null; });
   rail.append(shapes, lines);
 
@@ -132,6 +175,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     palette.replaceChildren();
     for (const item of paletteFor(type)) {
       const b = button("draw-shape", item.word, item.help);
+      b.replaceChildren(paletteGlyph(item.kind), el("span", undefined, item.word));
       b.dataset.kind = item.kind;
       b.addEventListener("pointerdown", (ev) => startPlacing(ev, item));
       b.addEventListener("keydown", (ev) => {
@@ -148,7 +192,21 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     const usual = el("option", undefined, "the usual for the two shapes");
     usual.value = "";
     relSel.appendChild(usual);
-    for (const r of cmd.RELATIONS[type]) { const o = el("option", undefined, r.word); o.value = r.op; o.title = r.help; relSel.appendChild(o); }
+    relPalette.replaceChildren();
+    for (const r of cmd.RELATIONS[type]) {
+      const o = el("option", undefined, r.word); o.value = r.op; o.title = r.help; relSel.appendChild(o);
+      const b = button("draw-relation-tool", r.word, `${r.help}. Choose source and target.`);
+      b.dataset.op = r.op;
+      b.setAttribute("aria-pressed", "false");
+      b.replaceChildren(relationGlyph(r.op), el("span", undefined, r.word));
+      b.addEventListener("click", () => {
+        if (canvas.connecting && relation === r.op) { canvas.stopConnectTool(); return; }
+        relation = r.op;
+        relSel.value = r.op;
+        canvas.beginConnectTool(r.op);
+      });
+      relPalette.appendChild(b);
+    }
     relation = null;
   }
 
@@ -159,7 +217,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     const sx = ev.clientX, sy = ev.clientY;
     let dragged = false;
     const again = canvas.placing === item.kind;
-    canvas.beginPlace(item.kind);
+    canvas.beginPlace(item.kind, true);
     const move = (e: PointerEvent): void => {
       if (Math.hypot(e.clientX - sx, e.clientY - sy) > 6) dragged = true;
       if (dragged) canvas.placeMove(e.clientX, e.clientY);
@@ -171,6 +229,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
       if (dragged) {
         // a drag: dropped on the canvas it lands there; dropped anywhere else it is called off
         if (e.type === "pointercancel" || !canvas.placeDrop(e.clientX, e.clientY)) { canvas.stopPlacing(); say("dropped outside the canvas: nothing added"); }
+        else canvas.stopPlacing();
       } else if (again) { canvas.stopPlacing(); say("stopped placing"); }
       else { say(`click the canvas to place the ${item.word} (Shift+click keeps placing, Escape stops)`); canvas.root.focus({ preventScroll: true }); }
     };
@@ -186,6 +245,17 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     b.addEventListener("click", run);
     return b;
   };
+  const libraryBtn = tool("library", "show or hide the shape library", () => {
+    const shown = panel.classList.toggle("library-collapsed") === false;
+    libraryBtn.setAttribute("aria-expanded", String(shown));
+    say(shown ? "shape library shown" : "shape library hidden");
+  }, "draw-library");
+  libraryBtn.setAttribute("aria-expanded", "true");
+  const selectBtn = tool("select", "leave insertion or connector mode (Escape)", () => {
+    canvas.stopPlacing();
+    if (canvas.connecting) canvas.stopConnectTool("selection tool"); else say("selection tool");
+    canvas.root.focus({ preventScroll: true });
+  }, "draw-select");
   const undoBtn = tool("undo", "undo (Ctrl+Z)", () => { say(session.undo() ? "undone" : "nothing to undo"); }, "draw-undo");
   const redoBtn = tool("redo", "redo (Ctrl+Y)", () => { say(session.redo() ? "redone" : "nothing to redo"); }, "draw-redo");
   const zoomOut = tool("−", "zoom out (Ctrl+-)", () => canvas.zoomBy(1 / 1.2));
@@ -220,7 +290,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     ];
   });
   const sep = (): HTMLElement => { const s = el("span", "toolbar-sep"); s.setAttribute("aria-hidden", "true"); return s; };
-  toolbar.append(undoBtn, redoBtn, sep(), zoomOut, zoomLabel, zoomIn, fitBtn, sep(), snapBtn, tidy);
+  toolbar.append(libraryBtn, selectBtn, sep(), undoBtn, redoBtn, sep(), zoomOut, zoomLabel, zoomIn, fitBtn, sep(), snapBtn, tidy);
 
   // ---------- a previewed change: look first, then keep it or put it back ----------
   let pending: { label: string; fn: (d: ChalkDoc) => void } | null = null;
@@ -373,12 +443,17 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
 
   // ---------- keeping the frame up to date ----------
   function chrome(): void {
+    const d = session.doc;
+    contextType.textContent = d ? TYPE_NAME[d.meta.type] : "Draw";
+    contextTitle.textContent = d?.meta.title ?? "";
     undoBtn.disabled = !session.canUndo;
     redoBtn.disabled = !session.canRedo;
     undoBtn.title = session.undoLabel ? `undo ${session.undoLabel} (Ctrl+Z)` : "nothing to undo";
     redoBtn.title = session.redoLabel ? `redo ${session.redoLabel} (Ctrl+Y)` : "nothing to redo";
     zoomLabel.textContent = `${Math.round(canvas.view.zoom * 100)}%`;
     for (const b of palette.querySelectorAll<HTMLButtonElement>("button")) b.setAttribute("aria-pressed", String(canvas.placing === b.dataset.kind));
+    for (const b of relPalette.querySelectorAll<HTMLButtonElement>("button")) b.setAttribute("aria-pressed", String(canvas.connecting && relation === b.dataset.op));
+    selectBtn.setAttribute("aria-pressed", String(!canvas.placing && !canvas.connecting));
     inspector.update();
   }
 
@@ -418,9 +493,8 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
       say("");
       return;
     }
-    if (!stage.contains(canvas.root)) stage.replaceChildren(canvas.root, inspector.root);
+    if (!stage.contains(canvas.root)) stage.replaceChildren(canvas.root);
     if (paletteType !== d.meta.type) buildPalette(d.meta.type);
-    inset();
     canvas.refresh();
     chrome();
     listFindings();

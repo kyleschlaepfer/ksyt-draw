@@ -47,6 +47,10 @@ async function typeLines(page: Page, lines: string[]): Promise<void> {
 
 /** Hover a shape so its dots show, then drag from one of them to another shape. */
 async function connect(page: Page, from: string, to: string, side: "top" | "right" | "bottom" | "left", hold?: () => Promise<void>): Promise<void> {
+  // A docked library and inspector can make a wide automatic layout use a small scale. Refit before
+  // calculating page coordinates so the chosen endpoints are actually inside the clipped canvas.
+  await page.getByRole("button", { name: "fit", exact: true }).click();
+  await canvas(page).scrollIntoViewIfNeeded();
   const a = await box(page, from);
   await page.mouse.move(a.cx, a.cy);
   const port = page.locator(`.overlay .port[data-port="${side}"]`);
@@ -168,7 +172,7 @@ async function roundTrip(page: Page, what: "project file" | "diagram text", dir:
   const saved = await saveAs(page, what, dir);
   await expect(status(page)).toHaveText(`saved ${saved.name}`);
   await startNew(page, /^flowchart/);
-  await expect.poll(async () => (await inspect(page)).nodes.map((n) => n.id)).toEqual(["begin", "step1", "done"]);
+  await expect.poll(async () => (await inspect(page)).nodes.map((n) => n.id)).toEqual([]);
   await openFromDisk(page, saved.path);
   await expect(status(page)).toContainText(`opened ${saved.name}`);
   await expect.poll(() => getText(page)).toBe(before.text);
@@ -696,6 +700,70 @@ const outDir = (name: string): string => { const dir = test.info().outputPath(na
 const openLook = (page: Page): Promise<void> => page.locator(".inspector-section", { hasText: "look" }).locator("summary").click();
 
 test.describe("save and reopen", () => {
+  test("canvas-first: five empty classes can be arranged, connected, warned about, named later, and reopened unfinished", async ({ page }) => {
+    await openTool(page, "diagram class\nid unfinished-domain\ntitle Unfinished domain\n", "write");
+    await tab(page, "draw").click();
+    await expect(canvas(page)).toBeVisible();
+    const cv = (await canvas(page).boundingBox())!;
+
+    // One library choice remains armed: construction order belongs to the person drawing.
+    await page.locator('.draw-shape[data-kind="class"]').click();
+    const places: Pt[] = [
+      [cv.x + cv.width * 0.22, cv.y + cv.height * 0.28],
+      [cv.x + cv.width * 0.50, cv.y + cv.height * 0.28],
+      [cv.x + cv.width * 0.78, cv.y + cv.height * 0.28],
+      [cv.x + cv.width * 0.35, cv.y + cv.height * 0.62],
+      [cv.x + cv.width * 0.65, cv.y + cv.height * 0.62],
+    ];
+    for (const p of places) await page.mouse.click(p[0], p[1]);
+    await page.keyboard.press("Escape");
+    let built = await inspect(page);
+    expect(built.nodes.map((n) => [n.id, n.label])).toEqual([
+      ["Class1", ""], ["Class2", ""], ["Class3", ""], ["Class4", ""], ["Class5", ""],
+    ]);
+
+    // Rearrange before naming, then use the visible relationship tools rather than a form.
+    const fifth = await box(page, "Class5");
+    await page.keyboard.down("Alt");
+    await drag(page, [fifth.cx, fifth.cy], [fifth.cx + 36, fifth.cy - 24]);
+    await page.keyboard.up("Alt");
+    await page.getByRole("button", { name: "association", exact: true }).click();
+    await clickNode(page, "Class1");
+    await clickNode(page, "Class2");
+    await expect(status(page)).toContainText("connected");
+
+    // Deliberately incomplete/invalid UML is drawn and saved; the checker explains it instead of blocking it.
+    await page.getByRole("button", { name: "dependency", exact: true }).click();
+    await clickNode(page, "Class3");
+    await clickNode(page, "Class3");
+    await expect(page.locator(".draw-findings summary")).toContainText("what the check found");
+    await page.locator(".draw-findings summary").click();
+    await expect(page.locator(".draw-findings")).toContainText("can't depend on itself");
+    await page.locator(".draw-findings li", { hasText: "can't depend on itself" }).getByRole("button", { name: "show it" }).click();
+    await expect(page.locator(".overlay .sel")).toHaveCount(1);
+    await expect(page.locator(".overlay .sel-line")).toHaveCount(1); // the class and its self-dependency
+
+    // Text can come last. The other four classes intentionally remain empty.
+    const first = await box(page, "Class1");
+    await page.mouse.dblclick(first.cx, first.cy);
+    await expect(inline(page)).toHaveValue("");
+    await page.keyboard.type("Order");
+    await page.keyboard.press("Enter");
+    built = await inspect(page);
+    expect(built.nodes.find((n) => n.id === "Class1")!.label).toBe("Order");
+    expect(built.nodes.filter((n) => n.label === "")).toHaveLength(4);
+    expect(built.edges.map((e) => [e.from, e.to, e.kind])).toEqual([
+      ["Class1", "Class2", "association"], ["Class3", "Class3", "dependency"],
+    ]);
+    await page.screenshot({ path: "docs/revamp/after/canvas-first-class.png", fullPage: true });
+
+    const reopened = await roundTrip(page, "project file", outDir("canvas-first"));
+    expect(picture(reopened.after)).toEqual(picture(built));
+    expect(reopened.after.nodes.filter((n) => n.label === "")).toHaveLength(4);
+    expect(reopened.after.edges.some((e) => e.from === "Class3" && e.to === "Class3" && e.kind === "dependency")).toBe(true);
+    await expect(page.locator(".draw-findings summary")).toContainText("what the check found");
+  });
+
   test("S: an activity with a resized lane, a placed and a sized shape, a bent line, a moved label and a styled line reopens exactly as saved, from a project file and from .ksd text", async ({ page }) => {
     await openTool(page, ksdOf("activity-lanes"), "draw");
     // a lane with a thickness: drag its divider
@@ -722,6 +790,8 @@ test.describe("save and reopen", () => {
     const lb = (await page.locator(`.layer-hits rect[data-uid="${guard.uid}"][data-label]`).boundingBox())!;
     await drag(page, [lb.x + lb.width / 2, lb.y + lb.height / 2], [lb.x + lb.width / 2 + 30, lb.y + lb.height / 2 + 26]);
     // a line style
+    await page.getByRole("button", { name: "fit", exact: true }).click();
+    await canvas(page).scrollIntoViewIfNeeded();
     await clickEdge(page, "pack", "ship");
     await openLook(page);
     await field(page, "edge:style:color").selectOption("terra");
@@ -764,15 +834,17 @@ test.describe("save and reopen", () => {
     expect(ksd.name).toBe("order-lanes.ksd");
     expect(readFileSync(ksd.path, "utf8")).toBe(built.text);
     expect(picture(ksd.after)).toEqual(picture(built));
-    // undo steps back over the open and the new, to the document as it was built
+    // undo steps back over the open to the blank flowchart chosen during the round trip
     await canvas(page).focus();
     await page.keyboard.press("ControlOrMeta+z");
-    expect((await inspect(page)).nodes.map((n) => n.id)).toEqual(["begin", "step1", "done"]);
+    expect((await inspect(page)).nodes.map((n) => n.id)).toEqual([]);
   });
 
   test("S: a class diagram with a member added in draw, a moved class and a role name reopens exactly as saved", async ({ page }) => {
     await openTool(page, ksdOf("class-orders"), "draw");
     // a class member, added and named in place
+    await page.getByRole("button", { name: "fit", exact: true }).click();
+    await canvas(page).scrollIntoViewIfNeeded();
     await clickNode(page, "Catalog");
     await page.locator(".draw-inspector").getByRole("button", { name: "add attribute" }).click();
     await expect.poll(() => getText(page)).toContain("class Catalog {\n  +attribute1: Type\n}");
@@ -1385,6 +1457,8 @@ test.describe("refresh and back", () => {
     expect(now.text).toBe(before.text);
     expect(picture(now)).toEqual(picture(before));
     // a restored drawing is still a drawing: it can be edited, and undone
+    await page.getByRole("button", { name: "fit", exact: true }).click();
+    await canvas(page).scrollIntoViewIfNeeded();
     const d = await box(page, "done");
     await page.keyboard.down("Alt");
     await drag(page, [d.cx, d.cy], [d.cx - 120, d.cy]);

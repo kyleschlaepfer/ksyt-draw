@@ -40,12 +40,12 @@ describe("commands", () => {
     expect(cmd.removeElements(uc, [uid(uc, "portal")]).freed).toBe(5);
     expect(uc.nodes.some((n) => n.parent)).toBe(false);
   });
-  it("connecting picks the usual relationship for the two shapes, and refuses what can't be a line", () => {
+  it("connecting picks the usual relationship and stores questionable endpoints for nonblocking review", () => {
     const uc = parseDoc(fixture("diagrams/usecase-permit.ksd"));
     expect(cmd.addEdge(uc, { from: uid(uc, "clerk"), to: uid(uc, "track") }).kind).toBe("association");
     expect(cmd.addEdge(uc, { from: uid(uc, "track"), to: uid(uc, "pay") })).toMatchObject({ kind: "include", directed: true });
-    expect(() => cmd.addEdge(uc, { from: uid(uc, "apply"), to: uid(uc, "apply") })).toThrow(/two different shapes/);
-    expect(() => cmd.addEdge(uc, { from: uid(uc, "apply"), to: uid(uc, "portal") })).toThrow(/not the boxes around them/);
+    expect(cmd.addEdge(uc, { from: uid(uc, "apply"), to: uid(uc, "apply") })).toMatchObject({ from: "apply", to: "apply" });
+    expect(cmd.addEdge(uc, { from: uid(uc, "apply"), to: uid(uc, "portal") })).toMatchObject({ from: "apply", to: "portal" });
     expect(() => cmd.addEdge(uc, { from: uid(uc, "apply"), to: uid(uc, "pay"), op: "--|>" })).toThrow(/doesn't belong/);
     const cls = parseDoc(fixture("v2/class-shapes.ksd"));
     expect(cmd.addEdge(cls, { from: uid(cls, "Square"), to: uid(cls, "Drawable") }).kind).toBe("realization");
@@ -71,7 +71,8 @@ describe("commands", () => {
     cmd.reconnect(d, e.uid, "to", uid(d, "begin"), "top");
     expect(e).toMatchObject({ from: "ok", to: "begin", label: "yes", style: { color: "terra" }, route: { kind: "elbow", from: "left", to: "top" } });
     expect(e.route!.via).toBeUndefined();
-    expect(() => cmd.reconnect(d, e.uid, "to", uid(d, "ok"))).toThrow(/two different shapes/);
+    cmd.reconnect(d, e.uid, "to", uid(d, "ok"));
+    expect(e).toMatchObject({ from: "ok", to: "ok" });
   });
   it("swapping ends swaps everything that belongs to an end", () => {
     const cls = parseDoc('diagram class\ntitle t\nclass A\nclass B\nA "1 owner" --> "0..* parts" B\nlayout {\n  route A --> B elbow from top to left via 1 2, 3 4\n  label A --> B 0.25 0 0\n}\n');

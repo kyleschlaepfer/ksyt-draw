@@ -7,7 +7,7 @@
  * interrupted by a redraw; the panel rebuilds after a commit and puts the focus back where it was.
  */
 import {
-  CLASSIFIERS, CONTAINERS, DEFAULT_PROFILE, PROFILES, TYPES, UNLABELED, edgeOp, maxStep,
+  CLASSIFIERS, CONTAINERS, DEFAULT_PROFILE, PROFILES, UNLABELED, edgeOp, maxStep,
   type ChalkDoc, type DocEdge, type DocNode, type Member, type NodeKind, type Side, type UseCaseDoc,
 } from "../../core/doc/types";
 import * as cmd from "../../core/doc/commands";
@@ -31,20 +31,24 @@ const num3 = (v: number): string => String(Math.round(v * 100) / 100);
 export class Inspector {
   readonly root: HTMLElement;
   private body: HTMLElement;
+  private toggle: HTMLButtonElement;
+  private manuallyCollapsed = false;
   private key = "";
   private pending = 0;
 
   constructor(private host: InspectorHost) {
-    this.root = el("aside", "draw-inspector");
+    const initiallyOpen = !!host.app.session.doc?.nodes.length;
+    this.root = el("aside", `draw-inspector${initiallyOpen ? "" : " is-collapsed"}`);
     this.root.setAttribute("aria-label", "properties");
     const head = el("div", "inspector-head");
-    const toggle = button("btn-quiet inspector-toggle", "properties");
-    toggle.setAttribute("aria-expanded", "true");
-    toggle.addEventListener("click", () => {
+    this.toggle = button("btn-quiet inspector-toggle", "properties");
+    this.toggle.setAttribute("aria-expanded", String(initiallyOpen));
+    this.toggle.addEventListener("click", () => {
       const open = this.root.classList.toggle("is-collapsed") === false;
-      toggle.setAttribute("aria-expanded", String(open));
+      this.manuallyCollapsed = !open;
+      this.toggle.setAttribute("aria-expanded", String(open));
     });
-    head.appendChild(toggle);
+    head.appendChild(this.toggle);
     this.body = el("div", "inspector-body");
     this.root.append(head, this.body);
   }
@@ -52,6 +56,10 @@ export class Inspector {
   /** Something changed: rebuild after the browser has finished moving the focus, then give it back. */
   update(force = false): void {
     const s = this.host.app.session;
+    if (!s.doc?.nodes.length && !this.host.canvas.selection.size && !this.manuallyCollapsed) {
+      this.root.classList.add("is-collapsed");
+      this.toggle.setAttribute("aria-expanded", "false");
+    }
     const key = `${s.inSync}|${[...this.host.canvas.selection].join(",")}|${s.text.length}:${hash(s.text)}`;
     if (key === this.key && !force) return;
     this.key = key;
@@ -191,7 +199,7 @@ export class Inspector {
     const m = d.meta;
     const lanes = d.nodes.some((n) => n.kind === "partition");
     const out: HTMLElement[] = [el("h2", undefined, "diagram")];
-    out.push(this.field("type", this.select(TYPES.map((t) => [t, TYPE_NAME[t].toLowerCase()]), m.type, (v) => this.edit("change type", (x) => cmd.patchMeta(x, { type: v as ChalkDoc["meta"]["type"] }), `now a ${TYPE_NAME[v].toLowerCase()}`, false)), "doc:type"));
+    out.push(el("p", "note", `${TYPE_NAME[m.type]}. Use change type above the canvas to start another notation without converting or dropping this diagram's objects.`));
     out.push(this.field("title: what it shows", this.text(m.title, (v) => this.edit("edit title", (x) => cmd.patchMeta(x, { title: v })), true), "doc:title"));
     out.push(this.field("id", this.text(m.id, (v) => this.edit("edit id", (x) => cmd.patchMeta(x, { id: v.trim() }))), "doc:id"));
     if (m.type !== "use-case") {

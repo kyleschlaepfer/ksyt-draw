@@ -105,6 +105,12 @@ describe("targeted edits", () => {
     expect(out).toContain("title After review,   a request takes one of two paths");
     expect(out).toContain('process submit   "submit request"');
   });
+  it("an empty Draw label is explicit and survives source synchronization", () => {
+    const src = "diagram class\ntitle t\n";
+    const out = edit(src, (d) => { cmd.addNode(d, { kind: "class", label: "", at: { x: 2, y: 2 } }); });
+    expect(out).toContain('class Class1 ""');
+    expect(parseDoc(out).nodes[0]).toMatchObject({ id: "Class1", label: "" });
+  });
   it("multi-line labels and quotes survive", () => {
     const out = edit(FLOW, (d) => cmd.setLabel(d, uidOf(d, "ok"), 'say "yes"\nor no'));
     expect(out).toContain('decision ok "say \\"yes\\"\\nor no"');

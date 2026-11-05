@@ -132,7 +132,8 @@ export function setLabel(d: ChalkDoc, uid: string, label: string | null): void {
   const n = d.nodes.find((x) => x.uid === uid);
   if (n) {
     if (UNLABELED.has(n.kind)) throw new EditError("this shape has no text");
-    n.label = text === null || text.trim() === "" ? (CLASSIFIERS.has(n.kind) ? n.id : null) : text;
+    // Empty is meaningful in Draw: the shape exists before its content and must round-trip as "".
+    n.label = text === null ? "" : text;
     return;
   }
   const e = edge(d, uid);
@@ -265,13 +266,10 @@ export function defaultRelation(d: ChalkDoc, from: DocNode, to: DocNode): string
   return "->";
 }
 
-/** Can a line of this kind join these two shapes at all? Notation mistakes are the check's job, not this. */
+/** Can these stored shapes be endpoints? Notation mistakes are the check's job, not this command. */
 export function canConnect(d: ChalkDoc, fromUid: string, toUid: string): { ok: boolean; why?: string } {
   const a = d.nodes.find((n) => n.uid === fromUid), b = d.nodes.find((n) => n.uid === toUid);
   if (!a || !b) return { ok: false, why: "pick two shapes" };
-  if (a === b) return { ok: false, why: "a line needs two different shapes" };
-  if (CONTAINERS.has(a.kind) || CONTAINERS.has(b.kind)) return { ok: false, why: "lines join shapes, not the boxes around them" };
-  if (a.kind === "note" || b.kind === "note") return { ok: false, why: "a note isn't part of the flow; put it beside what it explains" };
   return { ok: true };
 }
 

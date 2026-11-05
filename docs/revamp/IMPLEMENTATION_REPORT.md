@@ -15,20 +15,52 @@ This is the summary. The detail is in the documents beside it:
 | `TEST_MATRIX.md` | every test and scenario, measured performance, what is not covered |
 | `baseline/`, `after/`, `gallery/` | screenshots before, screenshots after, every fixture exported in every format |
 
-## 1. Two decisions that are still the owner's
+## Canvas-first Draw redesign addendum (2026-11-05)
 
-Both were asked at the start of this session and have no answer yet. The work went on assuming both
-stay as built. Neither answer would be cheap to reverse later, so they come first.
+This addendum records the implementation requested by `prompts/KSYT_DRAW_CANVAS_FIRST_REDESIGN.md` and supersedes older statements below that self-connectors or keyboard connector initiation are missing.
 
-1. **The purpose-built canvas, or React Flow as the interaction shell?** (Decision 12.) tldraw's
+The existing canvas engine was retained, while the restrictive shell and command policy were replaced. The retained engine already provided stable identities, direct pointer manipulation, manual geometry, routing, targeted source synchronization, shared rendering/export, one undo history, and complete project persistence. The earlier form-led experience came from populated templates, generated labels, text-only palette controls, a relationship dropdown, and command-level rejection of temporarily invalid connections.
+
+Implemented changes:
+
+- An explicit visual diagram-type chooser creates a blank flowchart, activity, use-case, or class diagram and enters Draw.
+- Draw now has a collapsible graphical shape/relationship library, dominant canvas, contextual type/title header, and docked collapsible inspector. Collapsing side zones correctly returns their width to the canvas.
+- A selected symbol tool stays armed for repeated empty placement. Empty labels are preserved in `.ksd`, so five or fifty shapes can be laid out before any text is entered.
+- Relationship buttons arm a pointer-and-keyboard source/target tool. Port dragging still works; self-referencing relationships can now be initiated directly and render as loops.
+- Connection commands permit existing endpoints and leave notation judgment to diagnostics. Invalid UML is drawn, saved, reopened, and explained without blocking construction.
+- Selected classes provide on-canvas `+ attribute` and `+ operation` actions, with Alt+A and Alt+O equivalents and inline member editing.
+- Diagram type is no longer a mutating inspector field. Changing notation explicitly starts another blank diagram, avoiding silent loss or coercion of visual information.
+- The first-node source-sync path for metadata-only blank documents was corrected.
+
+The purpose-built canvas is now the architectural decision, not an unanswered question. Replacing it with React Flow would add a second interaction abstraction while retaining custom routing, lanes, labels, editing, persistence, and rendering; it would not address the product-policy defects above. Manual positions continue to hold still unless the user invokes tidy-up.
+
+The behavioral acceptance test in `test/e2e/flows.spec.ts` places five empty classes, rearranges them, draws an association and an invalid self-dependency, navigates the warning, names one class afterward, saves the incomplete project, starts a different blank diagram, and reopens the project without loss. The screenshot is `after/canvas-first-class.png`.
+
+Final verification for this working tree:
+
+| Check | Result |
+|---|---|
+| Unit | 473 passed, 0 failed, 0 skipped |
+| Chromium end-to-end | 105 passed, 0 failed, 0 skipped |
+| Draw-specific browser suite | 21 passed, including repeated empty placement, self-link initiation, keyboard connector, direct class members, lanes, resize, routing, multi-select, undo/redo |
+| Production build | passed (`tsc --noEmit`, then Vite build) |
+
+Functional completeness against the canvas-first specification is estimated at **92%**. Remaining implementation effort is estimated at **2–5 engineering days**, with uncertainty driven by findings from Firefox/Safari, real touch devices, screen-reader use, external export applications, and an independent UML 2.5.1 rules audit. The implemented acceptance workflow itself is not blocked by those checks.
+
+## 1. Earlier architecture questions (resolved by the canvas-first assignment)
+
+The canvas-first assignment granted architectural freedom and made the interaction outcome authoritative.
+
+1. **The purpose-built canvas is retained.** (Decision 12.) tldraw's
    license rules it out, JointJS keeps the needed parts in its paid edition, and maxGraph brings its
    own geometry, which would give the editor one router and the embed another. React Flow is the only
    one that fits, as a shell for pan, zoom, select and drag. It would add React and about 100 KB
    gzipped to the tool, and everything particular to Chalk (routing, bends, labels, lanes, text in
    place) stays custom either way. The canvas as built is 1,210 lines, takes resolved geometry in and
-   gives commands out, and is driven by 19 pointer and keyboard tests. A switch is estimated at 10 to
-   20 hours.
-2. **Hold still, or re-flow with an animation?** (Decision 6.) In Draw nothing moves unless the
+   gives commands out, and is driven by 21 Draw browser tests. A switch is estimated at 10 to
+   20 hours. The redesign showed that the restrictive behavior was in the shell and command policy,
+   not the canvas engine.
+2. **Hold still remains the Draw behavior.** (Decision 6.) In Draw nothing moves unless the
    author moves it: when an edit would shift shapes the layout placed, those shapes are pinned where
    they are, in the same undo step, and the status line says how many ("3 others stay put"). After a
    few edits much of a diagram is placed by hand; "tidy up" hands it back. The one exception added
@@ -39,8 +71,8 @@ stay as built. Neither answer would be cheap to reverse later, so they come firs
 
 | | Baseline (`main`) | Checkpoint (`1a1e46f`) | Now |
 |---|---|---|---|
-| Unit tests | 191 passed | 411 passed | 472 passed, 0 failed, 0 skipped |
-| Browser tests | 67 passed, 2 failed | 78 passed | 102 passed, 0 failed, 0 skipped |
+| Unit tests | 191 passed | 411 passed | 473 passed, 0 failed, 0 skipped |
+| Browser tests | 67 passed, 2 failed | 78 passed | 105 passed, 0 failed, 0 skipped |
 | Build | passes | passes | passes |
 
 The two baseline failures were line endings in the Windows checkout, not the app. The browser tests
@@ -121,8 +153,8 @@ another check). Nothing below is marked ready without saying what stands between
 
 | # | Area | Built | Tested | Looked at | Ready? |
 |---|---|---|---|---|---|
-| 1 | Draw canvas interaction | yes | yes: 19 pointer and keyboard tests (place, type in place, drag at several zooms, resize, marquee, align, copy and paste, keyboard) | yes: light and dark at 1440, 820 and 390 px | Not yet. Waits on the owner's answer on the canvas. Touch has never been run. Chromium only |
-| 2 | Connector editing and routing | yes | yes: connect, reconnect, bend, restyle, label drag, include and extend, multiplicities; router unit tests | yes: every gallery sheet | Close. A line back to the same shape can't be started in Draw. There is no keyboard way to start a line. Two arrows into one side can share their last 0.2 in |
+| 1 | Draw canvas interaction | yes | yes: 21 pointer and keyboard tests (repeated empty placement, type in place, drag at several zooms, resize, marquee, align, copy and paste, keyboard) | yes: light and dark at 1440, 820 and 390 px; new canvas-first acceptance screenshot | Ready for Chromium desktop use. Touch has never been run |
+| 2 | Connector editing and routing | yes | yes: pointer and keyboard initiation, self-connect, reconnect, bend, restyle, label drag, include and extend, multiplicities; router unit tests | yes: every gallery sheet | Close. Two arrows into one side can share their last 0.2 in; other browsers and touch remain unverified |
 | 3 | Swimlanes | yes | yes: build three lanes, cross-lane flows, divider drag, move between lanes, rename, reorder, duplicate, delete; vertical and horizontal | yes | Yes for the cases tested. No lanes inside lanes, by design for now |
 | 4 | Write editing and diagnostics | yes | partly: typing, errors with lines, the syntax reference against the parser (17 tests). Completions, find and replace, and tidy have no browser test | yes | Close. The untested editor features work by hand |
 | 5 | UML correctness | yes | yes for what the rules say: the v1 rules are a verified port; the 12 v2 rules have unit tests | n/a | Not yet. The v2 rules have not been read against the UML 2.5.1 text. An interface's own stereotype is parsed but not drawn |
@@ -131,15 +163,14 @@ another check). Nothing below is marked ready without saying what stands between
 | 8 | Continuity with the redesigned UI | yes | house rules tested in the reference; the rest is not a thing a test can hold | yes: before and after, both themes, three widths | Needs the owner's eye. The departures are listed in the contract, section 5 |
 | 9 | Export quality: SVG, PNG, PDF | yes | yes: each format in both looks for three diagram types is the file the dialog described; exact pixel sizes; no CSS variables or classes; fonts embedded in the PDF | yes: all 18 sheets at 600, 420 and 240 px, in a second renderer | Not yet. No file has been opened in PowerPoint, Word, Keynote, Inkscape or Illustrator, and none has been printed |
 | 10 | Save and reload | yes | yes: project file and `.ksd` for three diagram types, identities, hostile files, refresh, back, the local draft | n/a | Yes |
-| 11 | Accessibility | yes | partly: tab semantics, canvas keyboard paths, step keys; axe-core run by hand with no contrast failures | yes | Not yet. No screen reader has been used. No keyboard way to start a line in Draw (the text view is the keyboard path). Reduced motion not checked in a browser |
+| 11 | Accessibility | yes | partly: tab semantics, keyboard connector initiation, canvas keyboard paths, step keys; axe-core run by hand with no contrast failures | yes | Not yet. No screen reader has been used. Reduced motion not checked in a browser |
 | 12 | Performance | yes | yes: frame times asserted at 50 and 100 shapes | measured | Acceptable on this desktop: about 28 redraws a second while dragging at 100 shapes, a drop in about 230 ms. Not measured on a slower machine. An embed's script is 71 KB gzipped, up from 46 |
-| 13 | Automated and manual QA | yes | 472 unit and 102 browser tests, none skipped | 33 screenshots and 18 export sheets reviewed | Good for Chromium on a desktop. No other browser, no touch device, no pixel-diff regression test |
+| 13 | Automated and manual QA | yes | 473 unit and 105 browser tests, none skipped | 34 screenshots and 18 export sheets reviewed | Good for Chromium on a desktop. No other browser, no touch device, no pixel-diff regression test |
 
 **Overall.** The tool works end to end and is tested more deeply than a count of tests suggests:
 the tests for scenarios M to X found six real defects, and all six are fixed. It is ready for the
-owner to use and judge. It is not ready to deploy without three things nobody could do from here:
-the two answers in section 1, a look at exports in the programs people will paste them into, and a
-pass in Safari and on a phone.
+owner to use and judge. It is not ready to deploy without a look at exports in the programs people
+will paste them into, an independent UML rules audit, and a pass in Safari and on a phone.
 
 ## 6. The acceptance demonstration, step by step
 
@@ -172,9 +203,6 @@ The steps are held by separate tests. There is no single test that walks all 17 
 
 Not done:
 
-- A line from a shape back to itself can't be started in Draw. It is written in the text, and Draw
-  then shows, bends, renames and deletes it.
-- No keyboard way to start a line in Draw.
 - Sequence, state, package, component and deployment diagrams (the brief places them later).
 - No lanes inside lanes. No notes attached to a specific shape. No object nodes.
 - No generic grouping and no bring-forward or send-back, on purpose: containment is the grouping
@@ -206,9 +234,9 @@ Not verified, anywhere:
 
 ## 8. What to do next
 
-1. The owner answers the two questions in section 1 and looks at `after/` and `gallery/`.
+1. The owner walks the canvas-first acceptance workflow and looks at `after/` and `gallery/`.
 2. Open a handful of gallery files in PowerPoint and Word, and print one. Fix what that shows.
-3. Run the tool in Safari and on a phone and a tablet. Fix what that shows.
-4. Read the 12 v2 rules against the UML text.
+3. Run the tool in Firefox, Safari, and on a phone and a tablet. Fix what that shows.
+4. Read the 12 v2 rules against the UML 2.5.1 text.
 5. Decide the small things in section 7.
 6. Then deploy: `npm run deploy`, which the owner runs.

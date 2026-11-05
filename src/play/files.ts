@@ -41,10 +41,39 @@ export function mountFiles(app: App, say: (msg: string) => void, openExport: () 
     file.text().then((t) => openText(t, file.name), () => say(`couldn't read ${file.name}`));
   });
 
-  const newBtn = menuButton(button("btn-quiet", "new"), () => TEMPLATES.map((t) => ({
-    label: t.label, hint: t.hint,
-    run: () => { app.open(t.text, `new ${t.label}`); say(`started a new ${t.label} (undo brings back what was here)`); },
-  })));
+  const typeDialog = el("dialog", "type-dialog");
+  typeDialog.setAttribute("aria-labelledby", "new-diagram-title");
+  const typeHead = el("div", "type-dialog-head");
+  const typeTitle = el("h2", undefined, "new diagram");
+  typeTitle.id = "new-diagram-title";
+  const typeClose = button("btn-quiet", "cancel", "keep the current diagram");
+  typeClose.addEventListener("click", () => typeDialog.close());
+  typeHead.append(typeTitle, typeClose);
+  typeDialog.append(typeHead, el("p", "note", "Choose the notation first. You can place empty shapes and fill them in whenever you are ready."));
+  const typeChoices = el("div", "type-choices");
+  for (const t of TEMPLATES) {
+    const choice = button("type-choice", t.label, t.hint);
+    choice.setAttribute("role", "menuitem");
+    choice.dataset.type = t.key;
+    const preview = el("span", `type-preview type-preview-${t.key}`);
+    preview.setAttribute("aria-hidden", "true");
+    const words = el("span", "type-choice-words");
+    words.append(el("strong", undefined, t.label), el("span", "note", t.hint));
+    choice.replaceChildren(preview, words);
+    choice.addEventListener("click", () => {
+      typeDialog.close();
+      app.open(t.text, `new ${t.label}`);
+      app.showTab("draw");
+      say(`started a blank ${t.label}; undo brings back what was here`);
+    });
+    typeChoices.appendChild(choice);
+  }
+  typeDialog.appendChild(typeChoices);
+  typeDialog.addEventListener("click", (ev) => { if (ev.target === typeDialog) typeDialog.close(); });
+  const newBtn = button("btn-quiet", "new");
+  newBtn.id = "new-diagram";
+  newBtn.setAttribute("aria-haspopup", "dialog");
+  newBtn.addEventListener("click", () => typeDialog.showModal());
   const openBtn = menuButton(button("btn-quiet", "open"), () => {
     const prev = loadPrevious();
     return [
@@ -73,7 +102,7 @@ export function mountFiles(app: App, say: (msg: string) => void, openExport: () 
   const exportBtn = button("btn-quiet", "export", "a picture for a slide, a report or a page");
   exportBtn.id = "open-export";
   exportBtn.addEventListener("click", openExport);
-  root.append(newBtn, openBtn, saveBtn, exportBtn, picker);
+  root.append(newBtn, openBtn, saveBtn, exportBtn, picker, typeDialog);
 
   // dropping a file anywhere on the page opens it
   window.addEventListener("dragover", (ev) => { if (ev.dataTransfer?.types.includes("Files")) ev.preventDefault(); });

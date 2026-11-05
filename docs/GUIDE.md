@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-Open the address Vite prints (`http://localhost:5173` unless that port is taken). The deployed copy lives at `https://draw.kyleschlaepfer.com`.
+Open the address Vite prints (`http://localhost:5173` unless that port is taken). The deployed copy lives at `https://chalk.kyleschlaepfer.com`.
 
 The first time, the page opens with an example use-case diagram. After that it opens with whatever you had last.
 
@@ -31,7 +31,7 @@ One row holds the three views and the document's actions.
 
 | Document | |
 |---|---|
-| new | start from a template: flowchart, activity diagram, activity with swimlanes, use-case diagram, class diagram |
+| new | choose a type and start with a blank flowchart, activity, use-case or class canvas |
 | open | a file from this computer, or the diagram you had before |
 | save | a project file, or the diagram text |
 | export | a picture for a slide, a report or a page |
@@ -113,7 +113,7 @@ The status line under them says what the diagram is and how its checks went: "Us
 
 ## 4. Draw
 
-The draw view has a list of shapes and line settings on the left, a toolbar, the canvas, a properties panel over the canvas's right side, and a status line that says what just happened.
+The draw view has a collapsible graphical shape and relationship library on the left, a toolbar and large canvas in the middle, a collapsible properties panel on the right, and a status line that says what just happened. The header names the current diagram type. “Change type” starts another blank diagram rather than converting or dropping the current diagram's objects.
 
 Everything you do here is written into the text. Switch to write at any time to see it.
 
@@ -122,7 +122,7 @@ Everything you do here is written into the text. Switch to write at any time to 
 Three ways:
 
 - **Drag** a shape from the list onto the canvas.
-- **Click** a shape in the list, then click the canvas where it goes. Shift+click keeps placing more of the same. Escape stops.
+- **Click** a shape in the library, then click the canvas wherever each copy goes. The tool stays armed so you can lay out several empty shapes. Escape, Select, or another tool stops it.
 - **Keyboard:** focus a shape in the list and press Enter or Space. It lands in the middle of the view.
 
 The list changes with the diagram type. A shape dropped on a partition or a boundary joins it.
@@ -155,17 +155,20 @@ The start dot, the end marks, the merge diamond and the actor have one size.
 - Double-click a shape or a line's label. Or select it and press Enter or F2. Or select it and just start typing, which replaces the text.
 - Enter keeps the change. Shift+Enter starts a new line in a shape's text. Escape gives up.
 - In a class, double-click the name or a member row.
+- With a class selected, use the `+ attribute` and `+ operation` actions below it. Alt+A and Alt+O do the same from the keyboard; the new row opens for inline editing.
 - A start dot, an end mark, a fork, a join and a merge have no text.
 
 ### Connect
 
-1. Point at a shape. Dots appear on its sides.
-2. Drag from a dot to another shape and let go.
+Two routes:
 
-- "new lines are" on the left chooses what kind of line you get. Left alone, it is the usual one for the two shapes: an arrow in a flow, an association from an actor to a use case, «include» between two use cases, a realization from a class to an interface.
+1. Point at a shape, then drag one of its side dots to another shape; or
+2. Choose a relationship in the left library, then choose its source and target. With the canvas focused, arrow keys select the first shape, Enter chooses it, Tab moves to the next shape, and Enter completes the line.
+
+- The relationship library is scoped to the diagram type. The smaller “port drags use” choice changes what a dot drag creates. Left alone, it is the usual relationship for the two shapes: an arrow in a flow, an association from an actor to a use case, «include» between two use cases, a realization from a class to an interface.
 - A new line out of a decision opens its label at once, because every exit of a decision needs one.
-- Some drops are refused, and the status line says why: a line needs two different shapes, lines join shapes and not the boxes around them, and a note is not part of the flow.
-- A line from a shape back to itself (a class associated with itself, a step that repeats) cannot be started here. Write it in the text, `Employee -- Employee`. After that it can be bent, renamed and deleted in draw like any other line.
+- A line may return to the same shape; it is drawn as a loop.
+- Notation mistakes are not refused. The line remains on the canvas and in the saved document, while “what the check found” explains the issue and offers “show it.” Missing objects, broken source text, and other technical failures still block an edit.
 
 ### Reconnect
 
@@ -191,7 +194,7 @@ The panel shows what is selected.
 
 | Selected | The panel shows |
 |---|---|
-| nothing | **diagram**: type, title, id, which way it runs, drawn as (sketch or precision). Under "more": checked as, narration, the text alternative |
+| nothing | **diagram**: the current type, title, id, which way it runs, drawn as (sketch or precision). Under "more": checked as, narration, the text alternative. Use “change type” above the canvas to start another notation |
 | one shape | its kind, text, id; where it is inside; x, y, width and height in inches; build-up (the step it shows from); look (fill, color, weight); delete |
 | an actor | also which side it stands on |
 | a class or interface | also its attributes and operations, stereotype, abstract |
@@ -298,8 +301,8 @@ file -> done
 
 In draw:
 
-- "new" has a template, "activity with swimlanes".
-- "partition" is in the shape list.
+- Choose “activity diagram” in New, then place as many empty partitions as you need.
+- “partition” is in the graphical shape library.
 - Drag a shape into a lane, or drop a new one on it.
 - Drag the line at a lane's far edge to make that lane thicker or thinner.
 - Select a lane by its header. The panel has its name ("who"), its width or height, move left and move right (move up and move down for rows), duplicate and delete.
@@ -441,7 +444,7 @@ Either one reopens as the same diagram. The `.ksd` file is plain text and is the
 
 **open** takes a `.ksd` file or a `.chalk.json` project. You can also drop a file anywhere on the page. A file over 4 MB is refused.
 
-**new** starts from a template.
+**new** opens the diagram-type chooser and starts a blank visual document.
 
 New and open replace the diagram on screen, and undo brings back what was there.
 
@@ -538,6 +541,8 @@ The editor is CodeMirror, and its other standard keys for moving, selecting and 
 | Shift+arrow keys | nudge 0.25 in |
 | Tab, Shift+Tab | with a shape selected, go to the next or previous shape |
 | Enter or F2 | edit the selected shape's text or the selected line's label |
+| Enter while a relationship tool is active | choose the selected source, then the selected target |
+| Alt+A, Alt+O | add an attribute or operation to the selected class or interface, then edit it inline |
 | any letter or digit | start replacing the selected shape's text or the selected line's label |
 | Escape | cancel what you are doing, or clear the selection |
 | Space, held | pan by dragging |
@@ -558,7 +563,7 @@ The editor is CodeMirror, and its other standard keys for moving, selecting and 
 
 | Keys | Does |
 |---|---|
-| Shift+click | keep placing the same shape |
+| repeated click | keep placing the same armed shape until Escape or another tool |
 | Shift+click on a shape | add it to the selection, or take it out |
 | Alt, held | place, move or bend freely; resize from the center |
 

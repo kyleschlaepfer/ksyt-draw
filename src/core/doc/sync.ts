@@ -85,7 +85,7 @@ export function syncSource(prev: ParsedSource, next: ChalkDoc): string {
     let at = -1;
     for (const s of prev.stmts) {
       if (recs[s.line].dead) continue;
-      if ((s.kind === "decl" && s.depth === 0) || (s.kind === "close" && s.depth === 0) || (s.kind === "meta" && at < 0)) at = Math.max(at, s.line);
+      if ((s.kind === "decl" && s.depth === 0) || (s.kind === "close" && s.depth === 0) || s.kind === "meta") at = Math.max(at, s.line);
     }
     if (at < 0) return Math.max(0, recs.length - 1);
     // a top-level declaration may open a block: step to its close

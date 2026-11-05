@@ -14,7 +14,7 @@ import { CONTAINERS, UNLABELED, cloneDoc } from "../../core/doc/types";
 import * as cmd from "../../core/doc/commands";
 import { PX } from "../../core/measure";
 import { resolve, drawnPath, textRect, type EdgeGeom, type Geometry } from "../../core/geom/resolve";
-import { nearestT, pointAt, routeEdge } from "../../core/geom/route";
+import { loopRoute, nearestT, pointAt, routeEdge } from "../../core/geom/route";
 import { SIDES, boxOf, contains, nodeSize, resizable, sideAnchor, type NodeGeom, type Pt } from "../../core/geom/shape";
 import { bounds, snapGrid, snapMove, type Box, type Guide } from "../../core/geom/arrange";
 import { paintContext, paintEdge, paintNode, textEl, type Element as SceneElement } from "../../core/render/scene";
@@ -72,6 +72,8 @@ export class Canvas {
   private doc: ChalkDoc | null = null;
   private geo: Geometry | null = null;
   private gesture: Gesture | null = null;
+  /** Relationship-tool state, separate from pointer gestures so Tab and Enter can drive it. */
+  private connectTool: { op: string | null; source: string | null } | null = null;
   private guides: Guide[] = [];
   private hover: string | null = null;
   private space = false;
@@ -88,7 +90,7 @@ export class Canvas {
     this.root.tabIndex = 0;
     this.root.setAttribute("role", "application");
     this.root.setAttribute("aria-roledescription", "drawing canvas");
-    this.root.setAttribute("aria-label", "drawing canvas: Tab steps through the shapes, arrows nudge, Enter edits text, Delete removes, Escape lets go");
+    this.root.setAttribute("aria-label", "drawing canvas: Tab steps through shapes, arrows nudge, Enter edits or completes a connector, Delete removes, Escape lets go");
     this.svgEl = svg("svg", { class: "draw-svg ksyt-fig", width: "100%", height: "100%" });
     this.svgEl.setAttribute("aria-hidden", "true");
     const defs = svg("defs");
@@ -303,6 +305,17 @@ export class Canvas {
             ["se", x1 + pad, y1 + pad], ["s", (x0 + x1) / 2, y1 + pad], ["sw", x0 - pad, y1 + pad], ["w", x0 - pad, (y0 + y1) / 2]];
         for (const [h, x, y] of hs) o.push(svg("rect", { class: `handle h-${h}`, "data-handle": h, x: x - 5, y: y - 5, width: 10, height: 10, rx: 2 }));
       }
+      if (nodes.length === 1 && this.selection.size === 1 && (n.kind === "class" || n.kind === "interface") && !g) {
+        const add = (kind: "attribute" | "operation", x: number, word: string): SVGElement => {
+          const q = svg("g", { class: "quick-add", "data-add-member": kind, "data-uid": n.uid, role: "button", "aria-label": `add ${kind}` });
+          q.append(svg("rect", { x, y: y1 + 10, width: 88, height: 26, rx: 5 }));
+          const label = svg("text", { x: x + 44, y: y1 + 28, "text-anchor": "middle" });
+          label.textContent = word;
+          q.appendChild(label);
+          return q;
+        };
+        o.push(add("attribute", x0, "+ attribute"), add("operation", x0 + 94, "+ operation"));
+      }
     }
     // ports: on the shape under the pointer, or the one selected shape
     const portOn = !quiet || g?.type === "connect" || g?.type === "reconnect"
@@ -374,6 +387,7 @@ export class Canvas {
     if (g.type === "connect") {
       const from = this.geomOf(g.from);
       if (!from) return null;
+      if (target?.uid === from.uid) return loopRoute(from, 0.04, 0.04, 0, g.side, g.targetSide ?? undefined).points;
       return routeEdge({ from, to: target ?? loose, kind, fromSide: kind === "elbow" ? g.side : undefined, ...(g.targetSide ? { toSide: g.targetSide } : {}), gapFrom: 0.04, gapTo: 0.04, obstacles: solid, flow }).points;
     }
     const e = d.edges.find((x) => x.uid === g.edge);
@@ -518,7 +532,20 @@ export class Canvas {
     }
     if (ev.button !== 0) return;
     if (this.gesture?.type === "place") { this.placeAt(p, ev.shiftKey); return; }
+    if (this.connectTool) {
+      const uid = t.closest("[data-uid]")?.getAttribute("data-uid") ?? this.nodeAt(p);
+      if (uid && this.node(uid)) this.pickConnector(uid);
+      else this.host.say(this.connectTool.source ? "choose the target shape" : "choose the source shape");
+      return;
+    }
     const editable = this.app.session.inSync;
+    const addMember = t.closest("[data-add-member]");
+    if (addMember && editable) {
+      const kind = addMember.getAttribute("data-add-member") as "attribute" | "operation";
+      const uid = addMember.getAttribute("data-uid");
+      if (uid) this.addClassMember(uid, kind);
+      return;
+    }
     const handle = t.getAttribute("data-handle") as Handle | null;
     const only = this.selection.size === 1 ? [...this.selection][0] : null;
     if (handle && only && editable) {
@@ -676,8 +703,7 @@ export class Canvas {
       case "connect":
       case "reconnect": {
         g.at = p;
-        const from = g.type === "connect" ? g.from : undefined;
-        const target = this.nodeAt(p, from);
+        const target = this.nodeAt(p);
         g.target = target;
         g.targetSide = null;
         g.ok = false;
@@ -1017,6 +1043,7 @@ export class Canvas {
     if (k === " ") { this.space = true; ev.preventDefault(); this.drawOverlay(); return; }
     if (k === "Escape") {
       if (this.gesture) { const was = this.gesture.type; this.gesture = null; this.guides = []; this.ghost.replaceChildren(); this.show(s.doc, s.geometry); this.host.say(was === "place" ? "stopped placing" : "cancelled"); this.host.changed(); }
+      else if (this.connectTool) this.stopConnectTool("cancelled the connector");
       else if (this.selection.size) { this.select([]); this.host.say("nothing selected"); }
       return;
     }
@@ -1074,6 +1101,19 @@ export class Canvas {
       return;
     }
     const only = this.selection.size === 1 ? [...this.selection][0] : null;
+    if (only && ev.altKey && (k.toLowerCase() === "a" || k.toLowerCase() === "o")) {
+      const n = this.node(only);
+      if (n && (n.kind === "class" || n.kind === "interface")) {
+        ev.preventDefault();
+        this.addClassMember(only, k.toLowerCase() === "a" ? "attribute" : "operation");
+        return;
+      }
+    }
+    if (this.connectTool && only && k === "Enter" && this.node(only)) {
+      ev.preventDefault();
+      this.pickConnector(only);
+      return;
+    }
     if (only && (k === "Enter" || k === "F2")) {
       ev.preventDefault();
       const n = this.node(only);
@@ -1140,9 +1180,76 @@ export class Canvas {
     this.host.say(`${duplicate ? "duplicated" : "pasted"} ${made.nodes.length} shape${made.nodes.length === 1 ? "" : "s"} with new ids`);
   }
 
+  // ---------------------------------------------------------------- relationship tool
+  /** Arm a relationship tool. Pointer users click two shapes; keyboard users select with arrows/Tab and press Enter. */
+  beginConnectTool(op: string | null): void {
+    this.stopPlacing();
+    this.connectTool = { op, source: null };
+    this.root.classList.add("is-connecting");
+    this.host.changed();
+    this.host.say("choose the source shape (keyboard: arrows select, Enter chooses, then Tab and Enter)");
+    this.root.focus({ preventScroll: true });
+  }
+
+  get connecting(): boolean { return this.connectTool !== null; }
+
+  stopConnectTool(message = "stopped connecting"): void {
+    if (!this.connectTool) return;
+    this.connectTool = null;
+    this.root.classList.remove("is-connecting");
+    this.host.changed();
+    this.host.say(message);
+    this.drawOverlay();
+  }
+
+  private pickConnector(uid: string): void {
+    const tool = this.connectTool, d = this.app.session.doc;
+    if (!tool || !d || !this.app.session.inSync) return;
+    if (!tool.source) {
+      tool.source = uid;
+      this.select([uid]);
+      const n = this.node(uid);
+      this.host.say(`source: ${n?.label || n?.id || "shape"}; choose the target (the same shape makes a loop)`);
+      return;
+    }
+    let made = "";
+    const source = tool.source;
+    const r = this.app.session.edit("connect", (draft) => {
+      made = cmd.addEdge(draft, { from: source, to: uid, ...(tool.op ? { op: tool.op } : {}) }).uid;
+    });
+    if (!r.ok) { this.host.say(r.message ?? "couldn't connect those shapes"); return; }
+    this.connectTool = null;
+    this.root.classList.remove("is-connecting");
+    this.select([made]);
+    this.host.changed();
+    this.host.say(`connected${aftermath(r) ? `; ${aftermath(r)}` : ""}`);
+  }
+
+  /** Add a class compartment row from the canvas, then edit that row in place. */
+  private addClassMember(uid: string, kind: "attribute" | "operation"): void {
+    const n = this.node(uid);
+    if (!n || (n.kind !== "class" && n.kind !== "interface")) return;
+    const members = [...(n.members ?? [])];
+    const used = new Set(members.map((m) => m.name));
+    const stem = kind === "attribute" ? "attribute" : "operation";
+    let i = 1;
+    while (used.has(`${stem}${i}`)) i++;
+    const index = members.length;
+    members.push({ kind, visibility: "+", name: `${stem}${i}`, ...(kind === "operation" ? { params: "" } : {}), type: "Type" });
+    const r = this.app.session.edit(`add ${kind}`, (d) => cmd.patchNode(d, uid, { members }), { select: [uid] });
+    if (!r.ok) { this.host.say(r.message ?? `couldn't add the ${kind}`); return; }
+    this.select([uid]);
+    this.host.say(`added an ${kind}; type on the canvas to replace it`);
+    requestAnimationFrame(() => this.host.editText({ type: "member", uid, index }));
+  }
+
   // ---------------------------------------------------------------- placing new shapes
   /** Arm a palette shape: it follows the pointer over the canvas and the next click (or the drop) places it. */
   beginPlace(kind: cmd.PaletteKind, sticky = false): void {
+    if (this.connectTool) {
+      this.connectTool = null;
+      this.root.classList.remove("is-connecting");
+    }
     this.gesture = { type: "place", kind, at: null, sticky };
     this.root.classList.add("is-placing");
     this.host.changed();
@@ -1176,7 +1283,7 @@ export class Canvas {
     const d = this.app.session.doc;
     if (g?.type !== "place" || !g.at || !d) { this.ghost.replaceChildren(); return; }
     const probe = cloneDoc(d);
-    const n = cmd.addNode(probe, { kind: g.kind });
+    const n = cmd.addNode(probe, { kind: g.kind, ...blankPlacement(g.kind) });
     const geom = nodeSize(this.app.measurer, n, this.app.session.geometry?.direction === "right");
     if (n.kind === "partition" || n.kind === "boundary") { geom.w = 2; geom.h = 1.5; geom.shape = "container"; geom.kind = "boundary"; }
     geom.cx = g.at[0]; geom.cy = g.at[1];
@@ -1196,7 +1303,7 @@ export class Canvas {
     const container = g.kind === "partition" || g.kind === "boundary";
     const r = s.edit(`add ${g.kind}`, (d) => {
       const into = container ? undefined : this.containerAt([at.x, at.y]);
-      const n = cmd.addNode(d, { kind: g.kind, ...(container ? {} : { at }), ...(into ? { parent: into } : {}) });
+      const n = cmd.addNode(d, { kind: g.kind, ...blankPlacement(g.kind), ...(container ? {} : { at }), ...(into ? { parent: into } : {}) });
       made = n.uid;
       what = `${n.kind} ${n.id}${into ? ` in ${d.nodes.find((x) => x.id === into)?.label ?? into}` : ""}`;
     });
@@ -1210,3 +1317,7 @@ export class Canvas {
 }
 
 const round = (v: number): number => Math.round(v * 1000) / 1000;
+
+/** Visual construction starts with empty content. Structural symbols keep their conventional defaults. */
+const blankPlacement = (kind: cmd.PaletteKind): { label?: string } =>
+  (["start", "end", "initial", "final", "flow-final", "fork", "join", "merge"] as string[]).includes(kind) ? {} : { label: "" };
