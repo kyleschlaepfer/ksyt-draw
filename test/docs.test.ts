@@ -47,7 +47,7 @@ describe("the syntax reference covers the code", () => {
   it("names the embed parameters", () => {
     for (const p of ["v", "d", "id", "step", "theme", "lint", "qa", "tools"]) expect(text).toContain(`<td><code>${p}</code></td>`);
   });
-  it("keeps the house rules: no em dashes, no hand-drawn phrasing, sequential headings, example buttons", () => {
+  it("keeps the house rules on wording, headings and example buttons", () => {
     expect(docs).not.toContain("—");
     expect(docs.toLowerCase()).not.toMatch(/hand[- ]drawn|drawn by hand/);
     const levels = [...docs.matchAll(/<h([1-6])/g)].map((m) => Number(m[1]));
