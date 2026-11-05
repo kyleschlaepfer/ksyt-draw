@@ -1,0 +1,28 @@
+# An inheritance hierarchy with an interface.
+diagram class
+id shapes
+title Every shape can report its area; circles and rectangles are kinds of shape
+
+interface Drawable {
+  +draw(canvas: Canvas): void
+}
+abstract class Shape {
+  #origin: Point
+  +area(): float {abstract}
+  +moveTo(p: Point): void
+}
+class Circle {
+  -radius: float
+  +area(): float
+}
+class Rectangle {
+  -width: float
+  -height: float
+  +area(): float
+}
+class Square
+
+Shape ..|> Drawable
+Circle --|> Shape
+Rectangle --|> Shape
+Square --|> Rectangle

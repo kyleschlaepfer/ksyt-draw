@@ -1,0 +1,36 @@
+# Two actors, include and extend, and a structured description of the main use case.
+diagram use-case
+id library
+title Members borrow and renew; a late return adds a fine to borrowing
+narration Borrow book includes check membership. Pay fine extends borrow book when the member has a late return.
+
+actor member "Member"
+actor librarian "Librarian" right
+boundary system "Library system" {
+  use-case borrow "borrow book"
+  use-case renew "renew loan"
+  use-case membership "check membership"
+  use-case fine "pay fine"
+  use-case catalog "update catalog"
+}
+
+member -- borrow
+member -- renew
+librarian -- catalog
+borrow -include-> membership
+fine -extend-> borrow
+
+describe borrow {
+  goal Take a book home for the loan period
+  primary member
+  supporting librarian
+  trigger The member brings a book to the desk
+  pre The member has a library card
+  main 1. The member presents the card and the book
+  main 2. The system checks the membership
+  main 3. The system records the loan and its due date
+  alt 2a. The membership has lapsed: the loan is refused
+  post The book is on loan to the member
+  related membership (include)
+  related fine (extend)
+}

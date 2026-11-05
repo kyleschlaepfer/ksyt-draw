@@ -1,0 +1,25 @@
+# A hand-arranged flow: two shapes placed, one resized, one line routed by hand, one line styled.
+diagram flowchart
+id manual
+title A draft is reviewed and either published or sent back
+start begin
+process draft "write draft"
+decision ok "ready?"
+process publish "publish"
+end done
+
+begin -> draft
+draft -> ok
+ok -> publish : yes
+ok -> draft : no
+publish -> done
+
+# layout: written by the draw view. Delete a line to hand that part back to automatic layout.
+layout {
+  place publish 3.4 3.2
+  size publish 1.8 0.7
+  place done 3.4 4.5
+  route ok -> draft elbow from left to left via -0.9 3.03, -0.9 1.6
+  style ok -> publish color accent weight bold
+  style publish fill wash
+}

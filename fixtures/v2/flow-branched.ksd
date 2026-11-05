@@ -1,0 +1,25 @@
+# A flowchart with a three-way branch and a loop back.
+diagram flowchart
+id triage
+title A support ticket is routed by severity and reopened until it is fixed
+start begin
+io ticket "ticket arrives"
+decision severity "how severe?"
+process page "page on-call engineer"
+process queue "add to team queue"
+process faq "send help article"
+process fix "work the ticket"
+decision fixed "fixed?"
+end done
+
+begin -> ticket
+ticket -> severity
+severity -> page : critical
+severity -> queue : normal
+severity -> faq : low
+page -> fix
+queue -> fix
+fix -> fixed
+fixed -> done : yes
+fixed -> fix : no
+faq -> done

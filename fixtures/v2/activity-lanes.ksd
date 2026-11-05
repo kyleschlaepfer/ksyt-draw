@@ -1,0 +1,32 @@
+# Three partitions: who does what when an online order is filled.
+diagram activity
+id order-lanes
+title The warehouse only ships after the customer's payment clears
+narration The customer places an order and pays. Sales checks the payment. If it clears, the warehouse packs and ships the order; otherwise sales cancels it.
+
+partition customer "Customer" {
+  start begin
+  action place "place order"
+  action pay "pay"
+  end done
+}
+partition sales "Sales" {
+  action check "check payment"
+  decision cleared "payment cleared?"
+  action cancel "cancel order"
+  flow-final stop
+}
+partition warehouse "Warehouse" {
+  action pack "pack order"
+  action ship "ship order"
+}
+
+begin -> place
+place -> pay
+pay -> check
+check -> cleared
+cleared -> pack : [yes]
+cleared -> cancel : [no]
+cancel -> stop
+pack -> ship
+ship -> done

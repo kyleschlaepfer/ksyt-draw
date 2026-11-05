@@ -4,13 +4,15 @@
 import "@fontsource/kalam/300.css";
 import "@fontsource/kalam/400.css";
 import "@fontsource/atkinson-hyperlegible-next/400.css";
+import "@fontsource/atkinson-hyperlegible-next/700.css";
 import "./embed.css";
-import { parse, ParseError } from "../core/parse";
+import { firstError, parseSource } from "../core/doc/parse";
 import { parseHash, buildHash, type HashState } from "../core/state";
 import { severityCounts } from "../core/lint";
 import { canvasMeasurer, loadFonts, type FontStatus } from "./measure-dom";
 import { errorCard, mountFigure, sceneFor, type Mounted } from "./figure";
 import { downloadSvg } from "./download";
+import { resolve } from "../core/geom/resolve";
 
 const app = document.getElementById("app") as HTMLElement;
 const framed = window.parent !== window;
@@ -57,20 +59,17 @@ async function render(keepStep = false): Promise<void> {
   if (state.v !== 1) return showError("This link uses an embed version this page doesn't know.", `v=${state.v ?? "missing"}; this page speaks v=1.`);
   const ksd = loadedKsd ?? state.d;
   if (!ksd) return showError("This link doesn't contain a diagram.", state.undecodable ? "The d parameter could not be decoded." : undefined);
-  let d;
-  try {
-    d = parse(ksd);
-  } catch (e) {
-    if (e instanceof ParseError) return showError("This diagram has a mistake in its text.", e.msg, e.line);
-    throw e;
-  }
+  const parsed = parseSource(ksd);
+  const bad = firstError(parsed);
+  if (bad || !parsed.doc) return showError("This diagram has a mistake in its text.", bad?.message ?? "empty diagram", bad?.line ?? 0);
+  const d = parsed.doc;
   if (!fontStatus) fontStatus = await loadFonts();
   if (token !== renderToken) return;
   const previousStep = keepStep && mounted ? mounted.step : state.step;
-  document.title = d.web.title;
+  document.title = d.meta.title;
   const width = Math.max(100, app.clientWidth || document.documentElement.clientWidth - 16);
   mounted = mountFigure(app, d, canvasMeasurer, {
-    initialStep: previousStep, lint: state.lint, qa: state.qa, containerWidth: width, fontStatus, idPrefix: d.diagram_id || "fig",
+    initialStep: previousStep, lint: state.lint, qa: state.qa, containerWidth: width, fontStatus, idPrefix: d.meta.id || "fig", look: state.look ?? undefined,
     onStep: (step, steps) => { post({ type: "step", step, steps }); requestResize(); },
   });
   if (state.tools) {
@@ -88,12 +87,12 @@ async function render(keepStep = false): Promise<void> {
     dl.type = "button";
     dl.className = "btn-quiet";
     dl.textContent = "download SVG";
-    const sc = mounted.scene;
-    dl.addEventListener("click", () => { void downloadSvg(sc); });
+    const shown = mounted;
+    dl.addEventListener("click", () => { void downloadSvg(shown.diagram, shown.scene.look, document.documentElement.getAttribute("data-theme")); });
     foot.append(open, sep, dl);
     mounted.root.appendChild(foot);
   }
-  post({ type: "ready", steps: mounted.steps, step: mounted.step, title: d.web.title });
+  post({ type: "ready", steps: mounted.steps, step: mounted.step, title: d.meta.title });
   post({ type: "lint", status: mounted.lint.status, counts: severityCounts(mounted.lint.findings) });
   requestResize();
 }
@@ -128,7 +127,10 @@ if (typeof ResizeObserver !== "undefined") {
     const w = app.clientWidth;
     if (w === lastWidth || !mounted) return;
     lastWidth = w;
-    const want = sceneFor(mounted.diagram, canvasMeasurer, w).direction;
+    const d = mounted.diagram;
+    // a right-running flow turns top-down when the frame gets too narrow for it, and back when it widens
+    const narrow = d.meta.type !== "use-case" && sceneFor(d, canvasMeasurer, w).scene.direction !== resolve(d, canvasMeasurer).direction;
+    const want = narrow ? "down" : resolve(d, canvasMeasurer).direction;
     if (want !== mounted.scene.direction) void render(true);
   }).observe(app);
 }

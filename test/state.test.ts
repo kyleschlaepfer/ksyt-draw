@@ -6,15 +6,16 @@ const permit = readFileSync(new URL("../fixtures/diagrams/usecase-permit.ksd", i
 
 describe("state.ts", () => {
   it("round-trips every field through the hash", () => {
-    const h = buildHash({ d: permit, id: "permit-portal", step: 2, theme: "dark", lint: true, qa: true, tools: false });
+    const h = buildHash({ d: permit, id: "permit-portal", step: 2, theme: "dark", lint: true, qa: true, tools: false, look: "precision" });
     const s = parseHash("#" + h);
-    expect(s).toEqual({ v: 1, d: permit, id: "permit-portal", step: 2, theme: "dark", lint: true, qa: true, tools: false, undecodable: false });
+    expect(s).toEqual({ v: 1, d: permit, id: "permit-portal", step: 2, theme: "dark", lint: true, qa: true, tools: false, look: "precision", undecodable: false });
     const all = parseHash(buildHash({ d: permit, step: "all" }));
     expect(all.step).toBe("all");
     expect(all.lint).toBe(false);
     expect(all.tools).toBe(true);
     expect(all.theme).toBe("auto");
     expect(all.id).toBe("");
+    expect(all.look).toBeNull();
   });
   it("survives a compressed form containing + (URLSearchParams encodes it)", () => {
     let text = "";

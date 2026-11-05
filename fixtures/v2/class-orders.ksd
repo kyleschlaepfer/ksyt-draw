@@ -1,0 +1,29 @@
+# Associations with multiplicities, composition and aggregation.
+diagram class
+id orders
+title An order belongs to one customer and is made of line items, each for one product
+
+class Customer {
+  +name: String
+  +email: String
+  +placeOrder(cart: Cart): Order
+}
+class Order {
+  +number: int
+  +placedOn: Date
+  +total(): Money
+}
+class LineItem {
+  +quantity: int
+  +subtotal(): Money
+}
+class Product {
+  +sku: String
+  +price: Money
+}
+class Catalog
+
+Customer "1" -- "0..*" Order : places
+Order "1" *-- "1..*" LineItem : contains
+LineItem "0..*" --> "1" Product : is for
+Catalog "1" o-- "0..*" Product : lists

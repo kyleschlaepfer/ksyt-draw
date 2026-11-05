@@ -50,7 +50,8 @@ main { display: block; padding-bottom: var(--s-8); }
 .meta > *:not(:last-child)::after { content: "\00B7"; margin-left: 0.6em; }
 
 /* ---------- the views: a nav row, the current one underlined in pen ---------- */
-.views-list { display: flex; flex-wrap: wrap; gap: 0.25rem var(--s-3); margin: 0 0 var(--s-3); border-bottom: 1px dashed var(--rule); }
+.views-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0 var(--s-3); margin: 0 0 var(--s-3); border-bottom: 1px dashed var(--rule); }
+.views-list { display: flex; flex-wrap: wrap; gap: 0.25rem var(--s-3); }
 .views-tab {
   font: var(--hand)/1.2 var(--font-hand); color: var(--ink); cursor: pointer;
   background: none; border: 0; padding: 0.55rem 0.1rem 0.7rem; min-height: 44px; position: relative;
@@ -67,14 +68,45 @@ main { display: block; padding-bottom: var(--s-8); }
 .play { display: grid; grid-template-columns: minmax(18rem, 1fr) minmax(0, 1.4fr); gap: var(--s-4); align-items: start; }
 @media (max-width: 48rem) { .play { grid-template-columns: 1fr; } }
 .play-editor { display: grid; gap: var(--s-1); }
-.play-editor label { font: 300 var(--hand-sm)/1.3 var(--font-hand); color: var(--ink-2); }
-.play-editor textarea {
-  width: 100%; min-height: 24rem; resize: vertical;
+.play-editor-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--s-2); }
+.play-editor-label { font: 300 var(--hand-sm)/1.3 var(--font-hand); color: var(--ink-2); }
+.play-editor-tools { display: flex; gap: var(--s-2); }
+.play-editor-tools .btn-quiet { min-height: 32px; font-weight: 300; color: var(--ink-2); }
+.play-editor-tools .btn-quiet:hover { color: var(--accent-strong); }
+.play-editor-host { min-width: 0; }
+.ksd-editor { display: block; min-width: 0; }
+/* the text is readable while the editor's code is on its way */
+.play-editor-loading {
+  margin: 0; min-height: 24rem; max-height: 70vh; overflow: auto;
   font: 0.95rem/1.5 var(--font-mono); color: var(--ink); background: var(--page-2);
-  border: 1.5px solid var(--rule); border-radius: 6px; padding: var(--s-1) var(--s-2);
-  tab-size: 2; white-space: pre; overflow-wrap: normal; overflow-x: auto;
+  border: 1.5px solid var(--rule); border-radius: 6px; padding: var(--s-1) var(--s-2); tab-size: 2;
 }
-.play-editor textarea:focus-visible { border-color: var(--accent); }
+.stale-note {
+  margin: 0 0 var(--s-1); padding: 0.4rem 0.75rem; color: var(--terra-ink);
+  border: 1.5px dashed var(--terra); border-radius: 6px;
+}
+.stale-note .btn-quiet { min-height: 32px; }
+/* the part of the figure the cursor's line declares */
+.play-preview .is-linked path.k-ink, .play-preview .is-linked path.k-ink-2, .play-preview text.is-linked { fill: var(--accent); }
+.play-preview .is-linked path.ks-ink, .play-preview .is-linked path.ks-ink-2, .play-preview .is-linked ellipse.ks-ink { stroke: var(--accent); }
+.play-preview svg [data-name] { cursor: pointer; }
+
+/* ---------- the document bar: new, open, save, export ---------- */
+.doc-bar { display: flex; flex-wrap: wrap; gap: 0 var(--s-2); align-items: center; }
+.doc-bar .btn-quiet { font-weight: 300; color: var(--ink-2); }
+.doc-bar .btn-quiet:hover, .doc-bar .btn-quiet[aria-expanded="true"] { color: var(--accent-strong); }
+.menu { position: relative; display: inline-flex; }
+.menu-list {
+  position: absolute; z-index: 30; top: 100%; right: 0; min-width: 17rem; padding: 0.3rem;
+  background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px; display: grid; gap: 0.1rem;
+}
+.menu-item {
+  display: grid; gap: 0.1rem; text-align: left; width: 100%; min-height: 44px; padding: 0.4rem 0.6rem; cursor: pointer;
+  font: var(--hand-sm)/1.2 var(--font-hand); color: var(--ink); background: none; border: 0; border-radius: 4px;
+}
+.menu-item:hover, .menu-item:focus-visible { background: var(--wash); }
+.menu-item:disabled { color: var(--ink-2); cursor: default; background: none; }
+.menu-hint { font: var(--text-sm)/1.3 var(--font-body); color: var(--ink-2); }
 .play-status { min-height: 1.6em; margin: 0; }
 .play-preview { min-width: 0; }
 .play-preview figure.fig > .fig-stage { justify-content: flex-start; }
@@ -120,46 +152,168 @@ main { display: block; padding-bottom: var(--s-8); }
   .docs-body .table tr { border-bottom: 1px solid var(--rule); padding-bottom: 0.5rem; }
 }
 
-/* ---------- draw: controls down the left like a list, the drawing on the right ---------- */
-.draw-editor { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: var(--s-4); align-items: start; }
+/* ---------- draw: the shapes down the left like a list, the canvas taking the rest ---------- */
+.draw-editor { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr); gap: var(--s-3); align-items: start; }
 @media (max-width: 56rem) { .draw-editor { grid-template-columns: 1fr; } }
 .draw-side { display: grid; gap: var(--s-3); }
+@media (max-width: 56rem) { .draw-side { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--s-2); } }
 .draw-sec { display: grid; gap: var(--s-1); align-content: start; padding-top: var(--s-2); border-top: 1px dashed var(--rule); }
 .draw-sec:first-child { padding-top: 0; border-top: 0; }
-.draw-sec h2 { font: var(--hand)/1.2 var(--font-hand); font-weight: 400; margin: 0; }
-.draw-sec .note { margin: 0; }
-.draw-field { display: grid; gap: 0.25rem; }
-.draw-field > span { font: 300 var(--hand-sm)/1.2 var(--font-hand); color: var(--ink-2); }
+.draw-sec h2, .draw-inspector h2 { font: var(--hand)/1.2 var(--font-hand); font-weight: 400; margin: 0; }
+.draw-sec .note { margin: 0; font-size: 1.1rem; }
+.draw-field { display: grid; gap: 0.2rem; min-width: 0; }
+.draw-field > span { font: 300 1.1rem/1.2 var(--font-hand); color: var(--ink-2); }
 .draw-field input, .draw-field select, .draw-field textarea {
-  width: 100%; font: var(--text-sm)/1.4 var(--font-body); color: var(--ink); background: var(--page-2);
-  border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.45rem 0.6rem; min-height: 44px;
+  width: 100%; min-width: 0; font: var(--text-sm)/1.35 var(--font-body); color: var(--ink); background: var(--page-2);
+  border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.35rem 0.5rem; min-height: 40px;
 }
 .draw-field textarea { resize: vertical; }
-.draw-field input:focus-visible, .draw-field select:focus-visible, .draw-field textarea:focus-visible { border-color: var(--accent); }
-.draw-palette { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.draw-field input.mono, .member-row input { font-family: var(--font-mono); font-size: 0.9rem; }
+.draw-field input:focus-visible, .draw-field select:focus-visible, .draw-field textarea:focus-visible, .member-row input:focus-visible { border-color: var(--accent); }
+.draw-check { display: flex; align-items: center; gap: 0.5rem; min-height: 40px; font: var(--hand-sm)/1.2 var(--font-hand); }
+.draw-check input { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
+.draw-palette { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .draw-shape {
   font: var(--hand-sm)/1 var(--font-hand); color: var(--ink); background: var(--page-2); cursor: grab;
-  border: 0; border-radius: 0.55em 0.8em 0.6em 0.75em / 0.8em 0.55em 0.75em 0.6em;
-  padding: 0 0.9rem; min-height: 44px; touch-action: none; user-select: none;
+  border: 1.5px solid transparent; border-radius: 0.55em 0.8em 0.6em 0.75em / 0.8em 0.55em 0.75em 0.6em;
+  padding: 0 0.8rem; min-height: 44px; touch-action: none; user-select: none;
   transition: background-color var(--dur-fast) var(--ease-out);
 }
 .draw-shape:hover { background: var(--wash); }
 .draw-shape:active { cursor: grabbing; }
-.draw-ghost {
-  position: fixed; z-index: 10; pointer-events: none; font: var(--hand-sm)/1 var(--font-hand); color: var(--ink);
-  background: var(--wash); padding: 0.4rem 0.8rem; border-radius: 0.5em 0.7em 0.55em 0.65em / 0.7em 0.5em 0.65em 0.55em;
+/* the armed shape is told by an outline and a mark as well as its color */
+.draw-shape[aria-pressed="true"] { background: var(--wash); border-color: var(--accent); }
+.draw-shape[aria-pressed="true"]::before { content: "\2713\00a0"; }
+
+.draw-main { min-width: 0; display: grid; gap: var(--s-1); }
+.draw-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--s-2); }
+.draw-toolbar .btn-quiet { min-height: 40px; }
+.draw-toolbar .btn-quiet[aria-pressed="true"] { color: var(--ink); position: relative; }
+.draw-toolbar .btn-quiet[aria-pressed="true"]::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0.3rem; height: 0.3em;
+  background: var(--accent); -webkit-mask: var(--stroke-underline) center / 100% 100% no-repeat; mask: var(--stroke-underline) center / 100% 100% no-repeat;
 }
-.draw-main { min-width: 0; }
+.toolbar-sep { width: 1px; height: 1.4rem; background: var(--rule); }
+#draw-zoom { min-width: 3.4em; justify-content: center; font-variant-numeric: tabular-nums; }
+.draw-banner { margin: 0; }
+
+/* the stage holds the canvas, the floating properties panel and the in-place text field */
+.draw-stage { position: relative; min-width: 0; }
 .draw-canvas {
-  min-height: 24rem; padding: var(--s-2) 0; overflow: auto; touch-action: none;
-  border-top: 1px dashed var(--rule); border-bottom: 1px dashed var(--rule);
+  position: relative; height: clamp(30rem, 74vh, 64rem); overflow: hidden; touch-action: none; cursor: default;
+  background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px; user-select: none; -webkit-user-select: none;
 }
-.draw-canvas:focus-visible { outline-offset: 2px; }
-.draw-canvas > svg { display: block; max-width: 100%; height: auto; }
-.draw-canvas [data-name] { cursor: grab; }
-.draw-canvas .is-selected path.k-ink, .draw-canvas .is-selected path.k-ink-2 { fill: var(--accent); }
-.draw-canvas text.is-selected { fill: var(--accent); }
-.draw-main .play-status { margin-top: var(--s-1); }
+.draw-canvas:focus-visible { outline-offset: 2px; border-color: var(--accent); }
+.draw-svg { display: block; width: 100%; height: 100%; max-width: none; }
+.draw-canvas .grid-dot { fill: var(--rule); }
+.draw-canvas.is-panning { cursor: grabbing; }
+.draw-canvas.is-placing { cursor: copy; }
+.draw-canvas.is-waiting { cursor: default; }
+.draw-stage.is-readonly .draw-canvas { border-style: dashed; }
+.draw-canvas .layer-texts { pointer-events: none; }
+.draw-canvas .world > g:not(.layer-hits) { pointer-events: none; }
+.draw-canvas .hit { fill: transparent; pointer-events: all; cursor: grab; }
+.draw-canvas .hit-line { fill: none; stroke: transparent; stroke-width: 14px; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: pointer; }
+.draw-canvas [data-container] .hit { cursor: pointer; }
+.draw-canvas .divider.col { cursor: col-resize; }
+.draw-canvas .divider.row { cursor: row-resize; }
+.draw-canvas .ghost { opacity: 0.45; }
+.draw-stage.is-readonly .hit, .draw-stage.is-readonly .hit-line { cursor: default; }
+
+/* overlay: selection, handles, ports, guides. Sizes are in screen pixels whatever the zoom. */
+.draw-canvas .overlay * { vector-effect: non-scaling-stroke; }
+.draw-canvas .sel { fill: none; stroke: var(--accent); stroke-width: 1.5px; stroke-dasharray: 5 4; pointer-events: none; }
+.draw-canvas .sel-line { fill: none; stroke: var(--accent); stroke-width: 6px; stroke-opacity: 0.28; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.draw-canvas .handle { fill: var(--page); stroke: var(--accent-strong); stroke-width: 1.5px; }
+.draw-canvas .h-nw, .draw-canvas .h-se { cursor: nwse-resize; }
+.draw-canvas .h-ne, .draw-canvas .h-sw { cursor: nesw-resize; }
+.draw-canvas .h-n, .draw-canvas .h-s { cursor: ns-resize; }
+.draw-canvas .h-e, .draw-canvas .h-w { cursor: ew-resize; }
+.draw-canvas .port { fill: var(--page); stroke: var(--accent-strong); stroke-width: 2px; cursor: crosshair; }
+.draw-canvas .port:hover, .draw-canvas .port.is-on { fill: var(--accent); }
+.draw-canvas .end { fill: var(--accent); stroke: var(--page); stroke-width: 2px; cursor: move; }
+.draw-canvas .seg { fill: var(--page); stroke: var(--accent-strong); stroke-width: 1.5px; }
+.draw-canvas .seg-h { cursor: ns-resize; }
+.draw-canvas .seg-v { cursor: ew-resize; }
+.draw-canvas .via { fill: var(--page); stroke: var(--accent-strong); stroke-width: 2px; cursor: move; }
+.draw-canvas .mid { fill: var(--page); stroke: var(--accent-strong); stroke-width: 1.5px; stroke-dasharray: 2 2; cursor: copy; }
+.draw-canvas .guide { stroke: var(--terra); stroke-width: 1px; stroke-dasharray: 4 3; pointer-events: none; }
+.draw-canvas .marquee { fill: var(--wash); fill-opacity: 0.35; stroke: var(--accent); stroke-width: 1px; stroke-dasharray: 4 3; pointer-events: none; }
+.draw-canvas .preview { fill: none; stroke: var(--accent); stroke-width: 2.5px; stroke-dasharray: 7 5; stroke-linejoin: round; pointer-events: none; }
+.draw-canvas .preview.is-bad { stroke: var(--terra-ink); stroke-dasharray: 2 5; }
+.draw-canvas .target { fill: none; stroke: var(--accent); stroke-width: 2.5px; pointer-events: none; }
+.draw-canvas .target.is-bad { stroke: var(--terra-ink); stroke-dasharray: 3 4; }
+
+/* the in-place text field: the shape's own text, where it is, in its own handwriting */
+.draw-inline {
+  position: absolute; z-index: 5; margin: 0; padding: 4px 12px; resize: none; overflow: hidden; white-space: pre;
+  color: var(--ink); background: var(--page); border: 2px solid var(--accent); border-radius: 6px; outline: 0;
+}
+.draw-inline-center { text-align: center; }
+.draw-inline-left { text-align: left; }
+
+/* the properties panel floats over the canvas corner so the canvas keeps its width */
+.draw-inspector {
+  position: absolute; z-index: 4; top: 0.6rem; right: 0.6rem; width: 17.5rem; max-width: calc(100% - 1.2rem); max-height: calc(100% - 1.2rem);
+  display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px;
+}
+.inspector-head { display: flex; justify-content: flex-end; padding: 0 0.6rem; border-bottom: 1px dashed var(--rule); }
+.inspector-toggle { min-height: 36px; font-weight: 300; color: var(--ink-2); }
+.inspector-toggle::after { content: "hide"; margin-left: 0.5em; font-size: 0.8em; }
+.draw-inspector.is-collapsed .inspector-toggle::after { content: "show"; }
+.draw-inspector.is-collapsed { width: auto; }
+.draw-inspector.is-collapsed .inspector-head { border-bottom: 0; }
+.draw-inspector.is-collapsed .inspector-body { display: none; }
+.inspector-body { overflow: auto; padding: 0.6rem 0.75rem 0.75rem; display: grid; gap: 0.6rem; align-content: start; }
+.inspector-body .note { margin: 0; font-size: 1.05rem; line-height: 1.3; }
+.inspector-body .btn-quiet { min-height: 36px; }
+.inspector-row { display: flex; flex-wrap: wrap; gap: 0.3rem 0.75rem; align-items: end; }
+.inspector-row > .draw-field { flex: 1 1 6rem; }
+.inspector-section { border-top: 1px dashed var(--rule); padding-top: 0.4rem; }
+.inspector-section > summary { cursor: pointer; font: var(--hand-sm)/1.3 var(--font-hand); min-height: 32px; }
+.inspector-section[open] { display: grid; gap: 0.5rem; }
+.member-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.2rem 0.5rem; align-items: center; }
+.member-row input { width: 100%; min-width: 0; color: var(--ink); background: var(--page-2); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.3rem 0.45rem; min-height: 36px; }
+@media (max-width: 56rem) {
+  /* on narrow screens the panel sits under the canvas instead of over it */
+  .draw-inspector { position: static; width: auto; max-width: none; max-height: none; margin-top: var(--s-1); }
+  .draw-canvas { height: clamp(24rem, 62vh, 40rem); }
+}
+.draw-proposal { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); padding: 0.4rem 0.75rem; border: 1.5px dashed var(--accent); border-radius: 6px; }
+.draw-proposal .note { margin: 0; }
+.draw-main .play-status { margin-top: 0; }
+
+/* ---------- export ---------- */
+.export-dialog {
+  width: min(64rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: var(--s-3); color: var(--ink); background: var(--page);
+  border: 1.5px solid var(--rule); border-radius: 6px; overflow: auto;
+}
+.export-dialog[open] { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(15rem, 1fr); gap: var(--s-2) var(--s-3); align-items: start; }
+.export-dialog::backdrop { background: color-mix(in srgb, var(--ink) 45%, transparent); }
+.export-dialog h2 { grid-column: 1 / -1; font: 1.75rem/1.2 var(--font-hand); font-weight: 400; margin: 0; }
+.export-preview {
+  grid-row: 2 / span 2; display: grid; place-items: center; min-height: 16rem; max-height: 62vh; overflow: auto; padding: var(--s-2);
+  border: 1.5px dashed var(--rule); border-radius: 6px; background: var(--page-2);
+}
+/* a see-through export is shown on the page color, with a different edge so it is told apart */
+.export-preview[data-ground="clear"] { background: var(--page); border-style: dotted; border-color: var(--accent); }
+.export-preview img { display: block; max-width: 100%; max-height: 56vh; width: auto; height: auto; }
+.export-facts { grid-column: 2; margin: 0; }
+.export-options { grid-column: 2; display: grid; gap: var(--s-1); }
+.export-group { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; }
+.export-group legend { font: 300 var(--hand-sm)/1.3 var(--font-hand); color: var(--ink-2); padding: 0; }
+.export-choice { display: inline-flex; align-items: baseline; gap: 0.4rem; min-height: 36px; font: var(--hand-sm)/1.2 var(--font-hand); cursor: pointer; }
+.export-choice input { accent-color: var(--accent); width: 1.05rem; height: 1.05rem; transform: translateY(0.15rem); }
+.export-choice small { display: block; font: var(--text-sm)/1.25 var(--font-body); color: var(--ink-2); }
+.export-more > summary { cursor: pointer; font: 300 var(--hand-sm)/1.3 var(--font-hand); color: var(--ink-2); min-height: 32px; }
+.export-more[open] { display: grid; gap: var(--s-1); }
+.export-dialog .actions { grid-column: 1 / -1; }
+.export-note { grid-column: 1 / -1; margin: 0; min-height: 1.5em; }
+@media (max-width: 48rem) {
+  .export-dialog[open] { grid-template-columns: 1fr; }
+  .export-preview { grid-row: auto; }
+  .export-facts, .export-options { grid-column: 1; }
+}
 
 /* the empty state: narrator, one line, one link */
 .empty-state { display: grid; grid-template-columns: auto 1fr; gap: var(--s-3); align-items: center; padding: var(--s-4) 0; max-width: var(--measure); }

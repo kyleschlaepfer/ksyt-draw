@@ -5,9 +5,9 @@
  * check runs in Node tests and in the browser; no canvas is needed. Knockouts of later elements hide
  * the strokes under them, exactly as on the page.
  */
-import { BG, WASH, type Poly } from "./pen";
+import type { Poly } from "./pen";
 import { PX } from "./measure";
-import type { Scene } from "./scene";
+import { paintBounds, paintPolys, type Scene } from "./render/scene";
 
 export interface QaReport {
   errors: string[];
@@ -68,19 +68,22 @@ export function checkScene(sc: Scene, o: QaOptions = {}): QaReport {
   const errors: string[] = [], warnings: string[] = [];
   const allowed = (a: string, b: string) => sc.overlaps.has(a + "|" + b) || sc.overlaps.has(b + "|" + a);
 
+  const EPS = 1e-6;
   for (const el of sc.elements) {
-    if (!el.sketch.items.length) continue;
-    const [x0, y0, x1, y1] = el.sketch.bbox();
-    if (x0 < 0 || y0 < 0 || x1 > sc.w || y1 > sc.h) {
+    if (!el.paints.length) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of el.paints) { const b = paintBounds(p); x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]); }
+    if (x0 < -EPS || y0 < -EPS || x1 > sc.w + EPS || y1 > sc.h + EPS) {
       errors.push(`CLIP ${el.name}: ink outside the frame (${x0.toFixed(2)}, ${y0.toFixed(2)}, ${x1.toFixed(2)}, ${y1.toFixed(2)} in)`);
     }
   }
-  const inkOf = sc.elements.map((el) => el.sketch.items.filter(([, c]) => c !== WASH && c !== BG).map(([p]) => p));
-  const koOf = sc.elements.map((el) => el.sketch.items.filter(([, c]) => c === BG).map(([p]) => p));
+  const polys = sc.elements.map((el) => el.paints.flatMap(paintPolys));
+  const inkOf: Poly[][] = polys.map((ps) => ps.filter((p) => p.ink).map((p) => p.poly));
+  const koOf: Poly[][] = polys.map((ps) => ps.filter((p) => p.knock).map((p) => p.poly));
 
   for (const t of sc.texts) {
     const [bx0, by0, bx1, by1] = t.box;
-    if (bx0 < 0 || by0 < 0 || bx1 > sc.w * PX || by1 > sc.h * PX) errors.push(`CLIP ${t.name}: label outside the frame`);
+    if (bx0 < -EPS || by0 < -EPS || bx1 > sc.w * PX + EPS || by1 > sc.h * PX + EPS) errors.push(`CLIP ${t.name}: label outside the frame`);
     const pad = 0.03 * PX + 0.06 * t.size;
     const zone: Zone = [
       Math.max(0, Math.trunc((bx0 - pad) * scale)), Math.max(0, Math.trunc((by0 - pad) * scale)),
@@ -88,7 +91,7 @@ export function checkScene(sc: Scene, o: QaOptions = {}): QaReport {
     ];
     const zw = zone[2] - zone[0], zh = zone[3] - zone[1];
     if (zw <= 0 || zh <= 0) continue;
-    const owner = t.owner ?? t.name.split(":")[0];
+    const owner = t.owner ?? "";
     const mask = new Uint8Array(zw * zh);
     for (let i = 0; i < sc.elements.length; i++) {
       const name = sc.elements[i].name;

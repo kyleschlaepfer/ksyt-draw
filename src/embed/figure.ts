@@ -2,13 +2,16 @@
  * Mount a diagram in the page: the SVG, build-up controls, "describe this figure", and the lint panel.
  * Shared by the embed and the playground. Everything from the diagram reaches the DOM as textContent.
  */
-import type { Diagram, Finding, LintResult } from "../core/model";
+import type { Finding, LintResult } from "../core/model";
+import type { ChalkDoc, Look } from "../core/doc/types";
 import type { Measurer } from "../core/measure";
 import { PX } from "../core/measure";
-import { buildScene, type Scene } from "../core/scene";
-import { sceneToSvg } from "../core/svg";
+import { resolve, type Geometry } from "../core/geom/resolve";
+import { buildScene, type Scene } from "../core/render/scene";
+import { sceneToSvg } from "../core/render/svg";
 import { describeItems } from "../core/describe";
-import { lint as runLint, sortFindings, statusWords } from "../core/lint";
+import { sortFindings, statusWords } from "../core/lint";
+import { review } from "../core/diagnostics";
 import { checkScene, type QaReport } from "../core/qa";
 import type { FontStatus } from "./measure-dom";
 
@@ -20,6 +23,8 @@ export interface FigureOptions {
   containerWidth: number;
   fontStatus?: FontStatus;
   idPrefix?: string;
+  /** sketch or precision; default is the document's own look */
+  look?: Look;
   onStep?: (step: number, steps: number) => void;
 }
 
@@ -27,8 +32,9 @@ export interface Mounted {
   root: HTMLElement;
   figure: HTMLElement;
   svg: SVGSVGElement;
-  diagram: Diagram;
+  diagram: ChalkDoc;
   scene: Scene;
+  geometry: Geometry;
   lint: LintResult;
   qa: QaReport | null;
   steps: number;
@@ -52,12 +58,14 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 };
 
 /** Build the scene, switching a right-running flow to top-down when it would shrink labels under 13 px. */
-export function sceneFor(d: Diagram, m: Measurer, containerWidth: number): Scene {
-  let sc = buildScene(d, m);
-  if (d.claimed_diagram_type !== "use-case" && d.web.direction === "right" && containerWidth / (sc.w * PX) < minScale(sc)) {
-    sc = buildScene(d, m, { direction: "down" });
+export function sceneFor(d: ChalkDoc, m: Measurer, containerWidth: number, look?: Look): { scene: Scene; geometry: Geometry } {
+  let geometry = resolve(d, m);
+  let scene = buildScene(d, geometry, m, { look });
+  if (d.meta.type !== "use-case" && geometry.direction === "right" && containerWidth / (scene.w * PX) < minScale(scene)) {
+    geometry = resolve(d, m, { direction: "down" });
+    scene = buildScene(d, geometry, m, { look });
   }
-  return sc;
+  return { scene, geometry };
 }
 
 export function svgElementFrom(markup: string): SVGSVGElement {
@@ -67,16 +75,16 @@ export function svgElementFrom(markup: string): SVGSVGElement {
   return document.importNode(root, true) as unknown as SVGSVGElement;
 }
 
-export function mountFigure(host: HTMLElement, d: Diagram, m: Measurer, o: FigureOptions): Mounted {
-  const scene = sceneFor(d, m, o.containerWidth);
-  const lintResult = runLint(d);
+export function mountFigure(host: HTMLElement, d: ChalkDoc, m: Measurer, o: FigureOptions): Mounted {
+  const { scene, geometry } = sceneFor(d, m, o.containerWidth, o.look);
+  const lintResult = review(d);
   const qa = o.qa ? checkScene(scene, { minDisplayPx: Math.max(1, Math.min(o.containerWidth, scene.w * PX)) }) : null;
   const svg = svgElementFrom(sceneToSvg(scene, { idPrefix: o.idPrefix ?? "fig" }));
 
   const root = el("div", "embed-root");
   const figure = el("figure", "fig");
   figure.setAttribute("tabindex", "0");
-  figure.setAttribute("aria-label", d.web.title);
+  figure.setAttribute("aria-label", d.meta.title);
   const stage = el("div", "fig-stage");
   // legibility floor: the figure never shrinks so far that a label drops under 13 px; on a phone it scrolls sideways instead
   const floorPx = Math.ceil(scene.w * PX * minScale(scene));
@@ -154,7 +162,7 @@ export function mountFigure(host: HTMLElement, d: Diagram, m: Measurer, o: Figur
 
   host.replaceChildren(root);
   return {
-    root, figure, svg, diagram: d, scene, lint: lintResult, qa, steps,
+    root, figure, svg, diagram: d, scene, geometry, lint: lintResult, qa, steps,
     get step() { return step; }, setStep, naturalWidth: scene.w * PX,
   };
 }
@@ -170,7 +178,7 @@ function findingRow(sev: string, rule: string, loc: string, problem: string, fix
   return li;
 }
 
-export function lintPanel(d: Diagram, r: LintResult, qa: QaReport | null, fonts?: FontStatus): HTMLElement {
+export function lintPanel(d: ChalkDoc, r: LintResult, qa: QaReport | null, fonts?: FontStatus): HTMLElement {
   const panel = el("section", "lint");
   panel.setAttribute("aria-label", "notation check");
   panel.appendChild(el("h2", undefined, `notation check: ${statusWords(r.status)}`));
@@ -195,7 +203,7 @@ export function lintPanel(d: Diagram, r: LintResult, qa: QaReport | null, fonts?
   if (fonts && !fonts.ok) {
     panel.appendChild(el("p", "note", `font didn't load: ${fonts.missing.join(", ")}. The layout was measured with a fallback font.`));
   }
-  panel.appendChild(el("p", "note lint-foot", `checked as ${d.notation_profile}`));
+  panel.appendChild(el("p", "note lint-foot", `checked as ${d.meta.profile}`));
   return panel;
 }
 

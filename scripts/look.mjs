@@ -1,0 +1,22 @@
+// A quick look at the running app: node scripts/look.mjs <outDir> [base]
+import { chromium } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+const out = process.argv[2] ?? ".scratch/look";
+const base = process.argv[3] ?? "http://localhost:5173";
+mkdirSync(out, { recursive: true });
+const browser = await chromium.launch();
+const errors = [];
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+const page = await ctx.newPage();
+page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
+page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
+await page.goto(base + "/");
+await page.waitForSelector("#preview svg.ksyt-fig", { timeout: 20000 }).catch(() => errors.push("no preview"));
+await page.waitForTimeout(600);
+await page.screenshot({ path: out + "/write.png" });
+await page.getByRole("tab", { name: "draw" }).click();
+await page.waitForSelector(".draw-canvas .layer-nodes g", { timeout: 20000 }).catch(() => errors.push("no canvas"));
+await page.waitForTimeout(500);
+await page.screenshot({ path: out + "/draw.png" });
+await browser.close();
+console.log(errors.length ? errors.join("\n") : "no errors");

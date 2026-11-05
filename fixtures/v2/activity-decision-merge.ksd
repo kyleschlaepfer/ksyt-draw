@@ -1,0 +1,23 @@
+# A decision and the merge that brings its paths back together.
+diagram activity
+id login
+title Either way of signing in ends at the same dashboard
+narration A returning visitor signs in with a password or with a one-time code, depending on what they set up. Either way they land on the dashboard.
+
+start begin
+action open "open sign-in page"
+decision how "has a password?"
+action password "enter password"
+action code "enter one-time code"
+merge together
+action dashboard "show dashboard"
+end done
+
+begin -> open
+open -> how
+how -> password : [yes]
+how -> code : [no]
+password -> together
+code -> together
+together -> dashboard
+dashboard -> done

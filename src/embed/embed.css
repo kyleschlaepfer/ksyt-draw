@@ -119,6 +119,12 @@ figure.fig details ol, figure.fig details ul { margin: 0 0 var(--s-1); padding-l
 .ksyt-fig .k-accent { fill: var(--accent); } .ksyt-fig .k-accent-strong { fill: var(--accent-strong); }
 .ksyt-fig .k-wash { fill: var(--wash); }     .ksyt-fig .k-terra { fill: var(--terra); }
 .ksyt-fig .k-page { fill: var(--page); }
+/* the precision look: real strokes (ks-<role>) and the prose font */
+.ksyt-fig text.k-body { font-family: var(--font-body); }
+.ksyt-fig .ks-ink { stroke: var(--ink); }      .ksyt-fig .ks-ink-2 { stroke: var(--ink-2); }
+.ksyt-fig .ks-accent { stroke: var(--accent); } .ksyt-fig .ks-accent-strong { stroke: var(--accent-strong); }
+.ksyt-fig .ks-terra { stroke: var(--terra); }   .ksyt-fig .ks-wash { stroke: var(--wash); }
+.ksyt-fig .ks-page { stroke: var(--page); }
 
 /* phased figure: the web version of a slide build-up (one step per click, all steps reachable) */
 .phased [data-step] { transition: opacity var(--dur-step) var(--ease-out); }

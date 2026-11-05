@@ -1,0 +1,59 @@
+# About thirty elements: an expense claim from submission to payment.
+diagram activity
+id expense-claim
+title An expense claim is checked twice before it is paid, and anything over the limit needs a director
+narration The employee submits a claim. The manager reviews it. Finance audits it and pays it. Claims over the limit also need the director.
+
+partition employee "Employee" {
+  start begin
+  action fill "fill in claim"
+  action attach "attach receipts"
+  action submit "submit claim"
+  action fix "correct claim"
+  action notified "read decision"
+  end done
+}
+partition manager "Manager" {
+  action review "review claim"
+  decision valid "valid?"
+  decision limit "over limit?"
+  action reject "reject claim"
+}
+partition director "Director" {
+  action second "second review"
+  decision approve "approve?"
+}
+partition finance "Finance" {
+  action audit "audit receipts"
+  decision clean "receipts match?"
+  fork split
+  action pay "pay employee"
+  action record "record in ledger"
+  join both
+  action notify "send decision"
+}
+
+begin -> fill
+fill -> attach
+attach -> submit
+submit -> review
+review -> valid
+valid -> limit : [yes]
+valid -> fix : [needs changes]
+fix -> submit
+limit -> second : [yes]
+limit -> audit : [no]
+second -> approve
+approve -> audit : [yes]
+approve -> reject : [no]
+audit -> clean
+clean -> split : [yes]
+clean -> reject : [no]
+split -> pay
+split -> record
+pay -> both
+record -> both
+both -> notify
+reject -> notify
+notify -> notified
+notified -> done

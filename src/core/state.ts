@@ -1,5 +1,5 @@
 /**
- * The URL hash (spec/embed-protocol.md §1): v=1&d=<lz>&id=&step=&theme=&lint=&qa=&tools=.
+ * The URL hash (spec/embed-protocol.md §1): v=1&d=<lz>&id=&step=&theme=&lint=&qa=&tools=&look=.
  * Always URLSearchParams: lz-string's alphabet has "+" and "$", which a hand-built string breaks.
  */
 import LZString from "lz-string";
@@ -16,6 +16,8 @@ export interface HashState {
   lint: boolean;
   qa: boolean;
   tools: boolean;
+  /** sketch or precision; null follows the diagram's own `look` line */
+  look: "sketch" | "precision" | null;
   /** d was present but could not be decoded */
   undecodable: boolean;
 }
@@ -45,8 +47,10 @@ export function parseHash(hash: string): HashState {
   const theme: Theme = themeRaw === "light" || themeRaw === "dark" ? themeRaw : "auto";
   const flag = (k: string, dflt: boolean) => (p.has(k) ? p.get(k) === "1" : dflt);
   const qa = flag("qa", false);
+  const lookRaw = p.get("look");
+  const look = lookRaw === "sketch" || lookRaw === "precision" ? lookRaw : null;
   return {
-    v, d, id: p.get("id") ?? "", step, theme, lint: flag("lint", false) || qa, qa, tools: flag("tools", true),
+    v, d, id: p.get("id") ?? "", step, theme, lint: flag("lint", false) || qa, qa, tools: flag("tools", true), look,
     undecodable: dRaw !== null && dRaw !== "" && d === null,
   };
 }
@@ -59,6 +63,7 @@ export interface HashInput {
   lint?: boolean;
   qa?: boolean;
   tools?: boolean;
+  look?: "sketch" | "precision" | null;
 }
 
 /** Build the hash (without the leading "#"), writing only non-default values after v and d. */
@@ -70,5 +75,6 @@ export function buildHash(s: HashInput): string {
   if (s.lint) p.set("lint", "1");
   if (s.qa) p.set("qa", "1");
   if (s.tools === false) p.set("tools", "0");
+  if (s.look) p.set("look", s.look);
   return p.toString();
 }

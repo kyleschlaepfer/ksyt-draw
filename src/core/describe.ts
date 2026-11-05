@@ -4,6 +4,9 @@
  * into sentences for the SVG <desc> when the author gave no `desc` line.
  */
 import type { Diagram, DiagramEdge, DiagramNode } from "./model";
+import type { ChalkDoc, DocEdge } from "./doc/types";
+import { toContract } from "./doc/contract";
+import { printMember } from "./doc/print";
 
 export interface Described {
   /** "Flowchart." / "Use-case diagram for Permit portal." */
@@ -12,7 +15,7 @@ export interface Described {
   ordered: boolean;
 }
 
-const TYPE_NAME: Record<string, string> = { flowchart: "Flowchart", activity: "Activity diagram", "use-case": "Use-case diagram" };
+const TYPE_NAME: Record<string, string> = { flowchart: "Flowchart", activity: "Activity diagram", "use-case": "Use-case diagram", class: "Class diagram" };
 
 function lab(n: DiagramNode | undefined, id: string): string {
   if (!n) return id;
@@ -28,9 +31,16 @@ function lab(n: DiagramNode | undefined, id: string): string {
   }
 }
 
-export function describeItems(d: Diagram): Described {
+export function describeItems(doc: ChalkDoc): Described {
+  if (doc.meta.type === "class") return describeClass(doc);
+  const lanes = doc.nodes.filter((n) => n.kind === "partition");
+  const laneOf = new Map(doc.nodes.filter((n) => n.parent && lanes.some((l) => l.id === n.parent)).map((n) => [n.id, lanes.find((l) => l.id === n.parent)!.label ?? n.parent!]));
+  // partitions are containers, not steps: the walk below never lists them
+  const d: Diagram = toContract(doc);
+  d.nodes = d.nodes.filter((n) => !lanes.some((l) => l.id === n.id));
   const byId = new Map(d.nodes.map((n) => [n.id, n]));
-  const name = (id: string) => lab(byId.get(id), id);
+  const plain = (id: string) => lab(byId.get(id), id);
+  const name = (id: string) => (laneOf.has(id) ? `${plain(id)} (${laneOf.get(id)})` : plain(id));
   if (d.claimed_diagram_type === "use-case") return describeUseCase(d, byId, name);
 
   const outs = new Map<string, DiagramEdge[]>();
@@ -84,7 +94,10 @@ export function describeItems(d: Diagram): Described {
     }
   }
   for (const n of d.nodes) if (n.kind === "note") items.push(`note: ${name(n.id)}`);
-  return { intro: `${TYPE_NAME[d.claimed_diagram_type] ?? "Diagram"}.`, items, ordered: true };
+  const intro = lanes.length
+    ? `${TYPE_NAME[d.claimed_diagram_type] ?? "Diagram"} with ${lanes.length} partition${lanes.length === 1 ? "" : "s"}: ${lanes.map((l) => l.label ?? l.id).join(", ")}.`
+    : `${TYPE_NAME[d.claimed_diagram_type] ?? "Diagram"}.`;
+  return { intro, items, ordered: true };
 }
 
 function describeUseCase(d: Diagram, byId: Map<string, DiagramNode>, name: (id: string) => string): Described {
@@ -111,9 +124,43 @@ function describeUseCase(d: Diagram, byId: Map<string, DiagramNode>, name: (id: 
   return { intro, items, ordered: false };
 }
 
+const REL: Record<string, (a: string, b: string) => string> = {
+  generalization: (a, b) => `${a} is a kind of ${b}`,
+  realization: (a, b) => `${a} implements ${b}`,
+  composition: (a, b) => `${a} is composed of ${b}`,
+  aggregation: (a, b) => `${a} has ${b}`,
+  dependency: (a, b) => `${a} depends on ${b}`,
+};
+
+function describeClass(doc: ChalkDoc): Described {
+  const byId = new Map(doc.nodes.map((n) => [n.id, n]));
+  const name = (id: string) => (byId.get(id)?.label ?? id).replace(/\n/g, " ");
+  const items: string[] = [];
+  for (const n of doc.nodes) {
+    if (n.kind !== "class" && n.kind !== "interface") continue;
+    const what = n.kind === "interface" ? "interface" : n.abstract ? "abstract class" : "class";
+    const attrs = (n.members ?? []).filter((m) => m.kind === "attribute").map(printMember);
+    const ops = (n.members ?? []).filter((m) => m.kind === "operation").map(printMember);
+    const parts = [attrs.length ? `attributes ${attrs.join(", ")}` : "", ops.length ? `operations ${ops.join(", ")}` : ""].filter(Boolean);
+    items.push(`${what} ${name(n.id)}${parts.length ? ": " + parts.join("; ") : ""}`);
+  }
+  const end = (e: DocEdge, which: "from" | "to") => {
+    const ad = e.ends?.[which];
+    const m = ad?.mult ? `${ad.mult} ` : "";
+    return `${m}${name(e[which])}${ad?.role ? ` (as ${ad.role})` : ""}`;
+  };
+  for (const e of doc.edges) {
+    if (!byId.has(e.from) || !byId.has(e.to)) continue;
+    if (REL[e.kind]) items.push(REL[e.kind](end(e, "from"), end(e, "to")) + (e.label ? ` (${e.label})` : ""));
+    else items.push(`${end(e, "from")} ${e.label ?? (e.navigable ? "refers to" : "is associated with")} ${end(e, "to")}`);
+  }
+  for (const n of doc.nodes) if (n.kind === "note") items.push(`note: ${name(n.id)}`);
+  return { intro: "Class diagram.", items, ordered: false };
+}
+
 /** The desc line when given, else the structure as sentences. */
-export function describeText(d: Diagram): string {
-  if (d.web.desc) return d.web.desc;
+export function describeText(d: ChalkDoc): string {
+  if (d.meta.desc) return d.meta.desc;
   const { intro, items } = describeItems(d);
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   return [intro, ...items.map((s) => cap(s) + ".")].join(" ");

@@ -1,7 +1,11 @@
 /**
  * The tool page at / (spec/embed-protocol.md §5), laid out like a page on kyleschlaepfer.com:
  * wordmark, the tool's name and one line on what it does, three views in a nav row (write, draw,
- * the syntax), a footer with the theme switch. State lives in the hash: d (the diagram) and tab.
+ * the syntax) with the document's new / open / save / export beside them, a footer with the theme
+ * switch.
+ *
+ * One Session holds the open diagram for both views. It is kept in this browser as a local draft,
+ * and short diagrams also ride in the link (the hash: d and tab), so a link is still a file.
  */
 import "@fontsource/kalam/300.css";
 import "@fontsource/kalam/400.css";
@@ -13,29 +17,23 @@ import "./strokes.css";
 import "./play.css";
 import docsHtml from "./docs.html?raw";
 import markSvg from "./art/mark.svg?raw";
-import { parse, ParseError } from "../core/parse";
-import { buildHash, parseHash } from "../core/state";
-import { canvasMeasurer, loadFonts, type FontStatus } from "../embed/measure-dom";
-import { errorCard, mountFigure, svgElementFrom, type Mounted } from "../embed/figure";
-import { downloadSvg } from "../embed/download";
+import { buildHash, compress, parseHash } from "../core/state";
+import { Session } from "../core/doc/session";
+import { canvasMeasurer, loadFonts } from "../embed/measure-dom";
+import { svgElementFrom } from "../embed/figure";
 import { makeTabs } from "./tabs";
 import { DEFAULT_EXAMPLE, EXAMPLES } from "./examples";
-import { mountDraw } from "./draw";
+import { el, type App, type Tab } from "./app";
+import { mountWrite, type WriteView } from "./write";
+import { mountFiles } from "./files";
+import { keepPrevious, loadDraft, saveDraft } from "./storage";
 
 /** The tool's name. One place to change it. */
 export const APP_NAME = "Chalk";
 const SITE = "https://kyleschlaepfer.com";
 const REPO = "https://github.com/kyleschlaepfer/ksyt-draw";
-
-const TYPE_NAME: Record<string, string> = { flowchart: "Flowchart", activity: "Activity diagram", "use-case": "Use-case diagram" };
-type Tab = "write" | "draw" | "syntax";
-
-const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] => {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text !== undefined) e.textContent = text;
-  return e;
-};
+/** Above this many characters of compressed text the link stops carrying the diagram; the local draft still does. */
+const LINK_LIMIT = 8000;
 
 // ---------- hash state (d plus tab) ----------
 function tabFromHash(): Tab {
@@ -44,10 +42,12 @@ function tabFromHash(): Tab {
   if (t === "syntax" || t === "docs") return "syntax";
   return "write";
 }
-function writeHash(ksd: string, tab: Tab): void {
-  let h = buildHash({ d: ksd });
+function writeHash(ksd: string, tab: Tab): boolean {
+  const fits = compress(ksd).length <= LINK_LIMIT;
+  let h = fits ? buildHash({ d: ksd }) : "v=1";
   if (tab !== "write") h += `&tab=${tab}`;
   history.replaceState(null, "", "#" + h);
+  return fits;
 }
 
 // ---------- theme switch (a per-viewer convenience; the embed follows the host instead) ----------
@@ -62,7 +62,7 @@ function applyTheme(t: string | null): void {
 
 // ---------- page ----------
 document.title = APP_NAME;
-const app = document.getElementById("app") as HTMLElement;
+const appRoot = document.getElementById("app") as HTMLElement;
 
 const skip = el("a", "skip-link", "skip to content");
 skip.href = "#main";
@@ -86,51 +86,17 @@ const h1 = el("h1", undefined, APP_NAME);
 h1.append(" ", el("small", "status", "(beta)"));
 intro.append(
   h1,
-  el("p", "tool-line", "A few lines of text, and you get a use-case, activity or flow diagram in the same style as the videos, with the same notation check the videos get."),
+  el("p", "tool-line", "Write a few lines of text or draw it yourself, and you get a use-case, activity, class or flow diagram in the same style as the videos, with the same notation check the videos get."),
 );
 const meta = el("p", "meta");
-meta.append(el("span", undefined, "use case, activity, flowchart"), el("span", undefined, "nothing leaves your browser; the link is the file"));
+meta.append(el("span", undefined, "use case, activity, class, flowchart"), el("span", undefined, "nothing leaves your browser; the link is the file"));
 intro.appendChild(meta);
 main.appendChild(intro);
 
-// write view
 const writePanel = el("div", "play");
 writePanel.id = "panel-write";
-const editor = el("div", "play-editor");
-const label = el("label", undefined, "diagram text");
-label.htmlFor = "ksd";
-const ta = el("textarea");
-ta.id = "ksd";
-ta.spellcheck = false;
-ta.setAttribute("autocapitalize", "off");
-ta.setAttribute("autocomplete", "off");
-const status = el("p", "play-status note");
-status.setAttribute("aria-live", "polite");
-const actions = el("div", "actions");
-const btnEmbed = el("button", "btn", "copy embed code");
-const btnLink = el("button", "btn-quiet", "copy link");
-const btnSite = el("button", "btn-quiet", "copy for the site");
-const btnSvg = el("button", "btn-quiet");
-const dlIcon = el("span", "icon icon-download");
-dlIcon.setAttribute("aria-hidden", "true");
-btnSvg.append(dlIcon, "download SVG");
-for (const b of [btnLink, btnEmbed, btnSite, btnSvg]) b.type = "button";
-actions.append(btnEmbed, btnLink, btnSite, btnSvg);
-editor.append(label, ta, actions, status);
-const preview = el("div", "play-preview");
-preview.id = "preview";
-writePanel.append(editor, preview);
-
-// draw view
 const drawPanel = el("div", "draw-editor");
 drawPanel.id = "panel-draw";
-let playDirty = false;
-const draw = mountDraw(drawPanel, {
-  getText: () => ta.value,
-  setText: (t) => { ta.value = t; writeHash(t, currentTab()); playDirty = true; },
-  goWrite: () => showTab("write"),
-});
-
 // the syntax view: static authored content, never diagram text
 const docsPanel = el("div", "docs");
 docsPanel.id = "panel-syntax";
@@ -144,6 +110,10 @@ const views = makeTabs(
   ],
   { label: "views", cls: "views", onChange: (id) => onTab(id as Tab) },
 );
+// the views and the document's actions share one row
+const viewsRow = el("div", "views-row");
+views.list.replaceWith(viewsRow);
+viewsRow.appendChild(views.list);
 main.appendChild(views.root);
 
 const footer = el("footer", "site-footer");
@@ -169,144 +139,123 @@ for (const t of ["light", "dark", "system"]) {
 wrapFoot.append(siteLink, repoLink, themeBar);
 footer.appendChild(wrapFoot);
 
-app.replaceChildren(skip, header, main, footer);
+appRoot.replaceChildren(skip, header, main, footer);
 let savedTheme: string | null = null;
 try { savedTheme = localStorage.getItem(THEME_KEY); } catch { /* ignore */ }
 applyTheme(savedTheme);
 
-// ---------- behavior ----------
-let fontStatus: FontStatus | null = null;
-let mounted: Mounted | null = null;
-let timer: number | null = null;
-let renderToken = 0;
-let renderedHidden = false;
+// ---------- the document ----------
+interface DrawView { refresh(): void; shown(): void; say(msg: string): void }
+let write: WriteView | null = null;
+let draw: DrawView | null = null;
+let drawLoading = false;
+let app: App | null = null;
+let persistTimer: number | null = null;
+let storageOk = true;
 
 const currentTab = (): Tab => views.current() as Tab;
-function showTab(tab: Tab): void {
-  views.select(tab);
+const say = (msg: string): void => { (currentTab() === "draw" && draw ? draw : write)?.say(msg); };
+
+function persist(): void {
+  if (!app) return;
+  const inLink = writeHash(app.session.text, currentTab());
+  const saved = saveDraft(app.session.text, app.workspace);
+  if (!saved && storageOk) say(inLink ? "this browser won't keep a local copy; the link in the address bar holds the diagram" : "this browser won't keep a local copy and the diagram is too long for a link: use save");
+  storageOk = saved;
 }
+function schedulePersist(): void {
+  if (persistTimer !== null) window.clearTimeout(persistTimer);
+  persistTimer = window.setTimeout(() => { persistTimer = null; persist(); }, 300);
+}
+
+function ensureDraw(): void {
+  if (draw || drawLoading || !app) return;
+  drawLoading = true;
+  const a = app;
+  void import("./draw/index").then(({ mountDraw }) => {
+    draw = mountDraw(drawPanel, a);
+    drawLoading = false;
+    if (currentTab() === "draw") draw.shown();
+  });
+}
+
 function onTab(tab: Tab): void {
-  writeHash(ta.value, tab);
-  if (tab === "draw") draw.refresh();
-  if (tab === "write" && (renderedHidden || playDirty)) { playDirty = false; void render(); }
+  if (!app) return;
+  writeHash(app.session.text, tab);
+  if (tab === "draw") { ensureDraw(); draw?.shown(); }
+  if (tab === "write") write?.shown();
 }
 
-function say(msg: string): void {
-  status.textContent = msg;
-}
+async function start(): Promise<void> {
+  const fonts = await loadFonts();
+  const fromLink = parseHash(location.hash).d;
+  const draft = loadDraft();
+  // a link wins over the local draft; the draft it replaces is kept where "open" can find it
+  if (fromLink && draft && draft.text !== fromLink) keepPrevious();
+  const session = new Session(fromLink ?? draft?.text ?? DEFAULT_EXAMPLE, canvasMeasurer);
+  app = {
+    session, measurer: canvasMeasurer, fonts,
+    workspace: (!fromLink || fromLink === draft?.text ? draft?.workspace : undefined) ?? {},
+    showTab: (tab) => views.select(tab),
+    currentTab,
+    open: (text, label) => { session.setText(text, label); },
+    touchWorkspace: schedulePersist,
+  };
+  const a = app;
+  write = mountWrite(writePanel, a);
+  const files = mountFiles(a, say, () => { void import("./export-dialog").then(({ openExportDialog }) => openExportDialog(a, say)); });
+  viewsRow.appendChild(files.root);
+  session.subscribe((origin) => {
+    write?.refresh(origin !== "write");
+    draw?.refresh();
+    schedulePersist();
+  });
+  // late-arriving fonts change every measurement
+  document.fonts?.addEventListener?.("loadingdone", () => { if (!fonts.ok) session.remeasure(); });
 
-async function render(): Promise<void> {
-  const token = ++renderToken;
-  const ksd = ta.value;
-  writeHash(ksd, currentTab());
-  let d;
-  try {
-    d = parse(ksd);
-  } catch (e) {
-    if (e instanceof ParseError) {
-      mounted = null;
-      preview.replaceChildren(errorCard("This diagram has a mistake in its text.", e.msg, e.line));
-      say(e.line ? `line ${e.line}: ${e.msg}` : e.msg);
+  window.addEventListener("hashchange", () => {
+    const s = parseHash(location.hash);
+    views.select(tabFromHash());
+    if (s.d && s.d !== session.text) a.open(s.d, "open link");
+  });
+
+  // the reference's example buttons and its table of contents
+  docsPanel.addEventListener("click", (ev) => {
+    const t = ev.target as HTMLElement;
+    const btn = t.closest<HTMLButtonElement>("button[data-example]");
+    if (btn) {
+      const ex = EXAMPLES[btn.dataset.example!];
+      if (!ex) return;
+      a.open(ex, `load the ${btn.dataset.example} example`);
+      views.select("write");
+      write?.say(`loaded the ${btn.dataset.example} example (undo brings back what was here)`);
       return;
     }
-    throw e;
-  }
-  if (!fontStatus) fontStatus = await loadFonts();
-  if (token !== renderToken) return;
-  const keep = mounted?.step ?? 0;
-  renderedHidden = writePanel.hidden || preview.clientWidth === 0;
-  mounted = mountFigure(preview, d, canvasMeasurer, {
-    initialStep: keep, lint: true, qa: true, containerWidth: Math.max(100, preview.clientWidth || 800), fontStatus, idPrefix: d.diagram_id || "fig",
-  });
-  const n = mounted.lint.findings.length;
-  say(`${TYPE_NAME[d.claimed_diagram_type] ?? "diagram"}, ${d.nodes.length} nodes, ${d.edges.length} edges, notation check: ${mounted.lint.status}${n ? ` (${n})` : ""}${mounted.qa?.errors.length ? `, layout: ${mounted.qa.errors.length} error${mounted.qa.errors.length === 1 ? "" : "s"}` : ""}`);
-}
-
-function schedule(): void {
-  if (timer !== null) window.clearTimeout(timer);
-  timer = window.setTimeout(() => { timer = null; void render(); }, 150);
-}
-
-ta.addEventListener("input", schedule);
-window.addEventListener("hashchange", () => {
-  const s = parseHash(location.hash);
-  showTab(tabFromHash());
-  if (s.d && s.d !== ta.value) { ta.value = s.d; void render(); if (currentTab() === "draw") draw.refresh(); }
-});
-
-// the reference's example buttons and its table of contents
-docsPanel.addEventListener("click", (ev) => {
-  const t = ev.target as HTMLElement;
-  const btn = t.closest<HTMLButtonElement>("button[data-example]");
-  if (btn) {
-    const ex = EXAMPLES[btn.dataset.example!];
-    if (!ex) return;
-    ta.value = ex;
-    showTab("write");
-    void render().then(() => { say(`loaded the ${btn.dataset.example} example`); ta.focus(); });
-    return;
-  }
-  const a = t.closest<HTMLAnchorElement>("a[href^='#d-']");
-  if (a) {
-    ev.preventDefault();
-    const target = docsPanel.querySelector<HTMLElement>(a.getAttribute("href")!);
-    if (target) {
-      target.tabIndex = -1;
-      target.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-      target.focus({ preventScroll: true });
+    const link = t.closest<HTMLAnchorElement>("a[href^='#d-']");
+    if (link) {
+      ev.preventDefault();
+      const target = docsPanel.querySelector<HTMLElement>(link.getAttribute("href")!);
+      if (target) {
+        target.tabIndex = -1;
+        target.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        target.focus({ preventScroll: true });
+      }
     }
-  }
-});
+  });
 
-async function copy(text: string, what: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    say(`copied the ${what}`);
-  } catch {
-    say(`couldn't copy the ${what}; select it in the page instead`);
-    window.prompt(`copy the ${what}`, text);
-  }
+  // a small scripting surface: read and replace the open diagram from the console or a test
+  (window as unknown as { chalk: unknown }).chalk = {
+    getText: () => session.text,
+    setText: (text: string) => a.open(String(text), "script"),
+    get valid() { return session.inSync; },
+    undo: () => session.undo(),
+    redo: () => session.redo(),
+  };
+
+  views.select(tabFromHash());
+  if (currentTab() === "draw") ensureDraw();
+  write.shown();
+  persist();
 }
 
-function header_(key: string): string | undefined {
-  return ta.value.split(/\r?\n/).map((l) => l.trim()).find((l) => l.startsWith(key + " "))?.slice(key.length + 1).trim();
-}
-
-export function embedSnippet(origin: string, ksd: string, id: string, title: string): string {
-  const src = `${origin}/embed/#${buildHash({ d: ksd, id })}`;
-  const attr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  return [
-    "<iframe",
-    '  class="ksyt-draw-frame"',
-    `  src="${attr(src)}"`,
-    `  title="${attr(title)}"`,
-    '  loading="lazy"',
-    '  referrerpolicy="strict-origin-when-cross-origin"',
-    '  sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"',
-    '  style="width:100%;height:360px;border:0;display:block"></iframe>',
-  ].join("\n");
-}
-
-const camel = (slug: string) => slug.replace(/[^A-Za-z0-9]+(.)?/g, (_, c: string | undefined) => (c ? c.toUpperCase() : "")).replace(/^[0-9]/, "_$&") || "diagram";
-
-btnLink.addEventListener("click", () => void copy(`${location.origin}/#${buildHash({ d: ta.value })}`, "link"));
-btnEmbed.addEventListener("click", () => {
-  const id = header_("id") ?? "diagram";
-  const type = header_("diagram") ?? "";
-  const title = `${TYPE_NAME[type] ?? "Diagram"}: ${header_("title") ?? ""}`;
-  void copy(embedSnippet(location.origin, ta.value, id, title), "embed code");
-});
-btnSite.addEventListener("click", () => {
-  const id = header_("id") ?? "diagram";
-  const name = camel(id);
-  const caption = (header_("title") ?? "").replace(/"/g, "'");
-  void copy(`import ${name} from "../../diagrams/${id}.ksd?raw";\n<DiagramEmbed ksd={${name}} caption="${caption}" />`, "component line");
-});
-btnSvg.addEventListener("click", () => { if (mounted) void downloadSvg(mounted.scene); });
-
-// start: the diagram from the link, else the example; the view from the link
-const initial = parseHash(location.hash);
-ta.value = initial.d ?? DEFAULT_EXAMPLE;
-showTab(tabFromHash());
-if (currentTab() === "draw") draw.refresh();
-void render();
+void start();
