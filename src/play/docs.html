@@ -1,0 +1,474 @@
+<!-- The syntax reference. Static, authored content: no diagram text ever lands here.
+     House rules: no em dashes, sequential headings, Kalam for headings, body text in Atkinson. -->
+<nav class="docs-toc" aria-label="on this page">
+  <p class="note">on this page</p>
+  <ol>
+    <li><a href="#d-shape">the shape of a file</a></li>
+    <li><a href="#d-header">the header</a></li>
+    <li><a href="#d-nodes">nodes</a></li>
+    <li><a href="#d-labels">ids, labels and options</a></li>
+    <li><a href="#d-boundary">boundaries</a></li>
+    <li><a href="#d-edges">edges</a></li>
+    <li><a href="#d-steps">build-up steps</a></li>
+    <li><a href="#d-examples">three complete examples</a></li>
+    <li><a href="#d-good">writing a diagram that teaches</a></li>
+    <li><a href="#d-check">the notation check</a></li>
+    <li><a href="#d-layout">the layout check</a></li>
+    <li><a href="#d-errors">errors</a></li>
+    <li><a href="#d-embed">putting it on a page</a></li>
+    <li><a href="#d-limits">what it won't do yet</a></li>
+  </ol>
+</nav>
+
+<div class="docs-body prose">
+
+<section id="d-shape">
+  <h2>the shape of a file</h2>
+  <p>A diagram is a short text file, one diagram per file, usually saved as <code>.ksd</code>. It reads top to bottom: first say what kind of diagram it is and what it shows, then list the parts, then say how they connect.</p>
+  <pre><code>diagram flowchart
+title After review, a request takes exactly one of two paths
+
+start begin
+process review "review request"
+decision ok "approved?"
+process schedule "schedule the work"
+process notify "notify requester"
+end done
+
+begin -&gt; review
+review -&gt; ok
+ok -&gt; schedule : yes
+ok -&gt; notify : no
+schedule -&gt; done
+notify -&gt; done</code></pre>
+  <p><button type="button" class="btn-quiet" data-example="flowchart">load this in the playground</button></p>
+  <ul>
+    <li>One statement per line. Blank lines are ignored. A line starting with <code>#</code> is a comment.</li>
+    <li>Leading and trailing spaces don't matter, so indent however you like. Indenting the inside of a boundary is a habit, not a rule.</li>
+    <li>Header lines come first, then nodes and edges in any order. Once the first node or edge appears, header words stop being special.</li>
+    <li>The parser is strict on purpose. A line it can't read stops the whole diagram and tells you the line number, so a typo never becomes a wrong picture.</li>
+  </ul>
+</section>
+
+<section id="d-header">
+  <h2>the header</h2>
+  <p>Everything before the first node or edge. Two lines are required; the rest are optional.</p>
+  <table class="table">
+    <thead><tr><th>line</th><th>required</th><th>what it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>diagram flowchart</code><br><code>diagram activity</code><br><code>diagram use-case</code></td><td>yes, first line</td><td>The kind of diagram you claim to be drawing. The notation check grades against this claim, so a use-case diagram that is really a flow gets called out rather than quietly redrawn.</td></tr>
+      <tr><td><code>title &lt;text&gt;</code></td><td>yes</td><td>What the figure shows: its finding, not its topic. "After review, a request takes exactly one of two paths" beats "Approval process". It becomes the SVG title, the default iframe title, and the first thing a screen reader announces.</td></tr>
+      <tr><td><code>id &lt;slug&gt;</code></td><td>no (default <code>diagram</code>)</td><td>A name for this diagram: letters, digits, <code>-</code> and <code>_</code>, starting with a letter. It prefixes every element's wobble seed, so two diagrams with different ids never share stroke shapes, and it names the downloaded SVG.</td></tr>
+      <tr><td><code>profile strict-uml</code><br><code>profile uml-inspired</code><br><code>profile general-diagram</code></td><td>no</td><td>How strictly UML rules apply. Flowcharts default to <code>general-diagram</code>; activity and use-case diagrams default to <code>uml-inspired</code>. <code>strict-uml</code> raises some findings a level (a directed association becomes major, a missing initial node becomes minor); <code>general-diagram</code> skips the UML-only rules entirely.</td></tr>
+      <tr><td><code>desc &lt;text&gt;</code></td><td>no</td><td>The text alternative, written the way you'd describe the picture to someone who can't see it. When it's missing, one is generated from the structure. Either way it appears under "describe this figure".</td></tr>
+      <tr><td><code>narration &lt;text&gt;</code></td><td>no, repeatable</td><td>The words this diagram goes with in the lesson. Several <code>narration</code> lines are joined with a space. The notation check reads it: "either" and "depending on" mean a choice, "at the same time" and "in parallel" mean a fork, and "X includes Y" settles which way an «include» should point.</td></tr>
+      <tr><td><code>direction down</code><br><code>direction right</code></td><td>no (default <code>down</code>)</td><td>Which way a flowchart or activity diagram runs. On a phone, a right-running flow switches to top-down by itself when its labels would get too small. Use-case diagrams ignore this.</td></tr>
+      <tr><td><code>legend &lt;text&gt;</code></td><td>no</td><td>Says what your arrows mean when you deliberately use one stroke for two meanings. It silences the mixed-meaning rule; it doesn't draw anything.</td></tr>
+    </tbody>
+  </table>
+  <p>Header text can't contain an em dash. That's a house rule across everything on this site, and the parser enforces it.</p>
+</section>
+
+<section id="d-nodes">
+  <h2>nodes</h2>
+  <pre><code>&lt;kind&gt; &lt;id&gt; ["label"] [left|right] [at X Y]</code></pre>
+  <p>Kind, then a unique id, then an optional quoted label and options. Which kinds are available depends on the diagram type.</p>
+  <h3>flowchart</h3>
+  <table class="table">
+    <thead><tr><th>kind</th><th>drawn as</th><th>default label</th></tr></thead>
+    <tbody>
+      <tr><td><code>start</code>, <code>end</code></td><td>a pill, the flowchart terminator</td><td>"start" or "end"</td></tr>
+      <tr><td><code>terminator</code></td><td>a pill with your own word in it</td><td>the id, as words</td></tr>
+      <tr><td><code>process</code></td><td>a square-cornered box</td><td>the id, as words</td></tr>
+      <tr><td><code>decision</code></td><td>a diamond with the question inside</td><td>the id, as words</td></tr>
+      <tr><td><code>merge</code></td><td>a small empty diamond where paths rejoin</td><td>none</td></tr>
+      <tr><td><code>io</code></td><td>a parallelogram, the input/output symbol</td><td>the id, as words</td></tr>
+    </tbody>
+  </table>
+  <h3>activity</h3>
+  <table class="table">
+    <thead><tr><th>kind</th><th>drawn as</th><th>default label</th></tr></thead>
+    <tbody>
+      <tr><td><code>start</code>, <code>end</code></td><td>the UML initial node (a solid dot) and final node (a bullseye)</td><td>none</td></tr>
+      <tr><td><code>initial</code>, <code>final</code></td><td>the same, under their UML names</td><td>none</td></tr>
+      <tr><td><code>flow-final</code></td><td>a circle with an X: this one path ends, the activity goes on</td><td>none</td></tr>
+      <tr><td><code>action</code></td><td>a rounded box</td><td>the id, as words</td></tr>
+      <tr><td><code>decision</code></td><td>a diamond with the question inside; label the exits with guards like <code>[approved]</code></td><td>the id, as words</td></tr>
+      <tr><td><code>merge</code></td><td>a small empty diamond</td><td>none</td></tr>
+      <tr><td><code>fork</code>, <code>join</code></td><td>a thick bar. A fork splits into paths that all happen; a join waits for all of them</td><td>none</td></tr>
+    </tbody>
+  </table>
+  <h3>use-case</h3>
+  <table class="table">
+    <thead><tr><th>kind</th><th>drawn as</th><th>default label</th></tr></thead>
+    <tbody>
+      <tr><td><code>actor</code></td><td>a stick figure with the role name below it. It's a role, never the narrator</td><td>the id, as words</td></tr>
+      <tr><td><code>use-case</code> (or <code>usecase</code>)</td><td>an ellipse with a verb phrase inside</td><td>the id, as words</td></tr>
+    </tbody>
+  </table>
+  <h3>any diagram</h3>
+  <table class="table">
+    <thead><tr><th>kind</th><th>drawn as</th><th>default label</th></tr></thead>
+    <tbody>
+      <tr><td><code>note</code></td><td>graphite handwriting with no box around it</td><td>the id, as words</td></tr>
+    </tbody>
+  </table>
+  <p>Mixing kinds across families (a <code>process</code> in a use-case diagram, say) is allowed by the parser and reported by the notation check, because sometimes the lesson is about the mistake.</p>
+</section>
+
+<section id="d-labels">
+  <h2>ids, labels and options</h2>
+  <h3>ids</h3>
+  <ul>
+    <li>A letter, then letters, digits, <code>-</code> or <code>_</code>: <code>review</code>, <code>pay-fee</code>, <code>step_2</code>.</li>
+    <li>Unique within the file, boundaries included. A repeat is an error, not a replacement, because ids are also what the strokes are seeded from.</li>
+    <li>Ids are what edges refer to, so keep them short and typeable. The label is what the reader sees.</li>
+  </ul>
+  <h3>labels</h3>
+  <ul>
+    <li>Double quotes: <code>action pay "pay the fee"</code>.</li>
+    <li><code>\n</code> breaks a line inside a node: <code>process check "check the\npaperwork"</code>.</li>
+    <li><code>\"</code> puts a quote inside a label; <code>\\</code> is a backslash.</li>
+    <li>Leave the label off and the id becomes the label with <code>-</code> and <code>_</code> turned into spaces: <code>action order-laptop</code> reads "order laptop".</li>
+    <li>No em dashes.</li>
+  </ul>
+  <h3>options after the label</h3>
+  <table class="table">
+    <thead><tr><th>option</th><th>meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>left</code> or <code>right</code></td><td>Which side of the system an actor stands on. Default <code>left</code>. Only actors use it.</td></tr>
+      <tr><td><code>at X Y</code></td><td>Pin the node's center at X, Y inches, overriding the automatic layout for that node only. Edges touching a pinned node run straight. This is also how the future editor will save a drag, so a hand-placed node stays text.</td></tr>
+    </tbody>
+  </table>
+  <pre><code>actor clerk "Permit clerk" right
+process review "review request" at 4 2.5</code></pre>
+</section>
+
+<section id="d-boundary">
+  <h2>boundaries</h2>
+  <p>A use-case diagram puts its use cases inside the system they belong to. A <code>boundary</code> line opens a block: an id, the system's name in quotes, an opening brace, then the use cases, then a closing brace on its own line.</p>
+  <pre><code>boundary portal "Permit portal" {
+  use-case apply "apply for permit"
+  use-case pay "pay fee"
+}</code></pre>
+  <ul>
+    <li>One level only. Boundaries don't nest.</li>
+    <li>The boundary's id counts as an id, so no node can reuse it.</li>
+    <li>Actors go outside. The parser will let you put one inside, and the notation check reports it (<code>UC-ACTOR-INSIDE</code>), which is the right behavior when the lesson is about why actors go outside.</li>
+    <li>A use case left outside any boundary draws in a column to the right of it and is reported (<code>UC-OUTSIDE-BOUNDARY</code>).</li>
+  </ul>
+</section>
+
+<section id="d-edges">
+  <h2>edges</h2>
+  <pre><code>&lt;from&gt; &lt;operator&gt; &lt;to&gt; [: label]</code></pre>
+  <p>Spaces around the operator are required: <code>a -&gt; b</code>, not <code>a-&gt;b</code>.</p>
+  <table class="table">
+    <thead><tr><th>write</th><th>meaning</th><th>drawn as</th></tr></thead>
+    <tbody>
+      <tr><td><code>a -&gt; b</code> or <code>a --&gt; b</code></td><td>control flow: a, then b. In a use-case diagram the check reads it as a directed association, which it then tells you to undirect</td><td>solid arrow</td></tr>
+      <tr><td><code>a -- b</code></td><td>association: this actor uses this use case</td><td>plain line, no head</td></tr>
+      <tr><td><code>a -include-&gt; b</code></td><td>«include»: doing a always includes doing b. Points from the base use case to the included one</td><td>dashed arrow with an open head and the «include» label</td></tr>
+      <tr><td><code>a -extend-&gt; b</code></td><td>«extend»: a sometimes adds to b. Points from the extension to the base it extends</td><td>dashed arrow with an open head and the «extend» label</td></tr>
+      <tr><td><code>a ..&gt; b</code></td><td>a proposed or hypothetical path, as opposed to what actually happens</td><td>dashed arrow</td></tr>
+    </tbody>
+  </table>
+  <h3>branch labels</h3>
+  <p>Anything after a colon is the edge's label. Every exit from a decision needs one; the check won't pass a diamond with an unlabeled branch.</p>
+  <pre><code>ok -&gt; schedule : yes
+ok -&gt; notify : no
+checked -&gt; refund : [approved]</code></pre>
+  <p>Flowcharts say <code>yes</code> and <code>no</code>; activity diagrams use guards in square brackets. Labels sit beside the line, never on it, and move to the other side by themselves if something is in the way.</p>
+  <h3>edge ids</h3>
+  <p>Edges are numbered <code>e1</code>, <code>e2</code>, ... in file order. You'll see those ids in findings ("edge e2") and as <code>data-name</code> on the SVG groups.</p>
+  <h3>edges to nothing</h3>
+  <p>An edge whose end names an id that was never declared is kept, not dropped: the parser adds a warning, the notation check reports <code>STRUCT-DANGLING-EDGE</code>, and the drawing skips it. Again, that's so a lesson can show the mistake.</p>
+</section>
+
+<section id="d-steps">
+  <h2>build-up steps</h2>
+  <p>A diagram can reveal itself one click at a time, the way a slide builds while someone talks. Put a <code>step &lt;n&gt;</code> line in the file and everything after it, nodes and edges alike, belongs to that step until the next <code>step</code> line. Everything before the first <code>step</code> line is step 0 and is always shown.</p>
+  <pre><code>start begin
+action accept "accept offer"
+begin -&gt; accept
+
+step 1
+fork split
+action laptop "order laptop"
+action badge "print badge"
+accept -&gt; split
+split -&gt; laptop
+split -&gt; badge
+
+step 2
+join wait
+action first "first day"
+end done
+laptop -&gt; wait
+badge -&gt; wait
+wait -&gt; first
+first -&gt; done</code></pre>
+  <ul>
+    <li>The embed opens at step 0 with <code>back</code>, <code>next step</code> and <code>show all</code> under the figure. Left and right arrow keys work when the figure has focus.</li>
+    <li>Hidden parts stay in the page but are marked hidden for screen readers until their step.</li>
+    <li>Give each step one idea, in the order the narration introduces them. Steps are for when the order of parts is the lesson. A diagram said all at once doesn't need them.</li>
+    <li>Step numbers don't have to be consecutive, but the controls count the highest one, so gaps just make empty clicks.</li>
+    <li>Nothing ever advances by itself.</li>
+  </ul>
+</section>
+
+<section id="d-examples">
+  <h2>three complete examples</h2>
+  <h3>a flowchart with a decision</h3>
+  <pre><code>diagram flowchart
+id approval
+title After review, a request takes exactly one of two paths
+desc Flowchart. Start, submit request, review request, then the decision approved?. Yes leads to schedule the work, then end. No leads to notify requester, then end.
+narration A submitted request is reviewed, then approved or rejected.
+
+start begin
+process submit "submit request"
+process review "review request"
+decision ok "approved?"
+process schedule "schedule the work"
+process notify "notify requester"
+end done
+
+begin -&gt; submit
+submit -&gt; review
+review -&gt; ok
+ok -&gt; schedule : yes
+ok -&gt; notify : no
+schedule -&gt; done
+notify -&gt; done</code></pre>
+  <p><button type="button" class="btn-quiet" data-example="flowchart">load this in the playground</button></p>
+
+  <h3>an activity diagram with parallel work, in three steps</h3>
+  <pre><code>diagram activity
+id onboarding
+title A new hire's laptop and badge are prepared at the same time
+narration After the offer is accepted, IT orders the laptop and security prints the badge at the same time.
+
+start begin
+action accept "accept offer"
+begin -&gt; accept
+
+step 1
+fork split
+action laptop "order laptop"
+action badge "print badge"
+accept -&gt; split
+split -&gt; laptop
+split -&gt; badge
+
+step 2
+join wait
+action first "first day"
+end done
+laptop -&gt; wait
+badge -&gt; wait
+wait -&gt; first
+first -&gt; done</code></pre>
+  <p><button type="button" class="btn-quiet" data-example="activity">load this in the playground</button></p>
+  <p>Change "at the same time" in the narration to "either orders the laptop or prints the badge" and the check will flag the fork: a fork means both happen.</p>
+
+  <h3>a use-case diagram with include and extend</h3>
+  <pre><code>diagram use-case
+id permit-portal
+title Residents apply and track; paying the fee is always part of applying
+narration Apply for permit includes pay fee. Request fee waiver extends pay fee, but only for some residents.
+
+actor resident "Resident"
+actor clerk "Permit clerk" right
+boundary portal "Permit portal" {
+  use-case apply "apply for permit"
+  use-case track "track status"
+  use-case review "review application"
+  use-case pay "pay fee"
+  use-case waiver "request fee waiver"
+}
+
+resident -- apply
+resident -- track
+clerk -- review
+apply -include-&gt; pay
+waiver -extend-&gt; pay</code></pre>
+  <p><button type="button" class="btn-quiet" data-example="use-case">load this in the playground</button></p>
+  <p>Swap the include line to <code>pay -include-&gt; apply</code> and the check reports <code>UC-INCLUDE-DIRECTION</code> with high confidence, because the narration says which way it goes.</p>
+</section>
+
+<section id="d-good">
+  <h2>writing a diagram that teaches</h2>
+  <ul>
+    <li><strong>Title the finding.</strong> The title is the sentence a reader should take away. If you can't write it, the diagram may not need to exist.</li>
+    <li><strong>Pick the type by the claim.</strong> Steps with choices are an activity diagram or a flowchart. Who uses the system for which goals is a use-case diagram. A use-case diagram has no order and no decisions; if you find yourself drawing "then" between ovals, it's a flow.</li>
+    <li><strong>Paste the narration in.</strong> The check reads it. It's the cheapest way to catch a fork where the script says "either", or an «include» pointing the wrong way.</li>
+    <li><strong>Label every branch.</strong> An unlabeled exit from a diamond is the most common mistake in student flowcharts, and the check won't pass it.</li>
+    <li><strong>Use cases are verb phrases.</strong> "place order", not "orders". A one-word noun gets a suggestion.</li>
+    <li><strong>Keep it to about eight nodes.</strong> More than that, split it, or use steps so each click has one idea.</li>
+    <li><strong>Don't draw what the lesson doesn't say.</strong> No actors, forks or boundaries added to look more formal.</li>
+    <li><strong>A wrong diagram on purpose is fine.</strong> Write it, leave the check panel off on the lesson page, and let the narration do the correcting. The check is for you, not the reader.</li>
+  </ul>
+</section>
+
+<section id="d-check">
+  <h2>the notation check</h2>
+  <p>Every diagram is reviewed with the same rules the slide reviewer uses on the videos, so a diagram gets the same verdict on the site as in a deck. The result is a status and a list of findings.</p>
+  <table class="table">
+    <thead><tr><th>status</th><th>means</th></tr></thead>
+    <tbody>
+      <tr><td>pass</td><td>no findings</td></tr>
+      <tr><td>pass with notes</td><td>only minor findings or suggestions</td></tr>
+      <tr><td>needs changes</td><td>at least one major finding</td></tr>
+      <tr><td>blocked</td><td>a critical finding: the diagram teaches the wrong notation</td></tr>
+    </tbody>
+  </table>
+  <p>Each finding has a severity, a rule id, where it is, what's wrong, why it matters, and the smallest fix. The check never stops the drawing; a blocked diagram still renders. In the playground the panel is always on; in an embed it's off unless the page asks for it.</p>
+  <p>Before grading, the check works out what family the structure actually looks like (flow, use case, data, and so on) from the kinds of nodes and edges, and compares that with the claimed type.</p>
+
+  <h3>claim and family</h3>
+  <table class="table">
+    <thead><tr><th>rule</th><th>severity</th><th>what it catches</th></tr></thead>
+    <tbody>
+      <tr><td><code>FAMILY-USECASE-IS-FLOW</code></td><td>critical</td><td>Called a use-case diagram, but the use cases are chained by arrows with yes/no branches. Redraw as an activity diagram.</td></tr>
+      <tr><td><code>FAMILY-MISMATCH</code></td><td>major</td><td>The claimed type and the structure disagree in some other way (a flowchart made of actors, say).</td></tr>
+      <tr><td><code>PROFILE-MISMATCH</code></td><td>suggestion or minor</td><td>A UML type reviewed as <code>general-diagram</code> (UML rules skipped), or a flowchart reviewed as <code>strict-uml</code> (flowcharts aren't UML).</td></tr>
+      <tr><td><code>XDIAG-NOTATION-MIX</code></td><td>major</td><td>Shapes from two families in one diagram with no legend.</td></tr>
+      <tr><td><code>XDIAG-ARROW-MEANING</code></td><td>major</td><td>One stroke style carrying two meanings (a solid arrow that is control flow here and an association there) with no <code>legend</code> line.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>structure, any diagram</h3>
+  <table class="table">
+    <thead><tr><th>rule</th><th>severity</th><th>what it catches</th></tr></thead>
+    <tbody>
+      <tr><td><code>STRUCT-DANGLING-EDGE</code></td><td>major</td><td>An edge end that names no node.</td></tr>
+      <tr><td><code>STRUCT-ISOLATED</code></td><td>minor</td><td>A node nothing connects to, in a diagram that has edges.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>flowcharts and activity diagrams</h3>
+  <p>Rule ids start with <code>FLOW-</code> for flowcharts and <code>ACTIVITY-</code> for activity diagrams; the checks are the same.</p>
+  <table class="table">
+    <thead><tr><th>rule</th><th>severity</th><th>what it catches</th></tr></thead>
+    <tbody>
+      <tr><td><code>FLOW-DECISION-GUARD</code>, <code>ACTIVITY-DECISION-GUARD</code></td><td>major</td><td>A decision with an unlabeled exit.</td></tr>
+      <tr><td><code>FLOW-DUPLICATE-GUARD</code>, <code>ACTIVITY-DUPLICATE-GUARD</code></td><td>major</td><td>Two exits of one decision with the same label.</td></tr>
+      <tr><td><code>FLOW-BRANCH-SAME-TARGET</code>, <code>ACTIVITY-BRANCH-SAME-TARGET</code></td><td>major</td><td>Two exits of one decision going to the same node.</td></tr>
+      <tr><td><code>FLOW-DECISION-ONE-EXIT</code>, <code>ACTIVITY-DECISION-ONE-EXIT</code></td><td>major</td><td>A decision with one way out, which is not a choice.</td></tr>
+      <tr><td><code>FLOW-MERGE-AS-DECISION</code>, <code>ACTIVITY-MERGE-AS-DECISION</code></td><td>suggestion</td><td>A diamond with several ways in and one out: that's a merge, so leave it empty or drop it.</td></tr>
+      <tr><td><code>FLOW-DEAD-END</code>, <code>ACTIVITY-DEAD-END</code></td><td>minor</td><td>A step with no way out while other paths end properly.</td></tr>
+      <tr><td><code>ACTIVITY-FORK-STRUCTURE</code>, <code>ACTIVITY-JOIN-STRUCTURE</code></td><td>major</td><td>A fork with fewer than two outgoing paths, or a join with fewer than two incoming.</td></tr>
+      <tr><td><code>ACTIVITY-GUARDED-FORK</code></td><td>major</td><td>Labels on the paths leaving a fork. Guards mean one path; a fork means all of them.</td></tr>
+      <tr><td><code>ACTIVITY-PARALLEL-VS-EXCLUSIVE</code></td><td>major</td><td>A fork while the narration says "either", "depending on", "otherwise" and the like.</td></tr>
+      <tr><td><code>ACTIVITY-EXCLUSIVE-VS-PARALLEL</code></td><td>major</td><td>A decision while the narration says "at the same time", "in parallel", "meanwhile" and the like.</td></tr>
+      <tr><td><code>ACTIVITY-NO-INITIAL</code>, <code>ACTIVITY-NO-FINAL</code></td><td>suggestion (minor under strict-uml)</td><td>An activity diagram without the dot at the start or the bullseye at the end.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>use-case diagrams</h3>
+  <table class="table">
+    <thead><tr><th>rule</th><th>severity</th><th>what it catches</th></tr></thead>
+    <tbody>
+      <tr><td><code>UC-ACTOR-INSIDE</code></td><td>major</td><td>An actor drawn inside the boundary.</td></tr>
+      <tr><td><code>UC-OUTSIDE-BOUNDARY</code></td><td>minor</td><td>A use case outside the boundary when there is one.</td></tr>
+      <tr><td><code>UC-ASSOC-DIRECTED</code></td><td>minor (major under strict-uml)</td><td>An actor linked with <code>-&gt;</code> instead of <code>--</code>. An arrowhead reads as a step in a sequence.</td></tr>
+      <tr><td><code>UC-SEQUENCE-ARROW</code></td><td>major</td><td>Two use cases joined by a control-flow arrow in a diagram that isn't claimed as use-case.</td></tr>
+      <tr><td><code>UC-INCLUDE-DIRECTION</code></td><td>major</td><td>An «include» pointing from the included use case to the base. High confidence when the narration says so, medium when only the structure does.</td></tr>
+      <tr><td><code>UC-EXTEND-DIRECTION</code></td><td>major</td><td>An «extend» pointing from the base to the extension.</td></tr>
+      <tr><td><code>UC-DEPENDENCY-STYLE</code></td><td>minor</td><td>An include or extend that isn't a dashed, directed arrow. The parser always draws them right, so you'll only see this from a hand-written spec.</td></tr>
+      <tr><td><code>UC-LABEL-VERB</code></td><td>suggestion</td><td>A one-word use case that isn't a verb ("orders").</td></tr>
+    </tbody>
+  </table>
+
+  <h3>other families</h3>
+  <p>The check also carries the rules for ERDs, class, sequence, state, DFD and causal diagrams, because it's the same reviewer the videos use. The text format can't write those families yet, so you'll only meet these ids when the future editor exports them.</p>
+  <p class="docs-rules"><code>ERD-CARDINALITY-MISSING</code> <code>ERD-MN-NEEDS-JUNCTION</code> <code>ERD-MN-CONCEPTUAL</code> <code>ERD-PK-MISSING</code> <code>ERD-JUNCTION-SIDE</code> <code>CLASS-GENERALIZATION-STYLE</code> <code>CLASS-MULTIPLICITY</code> <code>SEQ-MESSAGE-ORDER</code> <code>SEQ-NOT-LIFELINE</code> <code>STATE-TRANSITION-EVENT</code> <code>STATE-NAMED-AS-ACTION</code> <code>DFD-BLACK-HOLE</code> <code>DFD-MIRACLE</code> <code>DFD-STORE-TO-STORE</code> <code>DFD-EXTERNAL-TO-STORE</code> <code>DFD-EXTERNAL-TO-EXTERNAL</code> <code>DFD-UNLABELED-FLOW</code> <code>CAUSAL-UNLABELED</code></p>
+</section>
+
+<section id="d-layout">
+  <h2>the layout check</h2>
+  <p>After drawing, the figure is checked on a raster of its real geometry, the same way the slide reviewer checks a deck. The playground shows it always; an embed shows it with <code>qa=1</code>.</p>
+  <table class="table">
+    <thead><tr><th>code</th><th>level</th><th>what it catches</th></tr></thead>
+    <tbody>
+      <tr><td><code>LINE_THROUGH_TEXT</code></td><td>error</td><td>A stroke inside a label's clearance zone (the label's box plus a small margin). Labels keep that zone clear by moving to the other side of their line.</td></tr>
+      <tr><td><code>TEXT_OVERLAP</code></td><td>error</td><td>Two labels overlapping.</td></tr>
+      <tr><td><code>CLIP</code></td><td>error</td><td>Ink or a label outside the frame.</td></tr>
+      <tr><td><code>SMALL_KALAM</code></td><td>warning</td><td>Handwriting under 18 px, which Kalam doesn't survive.</td></tr>
+      <tr><td><code>PHONE_LEGIBILITY</code></td><td>warning</td><td>A label that would fall under 13 px on a narrow screen. The figure refuses to shrink that far and scrolls sideways instead.</td></tr>
+    </tbody>
+  </table>
+  <p>The layout is automatic and you can't fix a collision by hand in v1, short of pinning a node with <code>at</code>. A long label, a shorter one, or a step split usually clears it.</p>
+</section>
+
+<section id="d-errors">
+  <h2>errors</h2>
+  <p>A parse error stops rendering and shows the line number and the message. These are all of them.</p>
+  <table class="table">
+    <thead><tr><th>message</th><th>fix</th></tr></thead>
+    <tbody>
+      <tr><td>the first line must be: diagram flowchart | activity | use-case</td><td>Put the <code>diagram</code> line first, before the title.</td></tr>
+      <tr><td>unknown diagram type '...' (flowchart, activity, use-case)</td><td>Only those three, spelled that way. Sequence, state, class and ERD aren't in the text format yet.</td></tr>
+      <tr><td>diagram declared twice</td><td>One <code>diagram</code> line per file.</td></tr>
+      <tr><td>a diagram needs a title: one line saying what it shows (its finding, not its topic)</td><td>Add a <code>title</code> line in the header.</td></tr>
+      <tr><td>id must be a slug (letters, digits, - or _)</td><td>The diagram id can't have spaces or punctuation.</td></tr>
+      <tr><td>unknown profile '...'</td><td><code>strict-uml</code>, <code>uml-inspired</code> or <code>general-diagram</code>.</td></tr>
+      <tr><td>direction is down or right</td><td>Those two words only.</td></tr>
+      <tr><td>em dash in '...' (house rule: no em dashes)</td><td>Use a comma, a colon, or two sentences.</td></tr>
+      <tr><td>unknown kind '...'</td><td>Check the tables under nodes. A header word after the first node (a late <code>title</code> line, say) shows up as this too: move it up.</td></tr>
+      <tr><td>duplicate id '...'</td><td>Every id once, boundaries included.</td></tr>
+      <tr><td>start/end don't exist in use-case diagrams</td><td>Use-case diagrams have no order, so no start or end.</td></tr>
+      <tr><td>unknown option '...' (left, right, at X Y)</td><td>After the label only <code>left</code>, <code>right</code> or <code>at X Y</code> are allowed. A label without quotes shows up as this.</td></tr>
+      <tr><td>at takes two numbers in inches: at X Y</td><td><code>at 3 1.5</code>, decimals allowed, negatives allowed.</td></tr>
+      <tr><td>step takes a whole number</td><td><code>step 1</code>, not <code>step one</code> or <code>step 1.5</code>.</td></tr>
+      <tr><td>boundary syntax: boundary &lt;id&gt; "title" {</td><td>The title in quotes and the brace on the same line.</td></tr>
+      <tr><td>boundaries can't nest</td><td>Close the first one before opening another.</td></tr>
+      <tr><td>} without an open boundary</td><td>A stray closing brace.</td></tr>
+      <tr><td>boundary '...' is never closed with }</td><td>Add the closing brace on its own line.</td></tr>
+      <tr><td>can't read this line</td><td>It's neither a node, an edge, a step, nor a boundary. Usually a missing space around an operator, or a node without a kind.</td></tr>
+      <tr><td>empty diagram</td><td>The file has no lines besides comments.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="d-embed">
+  <h2>putting it on a page</h2>
+  <p>The whole diagram travels in the link. Nothing is stored on a server; the text is compressed into the part of the URL after <code>#</code>, which browsers never send anywhere.</p>
+  <h3>the embed link</h3>
+  <pre><code>https://draw.kyleschlaepfer.com/embed/#v=1&amp;d=&lt;compressed text&gt;&amp;id=permit-portal&amp;step=0&amp;theme=auto&amp;lint=0&amp;qa=0&amp;tools=1</code></pre>
+  <table class="table">
+    <thead><tr><th>parameter</th><th>values</th><th>default</th><th>meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>v</code></td><td><code>1</code></td><td>required</td><td>link format version</td></tr>
+      <tr><td><code>d</code></td><td>compressed text</td><td>required</td><td>the diagram. "copy embed code" and "copy link" build it for you</td></tr>
+      <tr><td><code>id</code></td><td>a slug</td><td>empty</td><td>echoed in every message the embed sends, so a page with several diagrams can tell them apart</td></tr>
+      <tr><td><code>step</code></td><td>a number or <code>all</code></td><td><code>0</code></td><td>the first build-up step shown</td></tr>
+      <tr><td><code>theme</code></td><td><code>auto</code>, <code>light</code>, <code>dark</code></td><td><code>auto</code></td><td><code>auto</code> follows the reader's system setting until the page says otherwise</td></tr>
+      <tr><td><code>lint</code></td><td><code>0</code>, <code>1</code></td><td><code>0</code></td><td>show the notation check under the figure</td></tr>
+      <tr><td><code>qa</code></td><td><code>0</code>, <code>1</code></td><td><code>0</code></td><td>add the layout check (turns <code>lint</code> on too)</td></tr>
+      <tr><td><code>tools</code></td><td><code>0</code>, <code>1</code></td><td><code>1</code></td><td>the "open in playground" and "download SVG" footer</td></tr>
+    </tbody>
+  </table>
+  <h3>any page</h3>
+  <p>"copy embed code" gives you an iframe. Paste it into a lesson, a course site or an LMS that allows iframes and it works on its own: it draws, it builds up, and it follows the reader's light or dark setting. The iframe keeps the height you give it.</p>
+  <h3>kyleschlaepfer.com</h3>
+  <p>Lesson pages use the <code>DiagramEmbed</code> component with the <code>.ksd</code> file next to the lesson. "copy for the site" gives the two lines. The page's small host script then sets the iframe's height to fit, and tells the embed when the site switches theme.</p>
+  <pre><code>import permitPortal from "../../diagrams/permit-portal.ksd?raw";
+&lt;DiagramEmbed ksd={permitPortal} caption="Paying the fee is always part of applying." /&gt;</code></pre>
+  <h3>download SVG</h3>
+  <p>The downloaded file stands on its own: colors for light and dark are inside it, and Kalam is embedded, so it looks the same in a document or a slide as it does here.</p>
+</section>
+
+<section id="d-limits">
+  <h2>what it won't do yet</h2>
+  <ul>
+    <li>Only three families: flowchart, activity, use-case. Sequence, state, class and ERD have their rules in the check already; the text format for them comes with the editor.</li>
+    <li>No freehand drawing, ever. Shapes are predefined and the pen only renders them.</li>
+    <li>No dragging. <code>at X Y</code> is the one way to move a node, until the draw tab exists.</li>
+    <li>No swimlanes, no notes attached to a specific node, no colors. One pen, one accent, by design.</li>
+    <li>No saving to an account. The link is the file.</li>
+  </ul>
+</section>
+
+</div>

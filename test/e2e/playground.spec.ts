@@ -93,3 +93,64 @@ test.describe("playground", () => {
     await page.screenshot({ path: "test-results/playground-375.png", fullPage: true });
   });
 });
+
+test.describe("folder tabs and the syntax reference", () => {
+  test("write and draw tabs, with real tab semantics and arrow keys", async ({ page }) => {
+    await page.goto("/");
+    const write = page.getByRole("tab", { name: "write" });
+    const draw = page.getByRole("tab", { name: "draw" });
+    await expect(write).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#panel-draw")).toBeHidden();
+    await draw.click();
+    await expect(draw).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#panel-draw")).toBeVisible();
+    await expect(page.locator("#panel-draw")).toContainText("nothing here yet");
+    await expect(page.locator("#panel-write")).toBeHidden();
+    expect(await page.evaluate(() => location.hash)).toContain("tab=draw");
+    await page.keyboard.press("ArrowLeft");
+    await expect(write).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#panel-write")).toBeVisible();
+    expect(await page.evaluate(() => location.hash)).not.toContain("tab=");
+    await page.screenshot({ path: "test-results/playground-tabs.png", fullPage: false });
+  });
+  test("the syntax sub-tab deep-links, keeps the diagram in the hash, and its contents links scroll without changing the hash", async ({ page }) => {
+    await page.goto("/#tab=docs");
+    await expect(page.getByRole("tab", { name: "the syntax" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#sub-docs")).toBeVisible();
+    await expect(page.locator("#sub-docs h2").first()).toHaveText("the shape of a file");
+    expect(await page.locator("#sub-docs h2").count()).toBeGreaterThanOrEqual(12);
+    const before = await page.evaluate(() => location.hash);
+    expect(parseHash(before).d).toContain("diagram use-case");
+    await page.locator('.docs-toc a[href="#d-errors"]').click();
+    await expect(page.locator("#d-errors")).toBeInViewport();
+    expect(await page.evaluate(() => location.hash)).toBe(before);
+    await page.screenshot({ path: "test-results/playground-docs.png", fullPage: true });
+  });
+  test("an example button loads the playground with that diagram", async ({ page }) => {
+    await page.goto("/#tab=docs");
+    await page.locator('button[data-example="activity"]').first().click();
+    await expect(page.getByRole("tab", { name: "playground" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("textarea#ksd")).toHaveValue(/diagram activity/);
+    await expect(page.locator("#preview svg title")).toHaveText("A new hire's laptop and badge are prepared at the same time");
+    await expect(page.locator(".phase-status")).toHaveText("step 1 of 3");
+    await expect(page.locator(".play-status")).toHaveText("loaded the activity example");
+  });
+  test("opening on the syntax tab still renders the playground correctly when switched to", async ({ page }) => {
+    await page.goto("/#tab=docs");
+    await page.getByRole("tab", { name: "playground" }).click();
+    await expect(page.locator("#preview svg.ksyt-fig")).toBeVisible();
+    const box = await page.locator("#preview svg.ksyt-fig").boundingBox();
+    expect(box!.width).toBeGreaterThan(300);
+  });
+  test("the reference has no em dashes and reads in Kalam and Atkinson only", async ({ page }) => {
+    await page.goto("/#tab=docs");
+    const text = await page.locator("#sub-docs").innerText();
+    expect(text).not.toContain("—");
+    const fonts = await page.evaluate(() => {
+      const names = new Set<string>();
+      for (const e of document.querySelectorAll("#sub-docs *")) names.add(getComputedStyle(e).fontFamily.split(",")[0].replace(/"/g, "").trim());
+      return [...names];
+    });
+    for (const f of fonts) expect(["Kalam", "Atkinson Hyperlegible Next", "Atkinson Hyperlegible Mono"]).toContain(f);
+  });
+});
