@@ -104,7 +104,8 @@ export function checkScene(sc: Scene, o: QaOptions = {}): QaReport {
       for (let q = 0; q < mask.length; q++) hits += mask[q];
       if (hits > 2 * scale) errors.push(`LINE_THROUGH_TEXT ${name} crosses or touches ${pyRepr(t.s)}`);
     }
-    if (t.size < 18) warnings.push(`SMALL_KALAM ${pyRepr(t.s)} at ${t.size}px (floor 18)`);
+    // the floor is for handwriting: the precision look sets its text in Atkinson, which reads well below it
+    if (sc.look !== "precision" && t.size < 18) warnings.push(`SMALL_KALAM ${pyRepr(t.s)} at ${t.size}px (floor 18)`);
     const shown = Math.min(1, minDisplay / (sc.w * PX)) * t.size;
     if (shown < 13) {
       warnings.push(`PHONE_LEGIBILITY ${pyRepr(t.s)} renders at ${shown.toFixed(1)}px on a ${minDisplay}px-wide screen; give the figure a ` +

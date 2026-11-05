@@ -161,6 +161,51 @@ describe("text with a mistake in it", () => {
   });
 });
 
+describe("holding still never breaks the picture", () => {
+  const box = (s: Session, id: string) => s.geometry!.nodes.get(id)!;
+  const gap = (s: Session, a: string, b: string): number => {
+    const p = box(s, a), q = box(s, b);
+    return Math.max(Math.abs(p.cx - q.cx) - (p.w + q.w) / 2, Math.abs(p.cy - q.cy) - (p.h + q.h) / 2);
+  };
+  it("a class that grows pushes the class it would grow into, and no farther than it needs", () => {
+    const s = session("diagram class\ntitle t\n\nclass Customer\nclass Account\nclass Ledger\n\nCustomer -- Account\nAccount -- Ledger\n");
+    const customer = at(s, "Customer");
+    let pushed = 0;
+    for (let i = 1; i <= 8; i++) {
+      const members = Array.from({ length: i }, (_, k) => ({ kind: "attribute" as const, visibility: "+" as const, name: `field${k}`, type: "String" }));
+      const r = s.edit("add attribute", (d) => cmd.patchNode(d, uid(s, "Account"), { members }), { select: [uid(s, "Account")] });
+      expect(r.ok).toBe(true);
+      pushed += r.nudged ?? 0;
+      // a bare line needs 0.3 in between the shapes it joins
+      expect(gap(s, "Customer", "Account"), `${i} members`).toBeGreaterThan(0.29);
+      expect(gap(s, "Account", "Ledger"), `${i} members`).toBeGreaterThan(0.29);
+    }
+    expect(pushed).toBeGreaterThan(0);
+    // the edited class and the one above it are where they were; only what was in the way moved
+    expect(at(s, "Customer")[0]).toBeCloseTo(customer[0], 3);
+    expect(s.undo()).toBe(true);
+  });
+  it("a new line with words on it gets room between two shapes that sat close", () => {
+    const s = session("diagram use-case\ntitle t\n\nactor a\nuse-case one \"apply for a permit\"\nuse-case two \"pay the fee\"\n\na -- one\na -- two\n");
+    const before = gap(s, "one", "two");
+    const r = s.edit("connect", (d) => { cmd.addEdge(d, { from: uid(s, "one"), to: uid(s, "two"), op: "-include->" }); });
+    expect(r.ok).toBe(true);
+    if (before < 0.55) expect(r.nudged).toBeGreaterThan(0);
+    expect(gap(s, "one", "two")).toBeGreaterThan(0.54);
+  });
+  it("what the author arranges is left exactly as arranged, however close", () => {
+    const s = session(FLOW);
+    const b = box(s, "b");
+    const r = s.edit("move", (d) => cmd.moveNode(d, uid(s, "a"), b.cx, b.cy - b.h - 0.02));
+    expect(r.nudged).toBeUndefined();
+    expect(at(s, "b")).toEqual([b.cx, b.cy]);
+    // and a later edit elsewhere does not start tidying that pair
+    const r2 = s.edit("edit text", (d) => cmd.setLabel(d, uid(s, "begin"), null));
+    expect(r2.nudged).toBeUndefined();
+    expect(gap(s, "a", "b")).toBeLessThan(0.05);
+  });
+});
+
 describe("the project file", () => {
   it("saves the text, the model and the workspace, and reopens to the same text and identities", () => {
     const text = fixture("v2/manual-layout.ksd");
@@ -172,6 +217,23 @@ describe("the project file", () => {
     expect(opened.source).toBe(text);
     expect(opened.workspace).toEqual({ view: { x: 10, y: 20, zoom: 1.5 }, export: { format: "png", scale: 2 } });
     expect(opened.notes).toEqual([]);
+    // opened over some other diagram, every shape and line has the uid it was saved with
+    const s = session(fixture("v2/class-orders.ksd"));
+    s.setText(opened.source, "open", opened.identities);
+    expect(s.doc!.nodes.map((n) => n.uid)).toEqual(parsed.doc!.nodes.map((n) => n.uid));
+    expect(s.doc!.edges.map((e) => e.uid)).toEqual(parsed.doc!.edges.map((e) => e.uid));
+  });
+  it("identities from a file are kept only when they look like identities and are not shared", () => {
+    const parsed = parseSource("diagram flowchart\ntitle t\nprocess a\nprocess b\nprocess c\na -> b\n");
+    const file = JSON.parse(JSON.stringify(toProject(parsed))) as { model: { nodes: Array<{ uid: unknown }> } };
+    file.model.nodes[0].uid = 'x" onload="alert(1)';
+    file.model.nodes[1].uid = "same";
+    file.model.nodes[2].uid = "same";
+    const got = openFile(JSON.stringify(file)).identities!.nodes.map((n) => n.uid);
+    expect(got[0]).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(got[1]).toBe("same");
+    expect(got[2]).not.toBe("same");
+    expect(new Set(got).size).toBe(3);
   });
   it("every fixture survives save, reload and a further edit without losing anything", () => {
     for (const name of ["v2/activity-lanes.ksd", "v2/class-orders.ksd", "v2/usecase-described.ksd", "v2/manual-layout.ksd", "diagrams/usecase-permit.ksd"]) {

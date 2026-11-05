@@ -40,6 +40,8 @@ describe("qa.ts", () => {
     expect(r.errors).toContain("CLIP far:label: label outside the frame");
     expect(r.warnings.some((w) => w.startsWith("SMALL_KALAM 'world' at 16px"))).toBe(true);
     expect(r.warnings.some((w) => w.startsWith("PHONE_LEGIBILITY 'hello'"))).toBe(true);
+    // the handwriting floor is not for the precision look, whose small text is 17.2 px Atkinson by design
+    expect(checkScene({ ...sc, look: "precision" }, { minDisplayPx: 50 }).warnings.some((w) => w.startsWith("SMALL_KALAM"))).toBe(false);
   });
   it("ink outside the frame is a clip", () => {
     const sc = scene(ONE);

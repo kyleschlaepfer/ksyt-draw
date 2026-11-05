@@ -19,7 +19,7 @@ import { SIDES, boxOf, contains, nodeSize, resizable, sideAnchor, type NodeGeom,
 import { bounds, snapGrid, snapMove, type Box, type Guide } from "../../core/geom/arrange";
 import { paintContext, paintEdge, paintNode, textEl, type Element as SceneElement } from "../../core/render/scene";
 import { elementMarkup, linePath, textMarkup } from "../../core/render/svg";
-import type { App } from "../app";
+import { aftermath, type App } from "../app";
 import { KeyedLayer, parseSvg, svg } from "./dom";
 
 export interface CanvasHost {
@@ -830,9 +830,10 @@ export class Canvas {
     cancelAnimationFrame(this.frame);
     try { this.root.releasePointerCapture(ev.pointerId); } catch { /* already released */ }
     const s = this.app.session;
-    const report = (r: { ok: boolean; message?: string; held: number }, done: string): void => {
+    const report = (r: { ok: boolean; message?: string; held: number; nudged?: number }, done: string): void => {
       if (!r.ok) { this.host.say(r.message ?? "that didn't work"); this.refresh(); return; }
-      this.host.say(r.held ? `${done}; ${r.held} other shape${r.held === 1 ? " now holds its" : "s now hold their"} place (tidy up lets them go)` : done);
+      const also = aftermath(r);
+      this.host.say(also ? `${done}; ${also}${r.held ? " (tidy up lets them go)" : ""}` : done);
     };
     switch (g.type) {
       case "pan":
@@ -1202,7 +1203,7 @@ export class Canvas {
     this.select([made]);
     // a new partition or boundary may land outside what is on screen: bring the whole diagram into view
     if (container) this.fit(Math.max(1, this.view.zoom));
-    this.host.say(`added ${what}${r.held ? `; ${r.held} other shape${r.held === 1 ? " holds its" : "s hold their"} place` : ""}`);
+    this.host.say(`added ${what}${aftermath(r) ? `; ${aftermath(r)}` : ""}`);
   }
 }
 

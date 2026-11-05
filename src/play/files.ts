@@ -20,7 +20,7 @@ export function mountFiles(app: App, say: (msg: string) => void, openExport: () 
       const f = openFile(text);
       if (f.workspace.view) app.workspace.view = f.workspace.view;
       if (f.workspace.export) app.workspace.export = f.workspace.export;
-      app.open(f.source, `open ${name}`);
+      app.open(f.source, `open ${name}`, f.identities);
       say([`opened ${name}`, ...f.notes].join("; ") + " (undo brings back what was here)");
     } catch (e) {
       say(e instanceof ProjectError ? e.message : `couldn't open ${name}`);

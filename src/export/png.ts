@@ -42,7 +42,8 @@ export async function rasterize(svg: string, width: number, height: number): Pro
 
 export async function exportPng(d: ChalkDoc, m: Measurer, o: ExportOptions): Promise<PngResult> {
   const { scene } = exportScene(d, m, o);
-  const w = scene.w * PX, h = scene.h * PX;
+  // the natural size is the SVG's own whole-pixel size, so 2x is exactly twice it and the dialog can say the size beforehand
+  const w = Math.round(scene.w * PX), h = Math.round(scene.h * PX);
   let scale = o.scale ?? 2;
   if (w * h * scale * scale > MAX_PIXELS) scale = Math.max(1, Math.floor(Math.sqrt(MAX_PIXELS / (w * h)) * 10) / 10);
   const width = Math.round(w * scale), height = Math.round(h * scale);

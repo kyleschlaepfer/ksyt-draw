@@ -42,11 +42,15 @@ function tabFromHash(): Tab {
   if (t === "syntax" || t === "docs") return "syntax";
   return "write";
 }
-function writeHash(ksd: string, tab: Tab): boolean {
+/** Marks a history entry the tool wrote itself, as opposed to a link someone followed or typed. */
+const OURS = { chalk: 1 };
+const isOurs = (): boolean => !!(history.state && (history.state as { chalk?: number }).chalk);
+/** Keep the address in step with the diagram and the view. `push` adds a history entry (a change of view); otherwise the current one is rewritten. */
+function writeHash(ksd: string, tab: Tab, push = false): boolean {
   const fits = compress(ksd).length <= LINK_LIMIT;
   let h = fits ? buildHash({ d: ksd }) : "v=1";
   if (tab !== "write") h += `&tab=${tab}`;
-  history.replaceState(null, "", "#" + h);
+  if (push) history.pushState(OURS, "", "#" + h); else history.replaceState(OURS, "", "#" + h);
   return fits;
 }
 
@@ -179,9 +183,15 @@ function ensureDraw(): void {
   });
 }
 
+/** The view the address bar's current entry is for, and whether the view is changing because the reader moved through history. */
+let shownTab: Tab = "write", viaHistory = false;
 function onTab(tab: Tab): void {
-  if (!app) return;
-  writeHash(app.session.text, tab);
+  if (!app) { shownTab = tab; return; }
+  // a change of view is a step the browser's back button undoes. The entry being left is brought up to date
+  // first, so going back to it never brings back older text.
+  if (viaHistory) writeHash(app.session.text, tab);
+  else { writeHash(app.session.text, shownTab); writeHash(app.session.text, tab, true); }
+  shownTab = tab;
   if (tab === "draw") { ensureDraw(); draw?.shown(); }
   if (tab === "write") write?.shown();
 }
@@ -198,7 +208,7 @@ async function start(): Promise<void> {
     workspace: (!fromLink || fromLink === draft?.text ? draft?.workspace : undefined) ?? {},
     showTab: (tab) => views.select(tab),
     currentTab,
-    open: (text, label) => { session.setText(text, label); },
+    open: (text, label, identities) => { session.setText(text, label, identities); },
     touchWorkspace: schedulePersist,
   };
   const a = app;
@@ -215,8 +225,15 @@ async function start(): Promise<void> {
 
   window.addEventListener("hashchange", () => {
     const s = parseHash(location.hash);
+    // an entry the tool wrote is a view to go back to, with the diagram as it is now: undo is what takes text
+    // back, not the back button. Anything else is a link, and a link brings its own diagram.
+    const ours = isOurs();
+    viaHistory = true;
     views.select(tabFromHash());
-    if (s.d && s.d !== session.text) a.open(s.d, "open link");
+    viaHistory = false;
+    shownTab = currentTab();
+    if (ours) writeHash(session.text, currentTab());
+    else if (s.d && s.d !== session.text) a.open(s.d, "open link");
   });
 
   // the reference's example buttons and its table of contents
@@ -268,7 +285,10 @@ async function start(): Promise<void> {
     },
   };
 
+  viaHistory = true;
   views.select(tabFromHash());
+  viaHistory = false;
+  shownTab = currentTab();
   if (currentTab() === "draw") ensureDraw();
   write.shown();
   persist();

@@ -16,7 +16,7 @@ import { printMember } from "../../core/doc/print";
 import { isDashed } from "../../core/geom/resolve";
 import { align, distribute, matchSize, type AlignHow, type Box } from "../../core/geom/arrange";
 import { resizable } from "../../core/geom/shape";
-import { TYPE_NAME, button, el, type App } from "../app";
+import { TYPE_NAME, aftermath, button, el, type App } from "../app";
 import type { Canvas } from "./canvas";
 
 export interface InspectorHost { say(msg: string): void; canvas: Canvas; app: App }
@@ -73,7 +73,7 @@ export class Inspector {
 
   private edit(label: string, fn: (d: ChalkDoc) => void, done?: string, hold = true): void {
     const r = this.host.app.session.edit(label, fn, { select: [...this.host.canvas.selection], hold });
-    this.host.say(r.ok ? (done ?? "") + (r.held ? `${done ? "; " : ""}${r.held} other shape${r.held === 1 ? " holds its" : "s hold their"} place` : "") : r.message ?? "that didn't work");
+    this.host.say(r.ok ? [done ?? "", aftermath(r)].filter((x) => x).join("; ") : r.message ?? "that didn't work");
     if (!r.ok) this.update(true);
   }
 

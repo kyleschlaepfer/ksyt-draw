@@ -10,11 +10,11 @@ import { printMember } from "../../core/doc/print";
 import { NODE_PX, PRECISION_SCALE, PX, SMALL_PX } from "../../core/measure";
 import { drawnPath, textRect } from "../../core/geom/resolve";
 import { pathLength, pointAt } from "../../core/geom/route";
-import { review } from "../../core/diagnostics";
-import { statusWords } from "../../core/lint";
+import { locate, review, type RuleFinding } from "../../core/diagnostics";
+import { sortFindings, statusWords } from "../../core/lint";
 import { svgElementFrom } from "../../embed/figure";
 import shrugSvg from "../art/shrug-neutral.svg?raw";
-import { button, el, menuButton, type App } from "../app";
+import { aftermath, button, el, menuButton, type App } from "../app";
 import { Canvas, type EditTarget } from "./canvas";
 import { Inspector } from "./inspector";
 import { InlineEditor } from "./inline-edit";
@@ -56,7 +56,10 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
   status.setAttribute("aria-live", "polite");
   const proposal = el("div", "draw-proposal");
   proposal.hidden = true;
-  main.append(toolbar, banner, stage, proposal, status);
+  // what the check found, each finding a way to the shapes it is about
+  const found = el("details", "draw-findings");
+  found.hidden = true;
+  main.append(toolbar, banner, stage, proposal, status, found);
   panel.replaceChildren(rail, main);
 
   let sayTimer = 0;
@@ -267,7 +270,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
         align: n.kind === "boundary" ? "left" : "center", caret: t.seed ? "end" : "all", label: `text of ${n.kind} ${n.id}`,
         commit: (text) => {
           const res = session.edit("edit text", (x) => cmd.setLabel(x, n.uid, text), { select: [n.uid] });
-          say(res.ok ? (res.held ? `${res.held} other shape${res.held === 1 ? " holds its" : "s hold their"} place` : "") : res.message ?? "");
+          say(res.ok ? aftermath(res) : res.message ?? "");
         },
         done,
       });
@@ -316,6 +319,41 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     });
   }
 
+  // ---------- the notation check's findings ----------
+  let foundKey = "";
+  function listFindings(): void {
+    const d = session.doc;
+    const list = d ? (sortFindings(review(d).findings) as RuleFinding[]) : [];
+    const key = JSON.stringify(list.map((f) => [f.severity, f.rule_id, f.location, f.problem]));
+    found.hidden = !list.length;
+    if (key === foundKey) return;
+    foundKey = key;
+    if (!d || !list.length) { found.replaceChildren(); return; }
+    const ul = el("ul");
+    for (const f of list) {
+      const at = locate(f, d);
+      const uids = [...at.nodes.map((id) => d.nodes.find((n) => n.id === id)?.uid ?? ""), ...at.edges].filter((u) => u);
+      const li = el("li");
+      const head = el("p", "row");
+      head.append(el("span", "sev", f.severity), el("span", "sep", "·"), el("span", undefined, f.problem));
+      li.appendChild(head);
+      if (f.minimal_fix) li.appendChild(el("p", "fix note", f.minimal_fix));
+      if (uids.length) {
+        const show = button("btn-quiet", "show it", "select what this is about on the canvas");
+        show.addEventListener("click", () => {
+          // the document may have changed since the list was made
+          const live = uids.filter((u) => session.doc?.nodes.some((n) => n.uid === u) || session.doc?.edges.some((e) => e.uid === u));
+          if (!live.length) return;
+          canvas.select(live);
+          canvas.reveal(live[0]);
+        });
+        li.appendChild(show);
+      }
+      ul.appendChild(li);
+    }
+    found.replaceChildren(el("summary", undefined, `what the check found (${list.length})`), ul);
+  }
+
   // ---------- keeping the frame up to date ----------
   function chrome(): void {
     undoBtn.disabled = !session.canUndo;
@@ -359,6 +397,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
       words.append(el("p", "hand", "The text has a mistake, so there's nothing to draw yet."), detail, fix);
       empty.append(who, words);
       stage.replaceChildren(empty);
+      listFindings();
       say("");
       return;
     }
@@ -367,6 +406,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     inset();
     canvas.refresh();
     chrome();
+    listFindings();
     if (!status.textContent || status.textContent.startsWith("notation check")) say("");
   }
 

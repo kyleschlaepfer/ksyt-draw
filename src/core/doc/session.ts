@@ -15,6 +15,7 @@
  */
 import type { Measurer } from "../measure";
 import { resolve, type Geometry } from "../geom/resolve";
+import type { NodeGeom } from "../geom/shape";
 import { adoptUids, parseSource, type ParsedSource } from "./parse";
 import { syncSource } from "./sync";
 import { cloneDoc, type ChalkDoc } from "./types";
@@ -34,6 +35,8 @@ export interface EditResult {
   message?: string;
   /** how many other shapes were placed where they already were, so the edit moved nothing but its own subject */
   held: number;
+  /** how many shapes were pushed over because the edit left too little room between them and a neighbour */
+  nudged?: number;
   /** the automatic layout as a whole moved by this much (inches); the canvas pans by it so nothing appears to move */
   shift?: [number, number];
 }
@@ -44,6 +47,12 @@ export type Listener = (origin: Origin) => void;
 const TYPING_WINDOW = 1200;
 const HISTORY_LIMIT = 300;
 const EPS = 0.004;
+/**
+ * The least room between two shapes, in inches: joined by a line with multiplicities or role names at its ends
+ * (they stand at both ends, with the line's name between), by a line with a name or a stereotype, by a bare
+ * line, not joined. The first is what the ranking allows for such lines.
+ */
+const ROOM_ENDS = 1, ROOM_WORDS = 0.55, ROOM_LINE = 0.3, ROOM_BARE = 0.08;
 
 export class Session {
   private current!: ParsedSource;
@@ -90,8 +99,8 @@ export class Session {
     this.emit("load");
   }
 
-  private adopt(text: string): void {
-    const parsed = adoptUids(parseSource(text), this.good?.doc ?? null);
+  private adopt(text: string, identities?: ChalkDoc): void {
+    const parsed = adoptUids(parseSource(text), identities ?? this.good?.doc ?? null);
     this.current = parsed;
     if (parsed.doc) {
       this.good = parsed;
@@ -117,15 +126,18 @@ export class Session {
     this.emit("load");
   }
 
-  /** The write view's edit. Typing within a short window is one undo step. */
-  setText(text: string, label = "typing"): void {
+  /**
+   * The write view's edit. Typing within a short window is one undo step. `identities` is for opening a
+   * project file: its shapes and lines take the uids they were saved with instead of the current document's.
+   */
+  setText(text: string, label = "typing", identities?: ChalkDoc): void {
     if (text === this.current.text) return;
     const t = this.now();
     const typing = label === "typing" && this.past.length > 0 && this.past[this.past.length - 1].label === "typing" && t - this.lastWrite < TYPING_WINDOW;
     if (!typing) this.remember(label);
     else this.future = [];
     this.lastWrite = t;
-    this.adopt(text);
+    this.adopt(text, identities);
     this.emit("write");
   }
 
@@ -139,8 +151,13 @@ export class Session {
       if (e instanceof EditError) return { ok: false, message: e.message, held: 0 };
       throw e;
     }
-    const kept = o.hold === false ? { held: 0 } : this.holdStill(draft);
-    const held = kept.held;
+    // an edit that places or sizes something is the author arranging things: it is left exactly as made
+    const was = new Map(this.good.doc.nodes.map((n) => [n.uid, JSON.stringify([n.place, n.size, n.thickness])]));
+    const arranging = draft.nodes.some((n) => JSON.stringify([n.place, n.size, n.thickness]) !== (was.get(n.uid) ?? JSON.stringify([undefined, undefined, undefined])));
+    const kept: { held: string[]; shift?: [number, number] } = o.hold === false ? { held: [] } : this.holdStill(draft);
+    const nudged = o.hold === false || arranging ? 0 : this.makeRoom(draft);
+    // the shape the edit was about is not one of the "others"
+    const held = kept.held.filter((uid) => !o.select?.includes(uid)).length;
     const text = syncSource(this.good, draft);
     if (text === this.current.text) return { ok: true, held: 0 };
     const check = adoptUids(parseSource(text), draft);
@@ -157,17 +174,73 @@ export class Session {
     if (o.select) this.selection = o.select;
     this.lastShift = kept.shift ?? null;
     this.emit("draw");
-    return { ok: true, held, ...(kept.shift ? { shift: kept.shift } : {}) };
+    return { ok: true, held, ...(nudged ? { nudged } : {}), ...(kept.shift ? { shift: kept.shift } : {}) };
+  }
+
+  /**
+   * Holding still must not break the picture. When an edit leaves two shapes with less room between them
+   * than they need (a class that grew into its neighbour, a new line with words on it between two shapes
+   * that sat close), the neighbour is pushed over just far enough, and whatever it then crowds after it.
+   * Pairs that were already that close before the edit are the author's business and are left alone.
+   * Returns how many shapes were moved.
+   */
+  private makeRoom(draft: ChalkDoc): number {
+    const before = this.geo, old = this.good?.doc;
+    if (!before || !old) return 0;
+    const links = (d: ChalkDoc): Map<string, number> => {
+      const m = new Map<string, number>();
+      for (const e of d.edges) {
+        const k = e.from < e.to ? `${e.from}|${e.to}` : `${e.to}|${e.from}`;
+        m.set(k, Math.max(m.get(k) ?? 0, e.ends ? ROOM_ENDS : e.label || e.kind === "include" || e.kind === "extend" ? ROOM_WORDS : ROOM_LINE));
+      }
+      return m;
+    };
+    const need = (m: Map<string, number>, a: string, b: string): number => m.get(a < b ? `${a}|${b}` : `${b}|${a}`) ?? ROOM_BARE;
+    const apart = (a: NodeGeom, b: NodeGeom): [number, number] => [Math.abs(a.cx - b.cx) - (a.w + b.w) / 2, Math.abs(a.cy - b.cy) - (a.h + b.h) / 2];
+    const oldLinks = links(old), newLinks = links(draft);
+    const moved = new Set<string>();
+    for (let pass = 0; pass < 8; pass++) {
+      const geo = resolve(draft, this.measurer);
+      const nodes = draft.nodes.filter((n) => { const g = geo.nodes.get(n.id); return !!g && g.shape !== "container" && g.shape !== "lane"; });
+      const grew = (id: string): boolean => { const a = before.nodes.get(id), b = geo.nodes.get(id)!; return !a || b.w > a.w + EPS || b.h > a.h + EPS; };
+      const thisPass = new Set<string>();
+      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        if (thisPass.has(a.id) || thisPass.has(b.id)) continue;
+        const ga = geo.nodes.get(a.id)!, gb = geo.nodes.get(b.id)!;
+        const room = need(newLinks, a.id, b.id);
+        const [sx, sy] = apart(ga, gb);
+        if (Math.max(sx, sy) >= room - EPS) continue;
+        const pa = before.nodes.get(a.id), pb = before.nodes.get(b.id);
+        if (pa && pb && !moved.has(a.id) && !moved.has(b.id)) {
+          const [px, py] = apart(pa, pb);
+          if (Math.max(px, py) < need(oldLinks, a.id, b.id) - EPS) continue;
+        }
+        // the one that is pushed: not the one that was pushed here already, not the one that grew; else the later one
+        const first = moved.has(a.id) !== moved.has(b.id) ? moved.has(b.id) : grew(a.id) !== grew(b.id) ? grew(b.id) : false;
+        const [mover, gm, go] = first ? [a, ga, gb] : [b, gb, ga];
+        // inside a partition a shape only moves along its lane
+        const lane = mover.parent ? geo.nodes.get(mover.parent) : undefined;
+        const alongX = lane?.shape === "lane" ? !!lane.horizontal : sx >= sy;
+        const by = room - (alongX ? sx : sy);
+        const dir = (alongX ? gm.cx - go.cx : gm.cy - go.cy) >= 0 ? 1 : -1;
+        mover.place = { x: Math.round((gm.cx + (alongX ? dir * by : 0)) * 1000) / 1000, y: Math.round((gm.cy + (alongX ? 0 : dir * by)) * 1000) / 1000 };
+        moved.add(mover.id);
+        thisPass.add(mover.id);
+      }
+      if (!thisPass.size) break;
+    }
+    return moved.size;
   }
 
   /**
    * Nothing moves unless the author moves it: any automatic shape the edit would shift is placed
    * where it already is, and partitions keep their thickness. Returns how many shapes were held.
    */
-  private holdStill(draft: ChalkDoc): { held: number; shift?: [number, number] } {
+  private holdStill(draft: ChalkDoc): { held: string[]; shift?: [number, number] } {
     const before = this.geo;
-    if (!before) return { held: 0 };
-    let held = 0;
+    if (!before) return { held: [] };
+    const held: string[] = [];
     // a diagram with nothing placed by hand may slide as a whole (a wider box re-centers its column):
     // that is not a rearrangement, so nothing is pinned; the canvas pans to cancel it
     if (!draft.nodes.some((n) => n.place) && !draft.pool) {
@@ -180,7 +253,7 @@ export class Session {
         if (!shift) shift = v;
         else if (Math.abs(v[0] - shift[0]) > EPS || Math.abs(v[1] - shift[1]) > EPS) { uniform = false; break; }
       }
-      if (uniform && shift) return Math.abs(shift[0]) > EPS || Math.abs(shift[1]) > EPS ? { held: 0, shift } : { held: 0 };
+      if (uniform && shift) return Math.abs(shift[0]) > EPS || Math.abs(shift[1]) > EPS ? { held: [], shift } : { held: [] };
     }
     for (let pass = 0; pass < 3; pass++) {
       const after = resolve(draft, this.measurer);
@@ -197,7 +270,7 @@ export class Session {
         if (Math.abs(was.cx - now.cx) > EPS || Math.abs(was.cy - now.cy) > EPS) {
           n.place = { x: Math.round(was.cx * 1000) / 1000, y: Math.round(was.cy * 1000) / 1000 };
           changed++;
-          held++;
+          held.push(n.uid);
         }
       }
       if (!changed) break;

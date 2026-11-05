@@ -494,9 +494,11 @@ test.describe("swimlanes", () => {
 test.describe("many shapes at once", () => {
   test("K: align and distribute a multi-selection; each is one step to undo", async ({ page }) => {
     await openTool(page, ksdOf("usecase-permit"), "draw");
-    // a marquee around the three use cases in the first column
-    const a = await box(page, "apply"), r = await box(page, "review");
-    await drag(page, [a.x - 14, a.y - 14], [Math.max(a.x + a.width, r.x + r.width) + 14, r.y + r.height + 14]);
+    // a marquee around the two use cases in the first column, then a shift-click adds one from the second
+    const a = await box(page, "apply"), t = await box(page, "track");
+    await drag(page, [a.x - 14, a.y - 14], [Math.max(a.x + a.width, t.x + t.width) + 14, t.y + t.height + 14]);
+    await expect(page.locator(".draw-inspector h2")).toHaveText("2 selected");
+    await clickNode(page, "review", { shift: true });
     await expect(page.locator(".draw-inspector h2")).toHaveText("3 selected");
     await expect(page.locator(".overlay .sel")).toHaveCount(3);
     const before = await inspect(page);

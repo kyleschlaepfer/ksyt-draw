@@ -8,6 +8,7 @@
 import { buildHash } from "../core/state";
 import { formatSource } from "../core/doc/sync";
 import { allIssues, lineOf } from "../core/diagnostics";
+import { statusWords } from "../core/lint";
 import { firstError } from "../core/doc/parse";
 import { mountFigure, type Mounted } from "../embed/figure";
 import { downloadSvg } from "../embed/download";
@@ -161,7 +162,7 @@ export function mountWrite(panel: HTMLElement, app: App): WriteView {
     if (bad) { noticeUntil = 0; summary(bad.line ? `line ${bad.line}: ${bad.message}` : bad.message); }
     else if (d && mounted) {
       const n = mounted.lint.findings.length, q = mounted.qa?.errors.length ?? 0;
-      summary(`${TYPE_NAME[d.meta.type] ?? "diagram"}, ${d.nodes.length} nodes, ${d.edges.length} edges, notation check: ${mounted.lint.status}${n ? ` (${n})` : ""}${q ? `, layout: ${q} error${q === 1 ? "" : "s"}` : ""}`);
+      summary(`${TYPE_NAME[d.meta.type] ?? "diagram"}, ${d.nodes.length} nodes, ${d.edges.length} edges, notation check: ${statusWords(mounted.lint.status)}${n ? ` (${n})` : ""}${q ? `, layout: ${q} error${q === 1 ? "" : "s"}` : ""}`);
     }
     link();
   }

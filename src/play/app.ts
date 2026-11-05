@@ -1,6 +1,7 @@
 /** What the views share: the open document, a status line, and small DOM helpers. */
 import type { Session } from "../core/doc/session";
 import type { Workspace } from "../core/doc/project";
+import type { ChalkDoc } from "../core/doc/types";
 import type { Measurer } from "../core/measure";
 import type { FontStatus } from "../embed/measure-dom";
 
@@ -15,7 +16,7 @@ export interface App {
   showTab(tab: Tab): void;
   currentTab(): Tab;
   /** replace the open diagram (undoable) */
-  open(text: string, label: string): void;
+  open(text: string, label: string, identities?: ChalkDoc): void;
   /** tell the views the workspace changed (so it gets saved) */
   touchWorkspace(): void;
 }
@@ -25,6 +26,14 @@ export const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, 
   if (cls) e.className = cls;
   if (text !== undefined) e.textContent = text;
   return e;
+};
+
+/** What an edit did besides what was asked: shapes pushed over to make room, shapes kept where they were. Empty when neither. */
+export const aftermath = (r: { held: number; nudged?: number }): string => {
+  const parts: string[] = [];
+  if (r.nudged) parts.push(`made room: ${r.nudged} shape${r.nudged === 1 ? "" : "s"} moved over`);
+  if (r.held) parts.push(`${r.held} other${r.held === 1 ? " stays" : "s stay"} put`);
+  return parts.join("; ");
 };
 
 export const button = (cls: string, text: string, title?: string): HTMLButtonElement => {

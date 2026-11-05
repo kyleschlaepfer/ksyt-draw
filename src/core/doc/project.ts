@@ -10,7 +10,7 @@
  * parser as anything typed; if the text is missing or broken, the model is validated field by field
  * and printed back to text. Nothing from the file is used without going through one of those two.
  */
-import { adoptUids, parseSource, type ParsedSource } from "./parse";
+import { parseSource, type ParsedSource } from "./parse";
 import { printDoc } from "./print";
 import {
   DOC_FORMAT, DOC_VERSION, PROFILES, TYPES, newUid,
@@ -48,6 +48,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 const str = (v: unknown, max = 4000): string | undefined => (typeof v === "string" && v.length <= max ? v : undefined);
 const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && Math.abs(v) < 1e5 ? v : undefined);
 const ID_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
+/** An identity from a file is kept only if it looks like one of ours and no other element has it. */
+const UID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const NODE_KINDS: readonly string[] = ["action", "process", "decision", "merge", "fork", "join", "initial", "final", "flow-final", "terminator", "io",
   "actor", "use-case", "note", "boundary", "partition", "class", "interface"];
 const EDGE_KINDS: readonly string[] = ["arrow", "association", "include", "extend", "generalization", "realization", "dependency", "aggregation", "composition"];
@@ -76,7 +78,13 @@ export function sanitizeDoc(raw: unknown): ChalkDoc {
     },
     nodes: [], edges: [],
   };
-  const ids = new Set<string>();
+  const ids = new Set<string>(), uids = new Set<string>();
+  const uidOf = (v: unknown, prefix?: "n" | "e"): string => {
+    const u = str(v, 40);
+    const out = u && UID_RE.test(u) && !uids.has(u) ? u : newUid(prefix);
+    uids.add(out);
+    return out;
+  };
   for (const r of raw.nodes as unknown[]) {
     if (!isObj(r)) continue;
     const id = str(r.id, 80), kind = pick<NodeKind>(r.kind, NODE_KINDS);
@@ -85,7 +93,7 @@ export function sanitizeDoc(raw: unknown): ChalkDoc {
     if ((kind === "class" || kind === "interface") && type !== "class") continue;
     if (kind === "partition" && type !== "activity" && type !== "flowchart") continue;
     ids.add(id);
-    const n: DocNode = { uid: str(r.uid, 40) ?? newUid(), id, kind, label: r.label === null ? null : str(r.label) ?? null, step: Math.max(0, Math.trunc(num(r.step) ?? 0)) };
+    const n: DocNode = { uid: uidOf(r.uid), id, kind, label: r.label === null ? null : str(r.label) ?? null, step: Math.max(0, Math.trunc(num(r.step) ?? 0)) };
     const parent = str(r.parent, 80);
     if (parent && ID_RE.test(parent)) n.parent = parent;
     if (r.side === "left" || r.side === "right") n.side = r.side;
@@ -135,7 +143,7 @@ export function sanitizeDoc(raw: unknown): ChalkDoc {
     const classOnly = ["generalization", "realization", "dependency", "aggregation", "composition"].includes(kind);
     if ((classOnly && type !== "class") || ((kind === "include" || kind === "extend" || kind === "arrow") && type === "class")) continue;
     const e: DocEdge = {
-      uid: str(r.uid, 40) ?? newUid("e"), id: `e${doc.edges.length + 1}`, kind, from, to,
+      uid: uidOf(r.uid, "e"), id: `e${doc.edges.length + 1}`, kind, from, to,
       label: str(r.label)?.replace(/\s+/g, " ").trim() || null, directed: r.directed !== false, step: Math.max(0, Math.trunc(num(r.step) ?? 0)),
     };
     if (kind === "arrow" && r.meaning === "proposed") e.meaning = "proposed";
@@ -168,6 +176,8 @@ export function sanitizeDoc(raw: unknown): ChalkDoc {
 export interface OpenedFile {
   /** the text to load */
   source: string;
+  /** a project's saved model, checked field by field: the identities the text's shapes and lines take back */
+  identities?: ChalkDoc;
   workspace: Workspace;
   /** what kind of file it was, and anything the reader had to repair */
   kind: "ksd" | "project";
@@ -207,9 +217,10 @@ export function openFile(text: string): OpenedFile {
   if (source !== null) {
     const parsed = parseSource(source);
     if (parsed.doc) {
-      // keep the saved identities when the model matches the text
-      try { adoptUids(parsed, sanitizeDoc(proj.model)); } catch { /* the text alone is enough */ }
-      return { source, workspace, kind: "project", notes };
+      // the saved identities come back with the text, wherever the model still matches it
+      let identities: ChalkDoc | undefined;
+      try { identities = sanitizeDoc(proj.model); } catch { /* the text alone is enough */ }
+      return { source, workspace, kind: "project", notes, ...(identities ? { identities } : {}) };
     }
     notes.push("the text in this project has a mistake; the saved model was used instead");
   }
