@@ -33,7 +33,7 @@ test.describe("playground", () => {
     await ta.fill("diagram flowchart\ntitle t\nprocess a\nprocess a");
     await expect(page.locator("#preview .error-card p")).toContainText("line 4:");
     await expect(page.locator("#preview .error-card code")).toHaveText("duplicate id 'a'");
-    await expect(page.locator(".play-status")).toContainText("line 4: duplicate id 'a'");
+    await expect(page.locator("#sub-play .play-status")).toContainText("line 4: duplicate id 'a'");
     await ta.fill("diagram flowchart\ntitle t\nprocess a\nprocess b\na -> b");
     await expect(page.locator("#preview svg.ksyt-fig")).toBeVisible();
     expect(await page.locator("#preview .error-card").count()).toBe(0);
@@ -44,7 +44,7 @@ test.describe("playground", () => {
     await page.locator("textarea#ksd").fill(ksdOf("usecase-permit"));
     await expect(page.locator("#preview svg title")).toContainText("Residents apply");
     await page.getByRole("button", { name: "copy embed code" }).click();
-    await expect(page.locator(".play-status")).toHaveText("copied the embed code");
+    await expect(page.locator("#sub-play .play-status")).toHaveText("copied the embed code");
     const copied = await page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
     const snippet = copied[0];
     expect(snippet).toMatch(/^<iframe\n/);
@@ -104,7 +104,7 @@ test.describe("folder tabs and the syntax reference", () => {
     await draw.click();
     await expect(draw).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#panel-draw")).toBeVisible();
-    await expect(page.locator("#panel-draw")).toContainText("nothing here yet");
+    await expect(page.locator("#panel-draw .draw-canvas svg.ksyt-fig")).toBeVisible();
     await expect(page.locator("#panel-write")).toBeHidden();
     expect(await page.evaluate(() => location.hash)).toContain("tab=draw");
     await page.keyboard.press("ArrowLeft");
@@ -133,7 +133,7 @@ test.describe("folder tabs and the syntax reference", () => {
     await expect(page.locator("textarea#ksd")).toHaveValue(/diagram activity/);
     await expect(page.locator("#preview svg title")).toHaveText("A new hire's laptop and badge are prepared at the same time");
     await expect(page.locator(".phase-status")).toHaveText("step 1 of 3");
-    await expect(page.locator(".play-status")).toHaveText("loaded the activity example");
+    await expect(page.locator("#sub-play .play-status")).toHaveText("loaded the activity example");
   });
   test("opening on the syntax tab still renders the playground correctly when switched to", async ({ page }) => {
     await page.goto("/#tab=docs");

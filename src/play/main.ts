@@ -19,6 +19,7 @@ import { errorCard, mountFigure, type Mounted } from "../embed/figure";
 import { downloadSvg } from "../embed/download";
 import { makeTabs } from "./tabs";
 import { DEFAULT_EXAMPLE, EXAMPLES } from "./examples";
+import { mountDraw } from "./draw";
 
 const TYPE_NAME: Record<string, string> = { flowchart: "Flowchart", activity: "Activity diagram", "use-case": "Use-case diagram" };
 type Tab = "play" | "docs" | "draw";
@@ -76,13 +77,14 @@ const docsPanel = el("div", "docs");
 docsPanel.id = "sub-docs";
 docsPanel.innerHTML = docsHtml;
 
-// draw panel: empty on purpose
-const drawPanel = el("div", "draw-empty");
+// draw panel: the editor, working on the same text
+const drawPanel = el("div", "draw-editor");
 drawPanel.id = "panel-draw";
-drawPanel.append(
-  el("p", "note", "nothing here yet."),
-  el("p", undefined, "This tab is for the drag and drop editor: the same shapes, placed by hand, saved back to the text on the write tab."),
-);
+let playDirty = false;
+const draw = mountDraw(drawPanel, {
+  getText: () => ta.value,
+  setText: (t) => { ta.value = t; writeHash(t, currentTab()); playDirty = true; },
+});
 
 const writePanel = el("div", "write-panel");
 writePanel.id = "panel-write";
@@ -112,7 +114,8 @@ function showTab(tab: Tab): void {
 }
 function onTab(tab: Tab): void {
   writeHash(ta.value, tab);
-  if (tab === "play" && renderedHidden) void render();
+  if (tab === "draw") draw.refresh();
+  if (tab === "play" && (renderedHidden || playDirty)) { playDirty = false; void render(); }
 }
 
 function say(msg: string): void {
@@ -155,7 +158,7 @@ ta.addEventListener("input", schedule);
 window.addEventListener("hashchange", () => {
   const s = parseHash(location.hash);
   showTab(tabFromHash());
-  if (s.d && s.d !== ta.value) { ta.value = s.d; void render(); }
+  if (s.d && s.d !== ta.value) { ta.value = s.d; void render(); if (currentTab() === "draw") draw.refresh(); }
 });
 
 // the reference's example buttons and its table of contents
@@ -232,4 +235,5 @@ btnSvg.addEventListener("click", () => { if (mounted) void downloadSvg(mounted.s
 const initial = parseHash(location.hash);
 ta.value = initial.d ?? DEFAULT_EXAMPLE;
 showTab(tabFromHash());
+if (currentTab() === "draw") draw.refresh();
 void render();

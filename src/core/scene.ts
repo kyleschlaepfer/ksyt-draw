@@ -30,6 +30,8 @@ export interface Scene {
   direction: "down" | "right";
   /** pairs ("a|b") allowed to touch */
   overlaps: Set<string>;
+  /** the translation from layout coordinates to scene coordinates (so `at` = scene - offset) */
+  offset: [number, number];
 }
 
 export const MARGIN = 0.2;
@@ -110,7 +112,7 @@ export function buildScene(d: Diagram, m: Measurer, o: SceneOptions = {}): Scene
   const nodes = [...layout.boundaries, ...layout.nodes.values()].map((n) => ({ ...n, cx: n.cx + dx, cy: n.cy + dy }));
   return {
     id, title: d.web.title, desc: describeText(d), w: x1 - x0 + 2 * MARGIN, h: y1 - y0 + 2 * MARGIN,
-    elements: shifted, texts, nodes, steps: maxStep(d), direction: layout.direction, overlaps: new Set(),
+    elements: shifted, texts, nodes, steps: maxStep(d), direction: layout.direction, overlaps: new Set(), offset: [dx, dy],
   };
 }
 

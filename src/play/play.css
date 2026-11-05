@@ -102,6 +102,41 @@ body { padding: var(--s-2) var(--s-3) var(--s-4); }
   .docs-body .table tr { border-bottom: 1px solid var(--rule); padding-bottom: 0.5rem; }
 }
 
-/* ---------- draw: empty on purpose ---------- */
-.draw-empty { min-height: 14rem; max-width: var(--measure); }
-.draw-empty .note { margin-bottom: var(--s-1); }
+/* ---------- draw: sidebar of controls, the drawing on the right ---------- */
+.draw-editor { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: var(--s-3); align-items: start; }
+@media (max-width: 56rem) { .draw-editor { grid-template-columns: 1fr; } }
+.draw-side { display: grid; gap: var(--s-3); }
+.draw-sec { background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px; padding: var(--s-2); display: grid; gap: var(--s-1); align-content: start; }
+.draw-sec h2 { font: var(--hand-sm)/1.2 var(--font-hand); font-weight: 400; margin: 0; }
+.draw-sec .note { margin: 0; }
+.draw-field { display: grid; gap: 0.25rem; }
+.draw-field > span { font: 300 var(--hand-sm)/1.2 var(--font-hand); color: var(--ink-2); }
+.draw-field input, .draw-field select, .draw-field textarea {
+  width: 100%; font: var(--text-sm)/1.4 var(--font-body); color: var(--ink); background: var(--page-2);
+  border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.45rem 0.6rem; min-height: 44px;
+}
+.draw-field textarea { resize: vertical; }
+.draw-field input:focus-visible, .draw-field select:focus-visible, .draw-field textarea:focus-visible { border-color: var(--accent); }
+.draw-palette { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.draw-shape {
+  font: var(--hand-sm)/1 var(--font-hand); color: var(--ink); background: var(--page-2); cursor: grab;
+  border: 1.5px solid var(--rule); border-radius: 0.5em 0.7em 0.55em 0.65em / 0.7em 0.5em 0.65em 0.55em;
+  padding: 0 0.8rem; min-height: 44px; touch-action: none; user-select: none;
+}
+.draw-shape:hover { border-color: var(--ink-2); }
+.draw-shape:active { cursor: grabbing; }
+.draw-ghost {
+  position: fixed; z-index: 10; pointer-events: none; font: var(--hand-sm)/1 var(--font-hand); color: var(--ink);
+  background: var(--wash); padding: 0.4rem 0.8rem; border-radius: 0.5em 0.7em 0.55em 0.65em / 0.7em 0.5em 0.65em 0.55em;
+}
+.draw-main { min-width: 0; }
+.draw-canvas {
+  background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px; min-height: 24rem;
+  padding: var(--s-2); overflow: auto; touch-action: none;
+}
+.draw-canvas:focus-visible { outline-offset: -3px; }
+.draw-canvas > svg { display: block; max-width: none; }
+.draw-canvas [data-name] { cursor: grab; }
+.draw-canvas .is-selected path.k-ink, .draw-canvas .is-selected path.k-ink-2 { fill: var(--accent); }
+.draw-canvas text.is-selected { fill: var(--accent); }
+.draw-canvas .error-card { margin: 0; }

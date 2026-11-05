@@ -2,7 +2,7 @@
 
 Diagrams for kyleschlaepfer.com: write a few lines of text, get a use-case, activity or flowchart diagram in the same style as the videos, embeddable in any page, with the same notation check as the slide reviewer.
 
-**Status:** v1 built. Parser, linter, layout, SVG, QA, the embed page and the playground pass `npm test` (171) and `npm run test:e2e` (57). Deploy steps are at the end of `BUILD_BRIEF.md`.
+**Status:** v1 built. Parser, linter, layout, SVG, QA, the embed page, the playground with its syntax reference, and a first draw tab (place, name, connect, drag; text stays the source of truth) pass `npm test` (171) and `npm run test:e2e` (57). Deploy steps are at the end of `BUILD_BRIEF.md`.
 
 ## Start here
 

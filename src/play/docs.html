@@ -137,7 +137,7 @@ notify -&gt; done</code></pre>
     <thead><tr><th>option</th><th>meaning</th></tr></thead>
     <tbody>
       <tr><td><code>left</code> or <code>right</code></td><td>Which side of the system an actor stands on. Default <code>left</code>. Only actors use it.</td></tr>
-      <tr><td><code>at X Y</code></td><td>Pin the node's center at X, Y inches, overriding the automatic layout for that node only. Edges touching a pinned node run straight. This is also how the future editor will save a drag, so a hand-placed node stays text.</td></tr>
+      <tr><td><code>at X Y</code></td><td>Pin the node's center at X, Y inches, overriding the automatic layout for that node only. Edges touching a pinned node run straight. This is how the draw tab saves a drag, so a placed node is still just text.</td></tr>
     </tbody>
   </table>
   <pre><code>actor clerk "Permit clerk" right
@@ -465,7 +465,7 @@ waiver -extend-&gt; pay</code></pre>
   <ul>
     <li>Only three families: flowchart, activity, use-case. Sequence, state, class and ERD have their rules in the check already; the text format for them comes with the editor.</li>
     <li>No freehand drawing, ever. Shapes are predefined and the pen only renders them.</li>
-    <li>No dragging. <code>at X Y</code> is the one way to move a node, until the draw tab exists.</li>
+    <li>The draw tab places, names, connects and drags shapes, and writes the result back as this text. The first drag pins every shape where it is (an <code>at</code> line each), so the picture stops rearranging itself; "let it find its own place" unpins one.</li>
     <li>No swimlanes, no notes attached to a specific node, no colors. One pen, one accent, by design.</li>
     <li>No saving to an account. The link is the file.</li>
   </ul>
