@@ -1,7 +1,8 @@
 # Implementation report: Chalk v2 revival
 
-Written 2026-11-05. Branch `feat/ksyt-draw-v2-revival`, 16 commits ahead of `main` before this
-document. Nothing has been pushed and nothing has been deployed.
+Written 2026-11-05 and updated after release. The canvas-first redesign was committed as
+`51c6646`, pushed to `main` and `feat/ksyt-draw-v2-revival`, and deployed at
+`https://chalk.kyleschlaepfer.com`.
 
 This is the summary. The detail is in the documents beside it:
 
@@ -43,6 +44,7 @@ Final verification for this working tree:
 | Unit | 473 passed, 0 failed, 0 skipped |
 | Chromium end-to-end | 105 passed, 0 failed, 0 skipped |
 | Draw-specific browser suite | 21 passed, including repeated empty placement, self-link initiation, keyboard connector, direct class members, lanes, resize, routing, multi-select, undo/redo |
+| Production smoke check | root and embed returned 200; release asset hashes and Draw bundle byte size matched; expected CSP headers were present |
 | Production build | passed (`tsc --noEmit`, then Vite build) |
 
 Functional completeness against the canvas-first specification is estimated at **92%**. Remaining implementation effort is estimated at **2–5 engineering days**, with uncertainty driven by findings from Firefox/Safari, real touch devices, screen-reader use, external export applications, and an independent UML 2.5.1 rules audit. The implemented acceptance workflow itself is not blocked by those checks.
@@ -239,4 +241,4 @@ Not verified, anywhere:
 3. Run the tool in Firefox, Safari, and on a phone and a tablet. Fix what that shows.
 4. Read the 12 v2 rules against the UML 2.5.1 text.
 5. Decide the small things in section 7.
-6. Then deploy: `npm run deploy`, which the owner runs.
+6. After any follow-up changes, rerun the complete verification suite and redeploy.

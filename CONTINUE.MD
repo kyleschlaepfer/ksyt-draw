@@ -1,6 +1,6 @@
 # CONTINUE: KSYT-Draw canvas-first Draw mode
 
-Updated 2026-11-05 on `feat/ksyt-draw-v2-revival` at base commit `f8ed994`. The canvas-first work in the working tree has not been committed, pushed, or deployed.
+Updated 2026-11-05 after production release. The canvas-first redesign was committed as `51c6646`, pushed to both `main` and `feat/ksyt-draw-v2-revival`, and deployed at `https://chalk.kyleschlaepfer.com`.
 
 The authoritative assignment is `prompts/KSYT_DRAW_CANVAS_FIRST_REDESIGN.md`. Read it with `docs/revamp/DRAW_MODE_REDESIGN.md` and `docs/revamp/IMPLEMENTATION_REPORT.md` before continuing.
 
@@ -12,10 +12,11 @@ The authoritative assignment is `prompts/KSYT_DRAW_CANVAS_FIRST_REDESIGN.md`. Re
 | `npm run test:e2e` | 105 passed, 0 failed, 0 skipped (Chromium) |
 | `npm run build` | passed (`tsc --noEmit` and Vite production build) |
 | Canvas-first acceptance workflow | passed: five empty classes, free arrangement, valid and invalid connections, warning navigation, text added later, project save/reopen |
+| Production smoke check | passed: root and embed return 200, production serves the release asset hashes, Draw bundle size matches the release build, and the expected CSP headers are present |
 
 The new acceptance screenshot is `docs/revamp/after/canvas-first-class.png`.
 
-## Implemented in this working tree
+## Implemented and released
 
 - New opens a diagram-type chooser for blank flowchart, activity, use-case, or class diagrams and enters Draw.
 - The Draw shell is three zones: a collapsible graphical symbol/relationship library, the dominant canvas, and a collapsible docked inspector. A grid-placement defect that could shrink the canvas to 68 px when side zones were collapsed is fixed.
@@ -50,7 +51,6 @@ The purpose-built canvas remains. It already has stable IDs, pointer and keyboar
 - PowerPoint, Word, Keynote, Google Slides, Inkscape, Illustrator, Figma, and printing for exported files.
 - An independent audit of the 12 v2 notation rules against UML 2.5.1.
 - `npm run fixtures` on a machine with Python 3. The Python-generated fixtures were not changed here.
-- Deployment. Do not push or deploy without owner instruction.
 
 ## Completion estimate
 
@@ -83,4 +83,4 @@ node scripts/capture-ui.mjs [outDir] [baseUrl]
 2. Run Firefox/Safari and touch-device passes before changing architecture.
 3. Audit the 12 UML rules against the UML 2.5.1 source.
 4. Open representative SVG, PNG, and PDF exports in the target office/design applications.
-5. Address only findings from those passes, then rerun all three verification commands above.
+5. Address only findings from those passes, then rerun all three verification commands above and redeploy.
