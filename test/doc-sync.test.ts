@@ -251,3 +251,47 @@ describe("formatSource", () => {
     expect(formatSource(parseSource("diagram flowchart\ntitle t\n   widget x\n"))).toBe("diagram flowchart\ntitle t\nwidget x\n");
   });
 });
+
+describe("build-up steps set from Draw", () => {
+  const STEPPED = fixture("activity-parallel.ksd");
+  const edgeUid = (d: ChalkDoc, from: string, to: string): string => d.edges.find((e) => e.from === from && e.to === to)!.uid;
+
+  it("a shape moved to a later step gets a step line before it, and the old step comes back after it", () => {
+    const text = edit(STEPPED, (d) => cmd.setStep(d, [uidOf(d, "laptop")], 2));
+    expect(text).toContain('fork split\nstep 2\naction laptop "order laptop"\nstep 1\naction badge "print badge"\n');
+    // nothing else in the file changed
+    expect(text).toBe(STEPPED.replace('action laptop "order laptop"\n', 'step 2\naction laptop "order laptop"\nstep 1\n'));
+  });
+  it("the first line under a step line takes that line's place, and no step line is left doing nothing", () => {
+    const text = edit(STEPPED, (d) => cmd.setStep(d, [uidOf(d, "split")], 2));
+    expect(text).toContain('begin -> accept\n\nstep 2\nfork split\nstep 1\naction laptop "order laptop"\n');
+  });
+  it("the last line of the file needs nothing after it", () => {
+    const text = edit(STEPPED, (d) => cmd.setStep(d, [edgeUid(d, "first", "done")], 3));
+    expect(text.endsWith("wait -> first\nstep 3\nfirst -> done\n")).toBe(true);
+  });
+  it("a whole step moved into the next one leaves one step line, not a pile of them", () => {
+    const text = edit(STEPPED, (d) => cmd.setStep(d, [...d.nodes, ...d.edges].filter((x) => x.step === 1).map((x) => x.uid), 2));
+    expect(text.match(/^step \d+$/gm)).toEqual(["step 2"]);
+    expect(text).toBe(STEPPED.replace("step 1\n", "step 2\n").replace("\n\nstep 2\njoin wait", "\n\njoin wait"));
+  });
+  it("a diagram without steps gets its first one, and a shape can go back to the start", () => {
+    const PLAIN = 'diagram flowchart\ntitle t\n\nprocess   a "A"\nprocess b "B"\n\n# then they meet\na -> b\n';
+    const stepped = edit(PLAIN, (d) => cmd.setStep(d, [uidOf(d, "b"), edgeUid(d, "a", "b")], 1));
+    expect(stepped).toBe('diagram flowchart\ntitle t\n\nprocess   a "A"\nstep 1\nprocess b "B"\n\n# then they meet\na -> b\n');
+    expect(edit(stepped, (d) => cmd.setStep(d, [uidOf(d, "b"), edgeUid(d, "a", "b")], 0))).toBe(PLAIN);
+  });
+  it("a partition's own step leaves the steps of what is inside it alone", () => {
+    const LANES = 'diagram activity\ntitle t\npartition p "P" {\n  action a "A"\n  step 1\n  action b "B"\n}\na -> b\n';
+    const text = edit(LANES, (d) => cmd.setStep(d, [uidOf(d, "p")], 2));
+    expect(text).toBe('diagram activity\ntitle t\nstep 2\npartition p "P" {\n  step 0\n  action a "A"\n  step 1\n  action b "B"\n}\na -> b\n');
+  });
+  it("a class with members moves as a whole", () => {
+    const CLS = "diagram class\ntitle t\nclass A {\n  + n: Int\n}\nclass B\nA -- B\n";
+    expect(edit(CLS, (d) => cmd.setStep(d, [uidOf(d, "A")], 1))).toBe("diagram class\ntitle t\nstep 1\nclass A {\n  + n: Int\n}\nstep 0\nclass B\nA -- B\n");
+  });
+  it("only whole numbers from 0 to 99 are steps", () => {
+    const d = parseDoc(STEPPED);
+    for (const bad of [-1, 1.5, 100, NaN]) expect(() => cmd.setStep(d, [uidOf(d, "laptop")], bad)).toThrow("a step is a whole number");
+  });
+});

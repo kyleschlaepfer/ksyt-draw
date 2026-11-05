@@ -203,6 +203,14 @@ export function patchNode(d: ChalkDoc, uid: string, p: NodePatch): void {
 }
 
 /** Move a shape into a container (or out, with undefined). */
+/** The build-up step shapes and lines first appear at. 0 is there from the start. */
+export function setStep(d: ChalkDoc, uids: Iterable<string>, step: number): void {
+  if (!Number.isInteger(step) || step < 0 || step > 99) throw new EditError("a step is a whole number from 0 to 99");
+  const ids = new Set(uids);
+  for (const n of d.nodes) if (ids.has(n.uid)) n.step = step;
+  for (const e of d.edges) if (ids.has(e.uid)) e.step = step;
+}
+
 export function setParent(d: ChalkDoc, uid: string, parentId: string | undefined): void {
   const n = node(d, uid);
   if (CONTAINERS.has(n.kind)) return;

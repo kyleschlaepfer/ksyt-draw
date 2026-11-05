@@ -192,19 +192,21 @@ The panel shows what is selected.
 | Selected | The panel shows |
 |---|---|
 | nothing | **diagram**: type, title, id, which way it runs, drawn as (sketch or precision). Under "more": checked as, narration, the text alternative |
-| one shape | its kind, text, id; where it is inside; x, y, width and height in inches; look (fill, color, weight); delete |
+| one shape | its kind, text, id; where it is inside; x, y, width and height in inches; build-up (the step it shows from); look (fill, color, weight); delete |
 | an actor | also which side it stands on |
 | a class or interface | also its attributes and operations, stereotype, abstract |
 | a use case | also its description |
 | a partition | who, width or height, move left and right (or up and down), duplicate, delete |
-| one line | what it means, its label, its route, look, swap ends, delete. In a class diagram: how many and the role at each end |
-| several things | align, space evenly, same size, duplicate, delete |
+| one line | what it means, its label, its route, build-up, look, swap ends, delete. In a class diagram: how many and the role at each end |
+| several things | align, space evenly, same size, build-up, duplicate, delete |
 
 A field takes effect when you press Enter or leave it.
 
 A line's pattern and its ends are part of what it means. To make a line dashed or give it a triangle, change "what it means".
 
 Colors come from the theme: ink, graphite, green, dark green, terracotta. There are no colors of your own.
+
+"build-up" holds "shows from step": the click of "next step" at which the selection first appears in an embed. 0 is there from the start. Changing it writes a `step` line before the shape or line in the text, puts the earlier step back for the lines after it, and touches nothing else. With several things selected the field sets them all.
 
 ### Align and distribute
 
@@ -225,6 +227,8 @@ Each is one step to undo.
 ### Undo and redo
 
 "undo" and "redo" in the toolbar, or Ctrl+Z and Ctrl+Y (also Ctrl+Shift+Z). Write and draw share one history, so undo steps back through both in the order things happened.
+
+The keys work anywhere in the draw view: on the canvas, and after a click on a button or a choice in the properties panel or the palette. While you type in a text field they undo the typing in that field, as they do everywhere else.
 
 ### Zoom and pan
 

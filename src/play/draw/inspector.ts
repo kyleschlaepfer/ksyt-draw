@@ -7,7 +7,7 @@
  * interrupted by a redraw; the panel rebuilds after a commit and puts the focus back where it was.
  */
 import {
-  CLASSIFIERS, CONTAINERS, DEFAULT_PROFILE, PROFILES, TYPES, UNLABELED, edgeOp,
+  CLASSIFIERS, CONTAINERS, DEFAULT_PROFILE, PROFILES, TYPES, UNLABELED, edgeOp, maxStep,
   type ChalkDoc, type DocEdge, type DocNode, type Member, type NodeKind, type Side, type UseCaseDoc,
 } from "../../core/doc/types";
 import * as cmd from "../../core/doc/commands";
@@ -61,9 +61,9 @@ export class Inspector {
       const field = active?.getAttribute("data-field");
       const caret = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? [active.selectionStart, active.selectionEnd] : null;
       this.build();
-      if (!field) return;
-      const again = this.body.querySelector<HTMLElement>(`[data-field="${field.replace(/"/g, "")}"]`);
-      if (!again) return;
+      const again = field ? this.body.querySelector<HTMLElement>(`[data-field="${field.replace(/"/g, "")}"]`) : null;
+      // the control that was used is gone (a deleted shape's "delete"): the canvas takes the focus, not nothing
+      if (!again) { if (active && !active.isConnected) this.host.canvas.root.focus({ preventScroll: true }); return; }
       again.focus({ preventScroll: true });
       if (caret && (again instanceof HTMLTextAreaElement || (again instanceof HTMLInputElement && again.type === "text"))) {
         try { again.setSelectionRange(caret[0], caret[1]); } catch { /* not a text field after all */ }
@@ -136,6 +136,28 @@ export class Inspector {
     b.setAttribute("data-field", `act:${word}`);
     b.addEventListener("click", run);
     return b;
+  }
+
+  /** The click of the build-up at which the selection first shows. Closed until the diagram uses steps. */
+  private buildUp(d: ChalkDoc, uids: string[], step: number | null): HTMLElement {
+    const i = el("input");
+    i.type = "number";
+    i.min = "0";
+    i.max = "99";
+    i.step = "1";
+    const shown = step === null ? "" : String(step);
+    i.value = shown;
+    if (step === null) i.placeholder = "mixed";
+    i.addEventListener("change", () => {
+      const v = Number(i.value);
+      if (i.value.trim() === "" || !Number.isInteger(v) || v < 0 || v > 99) { i.value = shown; this.host.say("a step is a whole number from 0 to 99"); return; }
+      this.edit("change step", (x) => cmd.setStep(x, uids, v), v ? `shows from step ${v}` : "there from the start");
+    });
+    const steps = maxStep(d);
+    return this.section("build-up", steps > 0, this.field("shows from step", i, "step"),
+      el("p", "note", steps
+        ? `0 is there from the start. This diagram builds up in ${steps} step${steps === 1 ? "" : "s"}.`
+        : "0 is there from the start. Give a later step to what should wait for \"next step\"."));
   }
 
   // ---- building
@@ -226,6 +248,7 @@ export class Inspector {
         this.act("delete", () => this.host.canvas.remove(), inside ? `its ${inside} shape${inside === 1 ? "" : "s"} stay, outside any partition` : undefined),
       ));
       out.push(el("p", "note", inside ? `${inside} shape${inside === 1 ? "" : "s"} inside. Deleting the partition keeps them, without an owner.` : "Nothing inside yet: drag shapes in, or drop new ones on it."));
+      out.push(this.buildUp(d, [n.uid], n.step));
       return out;
     }
 
@@ -259,6 +282,7 @@ export class Inspector {
       if (n.size) acts.push(this.act("fit to what's inside", () => this.edit("release size", (x) => cmd.releaseNode(x, n.uid, "both"), "the boundary fits its contents again", false)));
       out.push(this.section("place and size", true, el("p", "note", n.size ? "Sized by hand." : "Fits what is inside it. Drag a handle to size it yourself; drag it to move everything inside."), ...acts));
     }
+    out.push(this.buildUp(d, [n.uid], n.step));
     if (n.kind !== "note") out.push(this.styleControls(n.style, !["initial", "fork", "join", "actor", "boundary"].includes(n.kind), (st) => this.edit("change look", (x) => cmd.patchNode(x, n.uid, { style: st })), "node:style"));
     out.push(this.row(this.act("delete", () => this.host.canvas.remove())));
     return out;
@@ -428,6 +452,7 @@ export class Inspector {
       ),
       el("p", "note", `This route is ${routeWord}. Drag a handle on the line to bend it; drag an end to attach it somewhere else.`),
     ));
+    out.push(this.buildUp(d, [e.uid], e.step));
     out.push(this.styleControls(e.style, false, (st) => this.edit("change look", (x) => cmd.patchEdge(x, e.uid, { style: st })), "edge:style"));
     out.push(this.row(this.act("delete", () => this.host.canvas.remove())));
     return out;
@@ -457,6 +482,8 @@ export class Inspector {
       };
       if (sb.length >= 2) out.push(this.section("same size", true, this.row(this.act("width", () => size("width")), this.act("height", () => size("height")))));
     }
+    const all = [...nodes, ...edges];
+    out.push(this.buildUp(d, all.map((x) => x.uid), all.every((x) => x.step === all[0].step) ? all[0].step : null));
     const placed = movable.filter((n) => n.place);
     if (placed.length) out.push(this.row(this.act("let them find their own places", () => this.edit("release places", (x) => { for (const n of placed) cmd.releaseNode(x, n.uid, "place"); }, "back to automatic placing", false))));
     out.push(this.row(this.act("duplicate", () => { if (this.host.canvas.copy(true)) this.host.canvas.paste(true); }), this.act("delete", () => this.host.canvas.remove())));

@@ -95,6 +95,23 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
   inspector.root.addEventListener("click", () => requestAnimationFrame(inset));
   window.addEventListener("resize", inset);
 
+  // undo and redo work from anywhere in the view, not only on the canvas: after a click in the panel or the
+  // palette, or when the control that was clicked is gone and nothing has the focus, the keys still mean
+  // the drawing. A field that is being typed in keeps them for its own text.
+  document.addEventListener("keydown", (ev) => {
+    if (ev.target === canvas.root || canvas.waiting || !(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
+    const k = ev.key.toLowerCase();
+    if (k !== "z" && k !== "y") return;
+    const t = ev.target as HTMLElement;
+    if (!panel.getClientRects().length || (t !== document.body && !panel.contains(t))) return;
+    if (t instanceof HTMLTextAreaElement || t.isContentEditable || (t instanceof HTMLInputElement && t.type !== "checkbox")) return;
+    ev.preventDefault();
+    const redo = k === "y" || ev.shiftKey;
+    say((redo ? session.redo() : session.undo()) ? (redo ? "redone" : "undone") : redo ? "nothing to redo" : "nothing to undo");
+    // the control the keys were pressed on may be gone once the panel is rebuilt: the canvas takes over
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (!panel.contains(document.activeElement)) canvas.root.focus({ preventScroll: true }); }));
+  });
+
   // ---------- the palette ----------
   const shapes = el("section", "draw-sec");
   shapes.append(el("h2", undefined, "shapes"), el("p", "note", "drag one onto the canvas, or click it and then click where it goes"));

@@ -14,7 +14,10 @@ import {
   printMeta, printNodeLayout, printPool, type LayoutFacet,
 } from "./print";
 
-interface Rec { text: string; stmt: Stmt | null; dead: boolean; before: string[]; after: string[] }
+/** A line to add: text, or a step line, kept apart so the tidy at the end knows which lines set the step. */
+type Ins = string | { step: number; indent: string };
+interface Rec { text: string; stmt: Stmt | null; dead: boolean; before: Ins[]; after: Ins[] }
+interface Out { text: string; step?: number }
 
 const indentOf = (s: string): string => /^[ \t]*/.exec(s)![0];
 const dedent = (s: string): string => (s.startsWith("  ") ? s.slice(2) : s.startsWith("\t") ? s.slice(1) : s);
@@ -195,6 +198,30 @@ export function syncSource(prev: ParsedSource, next: ChalkDoc): string {
     for (const e of freshEdges) for (const f of EDGE_FACETS) { const s = printEdgeLayout(next, e, f); if (s) layoutAdds.push(s); }
   }
 
+  // ---- build-up steps: a statement whose step changed gets a step line before it, and the step that was in
+  // force is put back after it for the lines that follow
+  let restepped = false;
+  const lastElement = Math.max(-1, ...prev.stmts.filter((s) => (s.kind === "decl" || s.kind === "edge") && !recs[s.line].dead).map((s) => s.line));
+  const restep = (first: Stmt | undefined, last: Stmt | undefined, was: number, now: number, inside = ""): void => {
+    if (!first || !last || was === now || recs[first.line].dead) return;
+    const indent = indentOf(recs[first.line].text);
+    recs[first.line].before.push({ step: now, indent });
+    if (last.line < lastElement) recs[last.line].after.push({ step: was, indent: indent + inside });
+    restepped = true;
+  };
+  for (const n of next.nodes) {
+    const was = oldNodes.get(n.uid);
+    if (!was || (was.parent ?? "") !== (n.parent ?? "")) continue;
+    const d = declOf(n.uid), c = closeOf(n.uid);
+    // a boundary or a partition: its own line only, so what is inside keeps the steps it has
+    if (n.kind === "boundary" || n.kind === "partition") restep(d, d, was.step, n.step, "  ");
+    else restep(d, c && !recs[c.line].dead ? c : d, was.step, n.step);
+  }
+  for (const e of next.edges) {
+    const was = oldEdges.get(e.uid), row = owned(e.uid, "edge")[0];
+    if (was) restep(row, row, was.step, e.step);
+  }
+
   // ---- the partition pool
   facet(printPool(old), printPool(next), prev.stmts.filter((s) => s.kind === "pool"));
 
@@ -231,20 +258,22 @@ export function syncSource(prev: ParsedSource, next: ChalkDoc): string {
   if (wasOrder.some((n, i) => n.uid !== nowOrder[i].uid)) {
     wasOrder.forEach((n, i) => { swapped.set(blockOf(n)![0], blockOf(nowOrder[i])!); });
   }
-  const emit = (r: Rec, into: string[]): void => {
-    into.push(...r.before);
-    if (!r.dead) into.push(r.text);
-    into.push(...r.after);
+  const put = (x: Ins): Out => (typeof x === "string" ? { text: x } : { text: `${x.indent}step ${x.step}`, step: x.step });
+  const emit = (r: Rec, into: Out[]): void => {
+    into.push(...r.before.map(put));
+    if (!r.dead) into.push(r.stmt?.kind === "step" ? { text: r.text, step: parseInt(/[0-9]+/.exec(r.text)?.[0] ?? "0", 10) } : { text: r.text });
+    into.push(...r.after.map(put));
   };
-  let out: string[] = [];
+  const made: Out[] = [];
   for (let i = 0; i < recs.length; i++) {
     const from = swapped.get(i);
-    if (!from) { emit(recs[i], out); continue; }
+    if (!from) { emit(recs[i], made); continue; }
     // the block that now belongs at this position; then skip the one that was here
-    for (let k = from[0]; k <= from[1]; k++) emit(recs[k], out);
+    for (let k = from[0]; k <= from[1]; k++) emit(recs[k], made);
     const here = wasOrder.map(blockOf).find((b) => b![0] === i)!;
     i = here[1];
   }
+  let out = (restepped ? tidySteps(made) : made).map((l) => l.text);
   const trimEnd = () => { while (out.length && out[out.length - 1].trim() === "") out.pop(); };
   trimEnd();
   out.push(...endTail);
@@ -262,6 +291,25 @@ export function syncSource(prev: ParsedSource, next: ChalkDoc): string {
   }
 }
 
+/**
+ * After a step changed: step lines that no longer do anything go. That is one with another straight
+ * after it (only blank lines and comments between), and one that repeats the step already in force.
+ */
+function tidySteps(lines: Out[]): Out[] {
+  const idle = (l: Out): boolean => l.step === undefined && (l.text.trim() === "" || l.text.trim().startsWith("#"));
+  const out: Out[] = [];
+  let inForce = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.step === undefined) { out.push(l); continue; }
+    let k = i + 1;
+    while (k < lines.length && idle(lines[k])) k++;
+    if (lines[k]?.step !== undefined || l.step === inForce) continue;
+    inForce = l.step;
+    out.push(l);
+  }
+  return out;
+}
 
 /** Which layout facets exist, for callers that list them. */
 export type { LayoutFacet };

@@ -579,3 +579,125 @@ test.describe("many shapes at once", () => {
     expect((await inspect(page)).nodes.some((n) => n.id === "pay")).toBe(true);
   });
 });
+
+test.describe("horizontal lanes", () => {
+  const ROWS = ksdOf("activity-lanes").replace("title ", "lanes horizontal\ntitle ");
+
+  test("drag a row's divider and move an action to another row: rows shift together, membership follows, lines stay attached", async ({ page }) => {
+    await openTool(page, ROWS, "draw");
+    const before = await inspect(page);
+    const customer = before.nodes.find((n) => n.id === "customer")!;
+    const sales = before.nodes.find((n) => n.id === "sales")!;
+    // rows, one under the other, each as long as the next
+    expect(customer.w).toBeGreaterThan(customer.h);
+    expect(sales.y).toBeGreaterThan(customer.y);
+    expect(Math.abs(sales.w - customer.w)).toBeLessThan(0.002);
+    const at = await toPage(page, [customer.x, customer.y + customer.h / 2]);
+    const z = await zoom(page);
+    await drag(page, at, [at[0], at[1] + 60]);
+    let now = await inspect(page);
+    const c2 = now.nodes.find((n) => n.id === "customer")!;
+    expect(Math.abs((c2.h - customer.h) * 96 * z - 60)).toBeLessThan(3);
+    expect(Math.abs(c2.w - customer.w)).toBeLessThan(0.002);
+    expect(now.text).toMatch(/lane customer [0-9.]+/);
+    // the rows under it moved down with the divider, still edge to edge
+    const s2 = now.nodes.find((n) => n.id === "sales")!;
+    expect(Math.abs((s2.y - sales.y) - (c2.h - customer.h))).toBeLessThan(0.01);
+    expect(Math.abs(s2.y - s2.h / 2 - (c2.y + c2.h / 2))).toBeLessThan(0.002);
+    const insideOwnRow = (st: typeof now): void => {
+      for (const n of st.nodes.filter((x) => x.parent)) {
+        const lane = st.nodes.find((x) => x.id === n.parent)!;
+        expect(Math.abs(n.x - lane.x) <= lane.w / 2 && Math.abs(n.y - lane.y) <= lane.h / 2, `${n.id} in ${lane.id}`).toBe(true);
+      }
+      for (const e of st.edges) {
+        for (const [p, id] of [[e.points[0], e.from], [e.points[e.points.length - 1], e.to]] as const) {
+          const n = st.nodes.find((x) => x.id === id)!;
+          expect(Math.abs(p[0] - n.x) <= n.w / 2 + 0.09 && Math.abs(p[1] - n.y) <= n.h / 2 + 0.09, `${e.from}->${e.to} on ${id}`).toBe(true);
+        }
+      }
+    };
+    insideOwnRow(now);
+    // move "cancel order" from Sales down into Warehouse, to a free spot at the row's far end
+    const cancel = await box(page, "cancel");
+    const wh = now.nodes.find((n) => n.id === "warehouse")!;
+    const inWarehouse = now.nodes.filter((n) => n.parent === "warehouse");
+    const free = Math.max(...inWarehouse.map((n) => n.x + n.w / 2)) + 1.1;
+    const target = await toPage(page, [Math.min(free, wh.x + wh.w / 2 - 0.9), wh.y]);
+    await drag(page, [cancel.cx, cancel.cy], target);
+    await expect(status(page)).toContainText("cancel order is now in Warehouse");
+    now = await inspect(page);
+    expect(now.nodes.find((n) => n.id === "cancel")!.parent).toBe("warehouse");
+    expect(now.text).toMatch(/partition warehouse "Warehouse" \{[^}]*action cancel "cancel order"/);
+    expect(now.text).toContain("lanes horizontal");
+    insideOwnRow(now);
+    await page.keyboard.press("ControlOrMeta+z");
+    expect((await inspect(page)).nodes.find((n) => n.id === "cancel")!.parent).toBe("sales");
+    await page.keyboard.press("ControlOrMeta+z");
+    expect(await getText(page)).toBe(ROWS);
+    await page.screenshot({ path: "test-results/draw-rows-edited.png" });
+  });
+});
+
+test.describe("build-up steps and undo from the panel", () => {
+  const STEPPED = ksdOf("activity-parallel");
+
+  test("a shape's step is set in the panel: one step line before it, the old step back after it, nothing else in the text touched", async ({ page }) => {
+    await openTool(page, STEPPED, "draw");
+    await clickNode(page, "laptop");
+    const step = field(page, "step");
+    await expect(step).toBeVisible();
+    await expect(step).toHaveValue("1");
+    await step.fill("2");
+    await step.press("Enter");
+    await expect(status(page)).toContainText("shows from step 2");
+    expect(await getText(page)).toBe(STEPPED.replace('action laptop "order laptop"\n', 'step 2\naction laptop "order laptop"\nstep 1\n'));
+    await expect(field(page, "step")).toHaveValue("2");
+    // not a whole number: refused, said, and the field goes back
+    await field(page, "step").fill("1.5");
+    await field(page, "step").press("Enter");
+    await expect(status(page)).toContainText("a step is a whole number");
+    await expect(field(page, "step")).toHaveValue("2");
+    // several at once, shapes and lines together: the whole of step 1 joins step 2 and one step line is left
+    await canvas(page).focus();
+    await page.keyboard.press("ControlOrMeta+a");
+    await expect(field(page, "step")).toHaveValue("");
+    await field(page, "step").fill("2");
+    await field(page, "step").press("Enter");
+    const text = await getText(page);
+    expect(text.match(/^step \d+$/gm)).toEqual(["step 2"]);
+    const st = await inspect(page);
+    expect(st.valid).toBe(true);
+    expect(st.nodes.length).toBe(8);
+  });
+
+  test("undo and redo keys work after a click in the properties panel, and a field being typed in keeps them for itself", async ({ page }) => {
+    await openTool(page, ACTIVITY, "draw");
+    // a button that goes away with the shape it deleted
+    await clickNode(page, "pay");
+    await page.locator('.draw-inspector [data-field="act:delete"]').click();
+    expect((await inspect(page)).nodes.some((n) => n.id === "pay")).toBe(false);
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect(status(page)).toContainText("undone");
+    expect(await getText(page)).toBe(ACTIVITY);
+    await page.keyboard.press("ControlOrMeta+y");
+    expect((await inspect(page)).nodes.some((n) => n.id === "pay")).toBe(false);
+    await page.keyboard.press("ControlOrMeta+z");
+    expect(await getText(page)).toBe(ACTIVITY);
+    // a choice in the panel, with the focus left on it
+    await clickNode(page, "review");
+    await field(page, "node:style:weight").evaluate((el) => { (el.closest("details") as HTMLDetailsElement).open = true; });
+    await field(page, "node:style:weight").selectOption("bold");
+    await expect.poll(() => getText(page)).toContain("style review weight bold");
+    await field(page, "node:style:weight").focus();
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect.poll(() => getText(page)).toBe(ACTIVITY);
+    await page.keyboard.press("ControlOrMeta+Shift+z");
+    await expect.poll(() => getText(page)).toContain("style review weight bold");
+    // in a text field the keys are the field's own: the drawing does not change
+    await field(page, "node:label").click();
+    await page.keyboard.press("End");
+    await page.keyboard.type("s");
+    await page.keyboard.press("ControlOrMeta+z");
+    expect(await getText(page)).toContain("style review weight bold");
+  });
+});

@@ -179,6 +179,8 @@ export class Canvas {
     this.locked = false;
     this.root.classList.remove("is-waiting");
   }
+  /** A proposal is on show and the canvas takes no edits until it is settled. */
+  get waiting(): boolean { return this.locked; }
 
   /** Resolve a draft of the document (a gesture in progress) and show it, without touching the session. */
   private preview(edit: (draft: ChalkDoc) => void, moved: Set<string> = new Set(), full = false): void {
