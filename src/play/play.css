@@ -44,6 +44,7 @@ main { display: block; padding-bottom: var(--s-8); }
 /* ---------- the tool's name and what it does (the tool page pattern) ---------- */
 .tool-intro { margin: var(--s-2) 0 var(--s-3); max-width: var(--measure); }
 .tool-intro h1 { font: var(--hand-xl)/1.1 var(--font-hand); font-weight: 400; margin: 0 0 var(--s-1); }
+.tool-intro h1 .status { font-size: 0.45em; font-weight: 300; color: var(--ink-2); vertical-align: 0.25em; white-space: nowrap; }
 .tool-intro .tool-line { margin: 0 0 var(--s-1); }
 .meta { font: 300 var(--hand-sm)/1.3 var(--font-hand); color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 0 0.6em; margin: 0; }
 .meta > *:not(:last-child)::after { content: "\00B7"; margin-left: 0.6em; }

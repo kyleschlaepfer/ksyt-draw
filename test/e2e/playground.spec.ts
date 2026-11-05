@@ -100,7 +100,7 @@ test.describe("playground", () => {
 test.describe("folder tabs and the syntax reference", () => {
   test("write, draw and syntax views, with real tab semantics and arrow keys", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("h1")).toHaveText("Chalk");
+    await expect(page.locator("h1")).toHaveText("Chalk (beta)");
     const write = page.getByRole("tab", { name: "write" });
     const draw = page.getByRole("tab", { name: "draw" });
     await expect(write).toHaveAttribute("aria-selected", "true");

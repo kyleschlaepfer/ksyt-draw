@@ -82,12 +82,14 @@ header.appendChild(wrapHead);
 const main = el("main", "wrap");
 main.id = "main";
 const intro = el("div", "tool-intro");
+const h1 = el("h1", undefined, APP_NAME);
+h1.append(" ", el("small", "status", "(beta)"));
 intro.append(
-  el("h1", undefined, APP_NAME),
+  h1,
   el("p", "tool-line", "A few lines of text, and you get a use-case, activity or flow diagram in the same style as the videos, with the same notation check the videos get."),
 );
 const meta = el("p", "meta");
-meta.append(el("span", undefined, "beta"), el("span", undefined, "use case, activity, flowchart"), el("span", undefined, "nothing leaves your browser; the link is the file"));
+meta.append(el("span", undefined, "use case, activity, flowchart"), el("span", undefined, "nothing leaves your browser; the link is the file"));
 intro.appendChild(meta);
 main.appendChild(intro);
 
