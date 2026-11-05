@@ -1,11 +1,11 @@
 # Embed protocol (v1)
 
-How a page puts a diagram on screen and talks to it. Two sides: the **embed** (`https://draw.kyleschlaepfer.com/embed/`) and the **host** (any page with the iframe; on kyleschlaepfer.com that's `site/DiagramEmbed.astro` + `site/draw-host.ts`).
+How a page puts a diagram on screen and talks to it. Two sides: the **embed** (`https://chalk.kyleschlaepfer.com/embed/`) and the **host** (any page with the iframe; on kyleschlaepfer.com that's `site/DiagramEmbed.astro` + `site/draw-host.ts`).
 
 ## 1. The URL
 
 ```
-https://draw.kyleschlaepfer.com/embed/#v=1&d=<lz>&id=<instance>&step=0&theme=auto&lint=0&qa=0&tools=1
+https://chalk.kyleschlaepfer.com/embed/#v=1&d=<lz>&id=<instance>&step=0&theme=auto&lint=0&qa=0&tools=1
 ```
 
 Everything is in the **hash** (never sent to the server). Parse it with `new URLSearchParams(location.hash.slice(1))`.
@@ -56,7 +56,7 @@ The embed ignores any message where `event.source !== window.parent`, `source`/`
 ```html
 <iframe
   class="ksyt-draw-frame"
-  src="https://draw.kyleschlaepfer.com/embed/#v=1&d=...&id=permit-portal"
+  src="https://chalk.kyleschlaepfer.com/embed/#v=1&d=...&id=permit-portal"
   title="Use-case diagram: residents apply and track; paying the fee is always part of applying"
   loading="lazy"
   referrerpolicy="strict-origin-when-cross-origin"
@@ -64,7 +64,7 @@ The embed ignores any message where `event.source !== window.parent`, `source`/`
   style="width:100%;height:360px;border:0;display:block"></iframe>
 ```
 
-- Accept a message only when `event.origin === "https://draw.kyleschlaepfer.com"` and `event.source` is the `contentWindow` of one of your `.ksyt-draw-frame` iframes; match on `event.source`, not just `id`.
+- Accept a message only when `event.origin === "https://chalk.kyleschlaepfer.com"` and `event.source` is the `contentWindow` of one of your `.ksyt-draw-frame` iframes; match on `event.source`, not just `id`.
 - On `resize`: set that iframe's `style.height` to `height + "px"`.
 - On `ready`: send the current theme. On kyleschlaepfer.com the theme is `<html data-theme="light|dark">` or, without the attribute, `prefers-color-scheme`. Watch both (a `MutationObserver` on the attribute, a `matchMedia` listener) and send `theme` to every embed when they change.
 - Give the iframe a real `title` (screen readers announce it) and keep a visible caption outside it: the claim, one sentence.
@@ -88,7 +88,7 @@ The embed ignores any message where `event.source !== window.parent`, `source`/`
 - Background `var(--page)` for the theme in force (so there's never a white flash in dark mode); set `color-scheme` to match.
 - No margin around the document; 8 px inner padding. Styles come from a copy of `ksyt.css` (buttons `.btn` / `.btn-quiet`, `.note`, `figure.fig`, `.ksyt-fig` role fills, theme tokens and `[data-theme]` handling).
 - Lint panel rows: `severity · rule_id · location`, then the problem and the minimal fix in Atkinson Hyperlegible Next. Severity is spelled out (never color alone).
-- "open in playground" opens `https://draw.kyleschlaepfer.com/#d=<same>` in a new tab.
+- "open in playground" opens `https://chalk.kyleschlaepfer.com/#d=<same>` in a new tab.
 
 ## 5. Playground (`/`)
 

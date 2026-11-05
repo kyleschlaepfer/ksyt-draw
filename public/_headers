@@ -1,6 +1,6 @@
 # Applies to static responses (Workers static assets). Verify after deploy:
-#   curl -sI https://draw.kyleschlaepfer.com/ | grep -i content-security
-#   curl -sI https://draw.kyleschlaepfer.com/embed/ | grep -i content-security
+#   curl -sI https://chalk.kyleschlaepfer.com/ | grep -i content-security
+#   curl -sI https://chalk.kyleschlaepfer.com/embed/ | grep -i content-security
 # The playground can't be framed. The embed can be framed by any site (decision D2 in ARCHITECTURE.md);
 # for an allowlist, replace "frame-ancestors *" with "frame-ancestors https://kyleschlaepfer.com https://*.kyleschlaepfer.com".
 

@@ -31,7 +31,7 @@ apply -include-> pay
 ## 2. System shape
 
 ```
-kyleschlaepfer.com  (site repo, private, Astro)            draw.kyleschlaepfer.com  (this repo)
+kyleschlaepfer.com  (site repo, private, Astro)            chalk.kyleschlaepfer.com  (this repo)
 ┌──────────────────────────────────────────────┐           ┌─────────────────────────────────────────┐
 │ lessons/permits.mdx                          │           │ /embed/   index.html + embed.ts          │
 │   <DiagramEmbed src="permit.ksd" caption=…/> │  iframe   │   reads #d=<compressed .ksd>             │
@@ -60,7 +60,7 @@ Everything happens in the reader's browser. The diagram text travels in the URL 
 | Vanilla TypeScript + Vite, no UI framework | The embed is one SVG and four buttons. Small bundle, fast first paint inside someone else's page. | The future editor may want a framework; it can add one in its own entry. |
 | Cloudflare Workers static assets, no Worker script | Cloudflare's recommended path for new projects; static requests are free; `_headers` sets CSP and framing. | Wrangler config instead of Pages' dashboard flow. |
 
-## 4. Repo layout (draw.kyleschlaepfer.com)
+## 4. Repo layout (chalk.kyleschlaepfer.com)
 
 ```
 ksyt-draw/
@@ -117,7 +117,7 @@ The playground runs steps 2 to 7 directly on every keystroke (debounced), withou
     "name": "ksyt-draw",
     "compatibility_date": "2026-11-01",
     "assets": { "directory": "./dist", "not_found_handling": "404-page" },
-    "routes": [{ "pattern": "draw.kyleschlaepfer.com", "custom_domain": true }]
+    "routes": [{ "pattern": "chalk.kyleschlaepfer.com", "custom_domain": true }]
   }
   ```
   A custom domain creates the DNS record and certificate. Don't hand-create a `draw` CNAME first, or attaching it fails.
@@ -133,7 +133,7 @@ The hash is attacker-controllable (anyone can craft a link), so:
 - **All text from the diagram is escaped** when it becomes SVG or HTML (`svg.ts` escapes `& < > " '`; DOM code uses `textContent`). No `innerHTML` with diagram content, ever. A test feeds `<script>`, `"><img onerror>` and `]]>` through every label path.
 - **Strict CSP** (above): no inline script, no `eval`, no network calls from the embed (`connect-src 'none'`).
 - **No state-changing actions in the embed**, so framing it anywhere carries no clickjacking risk worth blocking. The playground (which will grow into the editor) refuses framing.
-- **postMessage:** the embed posts only non-sensitive data (`ready`, `resize`, `step`, `lint`) with target `*`; it accepts `theme`, `step` and `load` from its parent only (`event.source === window.parent`), validates their shape, and treats `load` text exactly like hash text. The host accepts messages only when `event.origin === "https://draw.kyleschlaepfer.com"` and `event.source` is one of its own iframes.
+- **postMessage:** the embed posts only non-sensitive data (`ready`, `resize`, `step`, `lint`) with target `*`; it accepts `theme`, `step` and `load` from its parent only (`event.source === window.parent`), validates their shape, and treats `load` text exactly like hash text. The host accepts messages only when `event.origin === "https://chalk.kyleschlaepfer.com"` and `event.source` is one of its own iframes.
 - **iframe attributes on the host:** `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"` (same-origin is needed so the embed loads its own fonts and its messages carry a real origin; it's safe because the frame is cross-origin), `loading="lazy"`, `referrerpolicy="strict-origin-when-cross-origin"`.
 
 ## 8. How it connects to the rest of the system
@@ -151,7 +151,7 @@ The hash is attacker-controllable (anyone can craft a link), so:
 |---|---|---|---|
 | D1 | Repo name and visibility | `ksyt-draw`, private until the editor is worth sharing | Public now, as the channel's open-source tool |
 | D2 | Who may embed `/embed/` | Anyone (`frame-ancestors *`): professors can drop it into Canvas or a course site | Allowlist: `https://kyleschlaepfer.com https://*.kyleschlaepfer.com` |
-| D3 | Subdomain | `draw.kyleschlaepfer.com` | `tools.` with `/draw/` under it |
+| D3 | Subdomain | `chalk.kyleschlaepfer.com` | `tools.` with `/draw/` under it |
 | D4 | Build-up start state | Step 1 of N, like `ksyt.js` figures (reader clicks through) | Final state first, "replay" button |
 
 ## 10. Roadmap after v1

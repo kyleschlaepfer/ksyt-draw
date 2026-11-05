@@ -68,7 +68,7 @@ export async function exportPdf(d: ChalkDoc, m: Measurer, o: ExportOptions): Pro
   pdf.registerFontkit(fontkit);
   pdf.setTitle(scene.title);
   pdf.setSubject(scene.desc);
-  pdf.setCreator("Chalk (draw.kyleschlaepfer.com)");
+  pdf.setCreator("Chalk (chalk.kyleschlaepfer.com)");
   pdf.setProducer("Chalk");
   const page = pdf.addPage([pg.w * PT, pg.h * PT]);
   const X = (x: number): number => (pg.dx + x * pg.scale) * PT;

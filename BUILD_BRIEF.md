@@ -51,5 +51,5 @@ What was built; test counts; screenshots worth looking at (paths); every decisio
 
 1. `npx wrangler login` (once).
 2. `npm run deploy`.
-3. `curl -sI https://draw.kyleschlaepfer.com/embed/ | grep -i content-security` shows `frame-ancestors *`; `curl -sI https://draw.kyleschlaepfer.com/` shows `frame-ancestors 'none'`.
+3. `curl -sI https://chalk.kyleschlaepfer.com/embed/ | grep -i content-security` shows `frame-ancestors *`; `curl -sI https://chalk.kyleschlaepfer.com/` shows `frame-ancestors 'none'`.
 4. Copy `site/DiagramEmbed.astro` and `site/draw-host.ts` into the site repo (`src/components/` and `src/scripts/`), `npm i lz-string` there, and use it in one lesson.
