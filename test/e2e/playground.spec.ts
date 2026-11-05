@@ -145,7 +145,7 @@ test.describe("folder tabs and the syntax reference", () => {
   test("the reference has no em dashes and reads in Kalam and Atkinson only", async ({ page }) => {
     await page.goto("/#tab=docs");
     const text = await page.locator("#sub-docs").innerText();
-    expect(text).not.toContain("—");
+    expect(text).not.toContain("\u2014");
     const fonts = await page.evaluate(() => {
       const names = new Set<string>();
       for (const e of document.querySelectorAll("#sub-docs *")) names.add(getComputedStyle(e).fontFamily.split(",")[0].replace(/"/g, "").trim());

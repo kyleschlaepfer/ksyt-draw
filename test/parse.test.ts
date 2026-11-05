@@ -87,11 +87,11 @@ describe("parse details", () => {
     expect(parse("diagram flowchart\ntitle t").notation_profile).toBe("general-diagram");
   });
   it("rejects em dashes in every text field", () => {
-    expect(() => parse("diagram flowchart\ntitle t\nprocess a \"x — y\"")).toThrow(/line 3: em dash/);
-    expect(() => parse("diagram flowchart\ntitle t\nprocess a\nprocess b\na -> b : x — y")).toThrow(/line 5: em dash/);
-    expect(() => parse("diagram flowchart\nnarration a — b\ntitle t")).toThrow(/line 2: em dash/);
-    expect(() => parse("diagram flowchart\nlegend a — b\ntitle t")).toThrow(/line 2: em dash/);
-    expect(() => parse("diagram use-case\ntitle t\nboundary b \"a — b\" {\n}")).toThrow(/line 3: em dash/);
+    expect(() => parse("diagram flowchart\ntitle t\nprocess a \"x \u2014 y\"")).toThrow(/line 3: em dash/);
+    expect(() => parse("diagram flowchart\ntitle t\nprocess a\nprocess b\na -> b : x \u2014 y")).toThrow(/line 5: em dash/);
+    expect(() => parse("diagram flowchart\nnarration a \u2014 b\ntitle t")).toThrow(/line 2: em dash/);
+    expect(() => parse("diagram flowchart\nlegend a \u2014 b\ntitle t")).toThrow(/line 2: em dash/);
+    expect(() => parse("diagram use-case\ntitle t\nboundary b \"a \u2014 b\" {\n}")).toThrow(/line 3: em dash/);
   });
   it("treats header words after the body as nodes", () => {
     expect(() => parse("diagram flowchart\ntitle t\nprocess a\ntitle again")).toThrow(/line 4: unknown kind 'title'/);
