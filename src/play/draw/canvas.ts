@@ -61,6 +61,8 @@ export class Canvas {
   /** uids of selected shapes and lines */
   selection = new Set<string>();
   gridSnap = false;
+  /** pixels at the right edge that something floats over (the properties panel): fit keeps the diagram clear of it */
+  insetRight = 0;
   private world: SVGGElement;
   private grid: SVGRectElement;
   private gridPattern: SVGPatternElement;
@@ -412,8 +414,10 @@ export class Canvas {
   /** Show the whole diagram, no larger than `maxZoom`. */
   fit(maxZoom = 1.5): void {
     const geo = this.app.session.geometry;
-    const w = this.root.clientWidth, h = this.root.clientHeight;
-    if (!geo || !w || !h) return;
+    const full = this.root.clientWidth, h = this.root.clientHeight;
+    // leave the strip under the floating panel free, unless that would squeeze the diagram into a sliver
+    const w = full - (this.insetRight < full * 0.5 ? this.insetRight : 0);
+    if (!geo || !full || !h) return;
     const [x0, y0, x1, y1] = geo.bounds;
     const pad = 56;
     const z = Math.max(MIN_ZOOM, Math.min(maxZoom, (w - 2 * pad) / ((x1 - x0) * PX || 1), (h - 2 * pad) / ((y1 - y0) * PX || 1)));
@@ -619,6 +623,8 @@ export class Canvas {
     const p = this.toWorld(ev.clientX, ev.clientY);
     if (!g && this.locked) return;
     if (!g) {
+      // on one of the shown ports: keep them, even where a neighbouring shape lies under the port
+      if ((ev.target as Element).classList?.contains("port")) return;
       // show the ports of the shape the pointer is on or just beside
       const over = this.nodeAt(p) ?? (this.hover && this.near(this.hover, p) ? this.hover : null);
       if (over !== this.hover) { this.hover = over; this.drawOverlay(); }
@@ -954,8 +960,9 @@ export class Canvas {
   }
 
   private dbl(ev: MouseEvent): void {
-    const t = ev.target as Element;
-    if (!this.app.session.inSync) return;
+    // the click that came before captured the pointer, so the event's own target is the canvas: look under the pointer instead
+    const t = document.elementFromPoint(ev.clientX, ev.clientY) ?? (ev.target as Element);
+    if (!this.app.session.inSync || !this.root.contains(t)) return;
     const only = this.selection.size === 1 ? [...this.selection][0] : null;
     if (t.hasAttribute("data-via") && only) {
       // double-click a bend to take it out
@@ -1193,6 +1200,8 @@ export class Canvas {
     if (!r.ok) { this.host.say(r.message ?? ""); return; }
     if (!(keepPlacing || g.sticky)) this.stopPlacing(); else this.gesture = g;
     this.select([made]);
+    // a new partition or boundary may land outside what is on screen: bring the whole diagram into view
+    if (container) this.fit(Math.max(1, this.view.zoom));
     this.host.say(`added ${what}${r.held ? `; ${r.held} other shape${r.held === 1 ? " holds its" : "s hold their"} place` : ""}`);
   }
 }

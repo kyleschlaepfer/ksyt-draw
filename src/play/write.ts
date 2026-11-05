@@ -83,7 +83,15 @@ export function mountWrite(panel: HTMLElement, app: App): WriteView {
   let renderedHidden = false;
   let timer: number | null = null;
   let cursorLine = 1;
-  const say = (msg: string): void => { status.textContent = msg; };
+  // the standing line (what the diagram is, how its checks went) gives way to a message for a few seconds
+  let noticeUntil = 0, standing = "", noticeTimer = 0;
+  const summary = (msg: string): void => { standing = msg; if (Date.now() >= noticeUntil) status.textContent = msg; };
+  const say = (msg: string): void => {
+    status.textContent = msg;
+    noticeUntil = Date.now() + 5000;
+    window.clearTimeout(noticeTimer);
+    noticeTimer = window.setTimeout(() => { if (standing) status.textContent = standing; }, 5000);
+  };
 
   const format = (): void => {
     const next = formatSource(session.parsed);
@@ -150,10 +158,10 @@ export function mountWrite(panel: HTMLElement, app: App): WriteView {
     }
     const issues = allIssues(session.parsed, session.inSync && mounted ? mounted.lint : null, session.inSync && mounted ? mounted.qa : null);
     editor?.setIssues(issues);
-    if (bad) say(bad.line ? `line ${bad.line}: ${bad.message}` : bad.message);
+    if (bad) { noticeUntil = 0; summary(bad.line ? `line ${bad.line}: ${bad.message}` : bad.message); }
     else if (d && mounted) {
       const n = mounted.lint.findings.length, q = mounted.qa?.errors.length ?? 0;
-      say(`${TYPE_NAME[d.meta.type] ?? "diagram"}, ${d.nodes.length} nodes, ${d.edges.length} edges, notation check: ${mounted.lint.status}${n ? ` (${n})` : ""}${q ? `, layout: ${q} error${q === 1 ? "" : "s"}` : ""}`);
+      summary(`${TYPE_NAME[d.meta.type] ?? "diagram"}, ${d.nodes.length} nodes, ${d.edges.length} edges, notation check: ${mounted.lint.status}${n ? ` (${n})` : ""}${q ? `, layout: ${q} error${q === 1 ? "" : "s"}` : ""}`);
     }
     link();
   }

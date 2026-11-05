@@ -180,6 +180,17 @@ describe("containers", () => {
   });
 });
 
+describe("reordering partitions", () => {
+  it("moves whole blocks, with their contents and comments, and touches nothing else", () => {
+    const src = 'diagram activity\ntitle t\n\n# first\npartition a "A" {\n  start s\n  # inside a\n  action x\n}\n# between\npartition b "B" {\n  action y\n}\npartition c "C" {\n  end e\n}\n\ns -> x\nx -> y\ny -> e\n';
+    const out = edit(src, (d) => { cmd.movePartition(d, uidOf(d, "c"), -1); });
+    expect(out).toBe('diagram activity\ntitle t\n\n# first\npartition a "A" {\n  start s\n  # inside a\n  action x\n}\n# between\npartition c "C" {\n  end e\n}\npartition b "B" {\n  action y\n}\n\ns -> x\nx -> y\ny -> e\n');
+    const twice = edit(out, (d) => { cmd.movePartition(d, uidOf(d, "a"), 1); });
+    expect(twice).toContain('# first\npartition c "C" {\n  end e\n}\n# between\npartition a "A" {\n  start s\n  # inside a\n  action x\n}\npartition b');
+    expect(parseDoc(twice).nodes.filter((n) => n.kind === "partition").map((n) => n.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
 describe("classes and descriptions", () => {
   const CLS = fixture("class-shapes.ksd");
   it("changing one member rewrites one line", () => {

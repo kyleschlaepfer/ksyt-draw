@@ -250,6 +250,22 @@ async function start(): Promise<void> {
     get valid() { return session.inSync; },
     undo: () => session.undo(),
     redo: () => session.redo(),
+    /** the document as resolved: where every shape, line and label is, in inches */
+    inspect: () => {
+      const d = session.doc, g = session.geometry;
+      return {
+        text: session.text, valid: session.inSync, canUndo: session.canUndo,
+        nodes: (d?.nodes ?? []).map((n) => {
+          const q = g?.nodes.get(n.id);
+          return { id: n.id, uid: n.uid, kind: n.kind, label: n.label, parent: n.parent ?? null, placed: !!n.place, sized: !!n.size, x: q?.cx ?? 0, y: q?.cy ?? 0, w: q?.w ?? 0, h: q?.h ?? 0 };
+        }),
+        edges: (g?.edges ?? []).map((e) => {
+          const src = d?.edges.find((x) => x.uid === e.uid);
+          return { uid: e.uid, id: e.id, from: e.from, to: e.to, kind: e.kind, label: src?.label ?? null, routed: !!src?.route, points: e.points, fromSide: e.fromSide, toSide: e.toSide };
+        }),
+        texts: (g?.texts ?? []).map((t) => ({ name: t.name, s: t.s, x: t.x, y: t.cy })),
+      };
+    },
   };
 
   views.select(tabFromHash());

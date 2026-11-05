@@ -99,8 +99,12 @@ test.describe("errors and safety", () => {
     expect(download.suggestedFilename()).toBe("approval.svg");
     const path = await download.path();
     const text = (await import("node:fs")).readFileSync(path!, "utf8");
-    expect(text).toContain("@font-face{font-family:Kalam;font-weight:400;src:url(data:font/woff2;base64,");
-    expect(text).toContain("prefers-color-scheme:dark");
-    expect(text).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
+    expect(text).toContain("@font-face{font-family:'Kalam';font-weight:400;src:url(data:font/woff2;base64,");
+    // v2: the file no longer changes with the viewer's theme or needs the page's stylesheet
+    expect(text).not.toContain("prefers-color-scheme");
+    expect(text).not.toContain("var(");
+    expect(text).not.toContain("class=");
+    expect(text).toMatch(/<rect width="[0-9]+" height="[0-9]+" fill="#FAFAF6"\/>/);
+    expect(text).toMatch(/^<\?xml version="1.0" encoding="UTF-8"\?>\n<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
   });
 });

@@ -84,6 +84,13 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
   });
   const inspector = new Inspector({ say, canvas, app });
   stage.append(canvas.root, inspector.root);
+  // the panel floats over the canvas's right edge on wide screens; fit keeps the diagram out from under it
+  const inset = (): void => {
+    const floating = getComputedStyle(inspector.root).position === "absolute" && !inspector.root.classList.contains("is-collapsed");
+    canvas.insetRight = floating ? inspector.root.offsetWidth + 20 : 0;
+  };
+  inspector.root.addEventListener("click", () => requestAnimationFrame(inset));
+  window.addEventListener("resize", inset);
 
   // ---------- the palette ----------
   const shapes = el("section", "draw-sec");
@@ -357,6 +364,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     }
     if (!stage.contains(canvas.root)) stage.replaceChildren(canvas.root, inspector.root);
     if (paletteType !== d.meta.type) buildPalette(d.meta.type);
+    inset();
     canvas.refresh();
     chrome();
     if (!status.textContent || status.textContent.startsWith("notation check")) say("");

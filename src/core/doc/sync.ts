@@ -216,11 +216,30 @@ export function syncSource(prev: ParsedSource, next: ChalkDoc): string {
     endTail = tail;
   }
 
+  // partitions (and boundaries) that changed order: their blocks trade places as wholes, contents and comments included
+  const blockOf = (n: DocNode): [number, number] | null => {
+    const d = declOf(n.uid), c = closeOf(n.uid);
+    return d && c && !recs[d.line].dead ? [d.line, c.line] : null;
+  };
+  const wasOrder = old.nodes.filter((n) => (n.kind === "partition" || n.kind === "boundary") && newNodes.has(n.uid) && blockOf(n));
+  const nowOrder = next.nodes.filter((n) => wasOrder.some((w) => w.uid === n.uid)).map((n) => oldNodes.get(n.uid)!);
+  const swapped = new Map<number, [number, number]>();
+  if (wasOrder.some((n, i) => n.uid !== nowOrder[i].uid)) {
+    wasOrder.forEach((n, i) => { swapped.set(blockOf(n)![0], blockOf(nowOrder[i])!); });
+  }
+  const emit = (r: Rec, into: string[]): void => {
+    into.push(...r.before);
+    if (!r.dead) into.push(r.text);
+    into.push(...r.after);
+  };
   let out: string[] = [];
-  for (const r of recs) {
-    out.push(...r.before);
-    if (!r.dead) out.push(r.text);
-    out.push(...r.after);
+  for (let i = 0; i < recs.length; i++) {
+    const from = swapped.get(i);
+    if (!from) { emit(recs[i], out); continue; }
+    // the block that now belongs at this position; then skip the one that was here
+    for (let k = from[0]; k <= from[1]; k++) emit(recs[k], out);
+    const here = wasOrder.map(blockOf).find((b) => b![0] === i)!;
+    i = here[1];
   }
   const trimEnd = () => { while (out.length && out[out.length - 1].trim() === "") out.pop(); };
   trimEnd();
