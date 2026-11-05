@@ -117,7 +117,16 @@ const views = makeTabs(
 // the views and the document's actions share one row
 const viewsRow = el("div", "views-row");
 views.list.replaceWith(viewsRow);
-viewsRow.appendChild(views.list);
+// draw fills the window and the page's header goes: the row carries the name instead
+const brand = el("a", "app-brand");
+brand.href = SITE;
+brand.title = "kyleschlaepfer.com";
+const brandMark = svgElementFrom(markSvg);
+brandMark.setAttribute("aria-hidden", "true");
+brandMark.removeAttribute("role");
+brandMark.removeAttribute("aria-labelledby");
+brand.append(brandMark, el("span", undefined, APP_NAME));
+viewsRow.append(brand, views.list);
 main.appendChild(views.root);
 
 const footer = el("footer", "site-footer");
@@ -144,6 +153,7 @@ wrapFoot.append(siteLink, repoLink, themeBar);
 footer.appendChild(wrapFoot);
 
 appRoot.replaceChildren(skip, header, main, footer);
+document.documentElement.dataset.view = "write";
 let savedTheme: string | null = null;
 try { savedTheme = localStorage.getItem(THEME_KEY); } catch { /* ignore */ }
 applyTheme(savedTheme);
@@ -197,6 +207,10 @@ void document.fonts?.ready.then(() => { if (!docsPanel.hidden) reachableCode(); 
 document.fonts?.addEventListener?.("loadingdone", () => { if (!docsPanel.hidden) reachableCode(); });
 
 function onTab(tab: Tab): void {
+  // the page's layout follows the view: draw is an application that fills the window, the others are pages
+  const wasDraw = document.documentElement.dataset.view === "draw";
+  document.documentElement.dataset.view = tab;
+  if (tab === "draw" && !wasDraw) window.scrollTo(0, 0);
   if (!app) { shownTab = tab; return; }
   // a change of view is a step the browser's back button undoes. The entry being left is brought up to date
   // first, so going back to it never brings back older text.

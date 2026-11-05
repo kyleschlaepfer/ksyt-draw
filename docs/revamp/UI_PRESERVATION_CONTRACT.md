@@ -16,6 +16,35 @@ writing this. They are produced by `node scripts/look.mjs .scratch/look` against
 view was reviewed in light mode at desktop width only; its dark mode and phone widths have not been
 looked at by anyone.
 
+## 0. Superseded for an active draw view (2026-11-05)
+
+The owner's handoff of 2026-11-05 (`prompts/CHALK_OPUS_UX_HANDOFF_2026-11-05.md`) asks for draw
+to work like a diagramming application, not a section of a page. Where this contract's page-shell
+rules conflict with that, they no longer apply **while draw is the current view**. Write, the
+syntax view and the embed keep every rule below unchanged, and the page shell comes back as soon as
+the reader leaves draw.
+
+Superseded in draw only:
+
+- **Item 4 (header, tool name, description, meta line)** and **item 12 (footer)**: hidden in draw.
+  The views row carries a small mark and the name "Chalk" instead; the theme choice moves into the
+  draw bar's "more" menu (it still drives the same `ksyt-theme` setting).
+- **The 80rem page width, the gutters and the page scroll**: draw fills the window (`100dvh`),
+  edge to edge, and the page itself never scrolls. Only the canvas pans, and the side panels scroll
+  inside themselves.
+- **Item 5 (views row)**: still three words with the pen underline and tab semantics, but in draw it
+  is a thin bar with a solid hairline under it, and the document bar sits at its right.
+- **Item 6 ("words, not icons")**: the draw tool bar and the selection bar use small glyphs drawn
+  for Chalk (`src/play/draw/icons.ts`, a few pen strokes each, `currentColor`), not an icon pack.
+  Each one keeps its word as its accessible name, and shows the word beside the glyph while there is
+  room. Controls in the bar are 40 px tall (36 px in the selection bar), below the 44 px page rule.
+- **Item 13 (breakpoints)**: in draw, a narrow window keeps the canvas full width and lays the
+  library and the properties over it on demand, instead of stacking them above and below.
+
+Still in force everywhere, draw included: the three fonts and their jobs; color roles, never hex;
+the green accent as the one accent; no shadows, gradients, all-caps, emoji or icon packs; state and
+severity never by color alone; the voice of labels and status lines; the checks' wording.
+
 ## 1. The design language at the baseline
 
 ### Character

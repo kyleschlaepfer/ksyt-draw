@@ -146,9 +146,7 @@ test.describe("placing and editing shapes", () => {
   });
 
   test("C: dragging at several zoom levels moves the shape with the pointer, keeps the view still and re-routes its lines live", async ({ page }) => {
-    await openTool(page, ACTIVITY, "draw");
-    await page.getByRole("button", { name: "library" }).click();
-    await page.getByRole("button", { name: "properties hide" }).click();
+    await openTool(page, ACTIVITY, "draw", { panels: { library: false, inspector: false } });
     for (const presses of [0, 2, -2]) {
       // Exercise each zoom from the same document position rather than eventually dragging
       // beyond the clipped viewport of the deliberately docked canvas workspace.
@@ -470,10 +468,8 @@ test.describe("swimlanes", () => {
   });
 
   test("J: drag a lane divider and move an action to another lane: lanes shift together, membership follows, lines stay attached", async ({ page }) => {
-    await openTool(page, ksdOf("activity-lanes"), "draw");
+    await openTool(page, ksdOf("activity-lanes"), "draw", { panels: { library: false, inspector: false } });
     // Return the optional side zones while manipulating a wide three-lane pool.
-    await page.getByRole("button", { name: "library" }).click();
-    await page.getByRole("button", { name: "properties hide" }).click();
     await page.getByRole("button", { name: "fit", exact: true }).click();
     const before = await inspect(page);
     const customer = before.nodes.find((n) => n.id === "customer")!;

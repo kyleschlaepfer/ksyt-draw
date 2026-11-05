@@ -30,6 +30,8 @@ export interface CanvasHost {
   editText(target: EditTarget): void;
   /** the relationship new lines get (null: the usual one for the two shapes) */
   relation(): string | null;
+  /** the overlay was drawn again (the selection or the view moved): things that sit beside the selection follow it */
+  framed?(): void;
 }
 
 export type EditTarget =
@@ -61,8 +63,10 @@ export class Canvas {
   /** uids of selected shapes and lines */
   selection = new Set<string>();
   gridSnap = false;
-  /** pixels at the right edge that something floats over (the properties panel): fit keeps the diagram clear of it */
-  insetRight = 0;
+  /** the view before a proposal was shown, so "put it back" puts the camera back too */
+  private viewBefore: { x: number; y: number; zoom: number } | null = null;
+  /** the canvas's size and place at the last layout, so a resize leaves the drawing where it was on screen */
+  private size = { w: 0, h: 0, left: 0, top: 0 };
   private world: SVGGElement;
   private grid: SVGRectElement;
   private gridPattern: SVGPatternElement;
@@ -157,10 +161,24 @@ export class Canvas {
     this.show(d, s.geometry);
     if (!this.fitted && this.root.clientWidth > 0 && s.geometry) {
       this.fitted = true;
+      const r0 = this.root.getBoundingClientRect();
+      this.size = { w: this.root.clientWidth, h: this.root.clientHeight, left: r0.left, top: r0.top };
       const saved = this.app.workspace.view;
-      if (saved) this.view = { ...saved }; else this.fit(1);
+      // a remembered view is kept only if it still shows some of the drawing (a smaller window, an edited text)
+      if (saved) { this.view = { ...saved }; if (this.visibleShare(s.geometry) < 0.25) this.fit(1); }
+      else this.fit(1);
       this.applyView();
     }
+  }
+
+  /** How much of the drawing's area is inside the canvas, 0 to 1. */
+  private visibleShare(geo: Geometry | null = this.geo, w = this.root.clientWidth, h = this.root.clientHeight): number {
+    if (!geo) return 1;
+    const [x0, y0, x1, y1] = geo.bounds;
+    const a = this.toScreen([x0, y0]), b = this.toScreen([x1, y1]);
+    const ix = Math.max(0, Math.min(b[0], w) - Math.max(a[0], 0)), iy = Math.max(0, Math.min(b[1], h) - Math.max(a[1], 0));
+    const area = (b[0] - a[0]) * (b[1] - a[1]);
+    return area > 0 ? (ix * iy) / area : 1;
   }
 
   private show(d: ChalkDoc | null, geo: Geometry | null): void {
@@ -174,12 +192,19 @@ export class Canvas {
   propose(edit: (draft: ChalkDoc) => void): void {
     this.selection.clear();
     this.locked = true;
+    this.viewBefore ??= { ...this.view };
     this.preview(edit, new Set(), true);
+    // the proposal is looked at whole: frame what tidying gives, and keep it framed if it is kept
+    this.fit(1.25, this.geo);
     this.root.classList.add("is-waiting");
   }
-  endProposal(): void {
+  /** The proposal is settled: kept, the view stays on the result; put back, the view goes back with it. */
+  endProposal(apply = false): void {
     this.locked = false;
     this.root.classList.remove("is-waiting");
+    const before = this.viewBefore;
+    this.viewBefore = null;
+    if (!apply && before) { this.view = before; this.applyView(); }
   }
   /** A proposal is on show and the canvas takes no edits until it is settled. */
   get waiting(): boolean { return this.locked; }
@@ -373,6 +398,30 @@ export class Canvas {
       }
     }
     this.overlay.replaceChildren(...o);
+    this.host.framed?.();
+  }
+
+  /** A gesture is under way (a drag, a marquee, a connector): things beside the selection keep out of the way. */
+  get busy(): boolean { return !!this.gesture && this.gesture.type !== "place"; }
+  /** The shape under the pointer, if any. */
+  get hovered(): string | null { return this.hover; }
+
+  /** The selection's box in canvas pixels, including a selected class's "+ attribute" row; null when nothing is selected. */
+  selectionBox(): { x0: number; y0: number; x1: number; y1: number } | null {
+    const geo = this.geo, d = this.doc;
+    if (!geo || !d || !this.selection.size) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const take = (p: Pt): void => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); };
+    for (const n of d.nodes) {
+      if (!this.selection.has(n.uid)) continue;
+      const g = geo.nodes.get(n.id);
+      if (!g) continue;
+      take(this.toScreen([g.cx - g.w / 2, g.cy - g.h / 2]));
+      take(this.toScreen([g.cx + g.w / 2, g.cy + g.h / 2]));
+      if (this.selection.size === 1 && (n.kind === "class" || n.kind === "interface")) y1 += 40;
+    }
+    for (const e of geo.edges) if (this.selection.has(e.uid)) for (const p of drawnPath(e)) take(this.toScreen(p));
+    return Number.isFinite(x0) ? { x0, y0, x1, y1 } : null;
   }
 
   /** The path a line being drawn or re-attached would take, through the real router. */
@@ -425,19 +474,72 @@ export class Canvas {
     this.view = { x: cx - (cx - this.view.x) * k, y: cy - (cy - this.view.y) * k, zoom: z };
     this.applyView();
   }
-  zoomTo(z: number): void { this.zoomBy(z / this.view.zoom); }
+  zoomTo(z: number): void { this.zoomStep(z / this.view.zoom); }
 
-  /** Show the whole diagram, no larger than `maxZoom`. */
-  fit(maxZoom = 1.5): void {
-    const geo = this.app.session.geometry;
-    const full = this.root.clientWidth, h = this.root.clientHeight;
-    // leave the strip under the floating panel free, unless that would squeeze the diagram into a sliver
-    const w = full - (this.insetRight < full * 0.5 ? this.insetRight : 0);
-    if (!geo || !full || !h) return;
+  /**
+   * A zoom from the toolbar or the keys: it holds the selection still when the selection is on screen,
+   * otherwise the middle of the view, and then keeps the drawing framed (see `contain`).
+   */
+  zoomStep(factor: number): void {
+    const w = this.root.clientWidth, h = this.root.clientHeight;
+    let cx = w / 2, cy = h / 2;
+    const box = this.selectionBox();
+    if (box) {
+      const mx = (box.x0 + box.x1) / 2, my = (box.y0 + box.y1) / 2;
+      if (mx >= 0 && mx <= w && my >= 0 && my <= h) { cx = mx; cy = my; }
+    }
+    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.view.zoom * factor));
+    const k = z / this.view.zoom;
+    this.view = { x: cx - (cx - this.view.x) * k, y: cy - (cy - this.view.y) * k, zoom: z };
+    this.contain();
+    this.applyView();
+  }
+
+  /**
+   * Keep the drawing framed after a zoom: along each axis, a drawing that fits is kept wholly on screen,
+   * and one that does not fit leaves no empty margin wider than the padding on either side.
+   */
+  private contain(geo: Geometry | null = this.geo): void {
+    if (!geo) return;
+    const w = this.root.clientWidth, h = this.root.clientHeight;
+    if (!w || !h) return;
+    const m = 32;
+    const a = this.toScreen([geo.bounds[0], geo.bounds[1]]), b = this.toScreen([geo.bounds[2], geo.bounds[3]]);
+    const shift = (lo: number, hi: number, size: number): number => {
+      if (hi - lo <= size - 2 * m) return lo < m ? m - lo : hi > size - m ? size - m - hi : 0;
+      return lo > m ? m - lo : hi < size - m ? size - m - hi : 0;
+    };
+    this.view = { ...this.view, x: this.view.x + shift(a[0], b[0], w), y: this.view.y + shift(a[1], b[1], h) };
+  }
+
+  /** Show the whole drawing (every shape, line and label), no larger than `maxZoom`. */
+  fit(maxZoom = 1.5, geo: Geometry | null = this.geo ?? this.app.session.geometry): void {
+    const w = this.root.clientWidth, h = this.root.clientHeight;
+    if (!geo || !w || !h) return;
     const [x0, y0, x1, y1] = geo.bounds;
-    const pad = 56;
+    const pad = Math.min(48, w * 0.06, h * 0.06) + 8;
     const z = Math.max(MIN_ZOOM, Math.min(maxZoom, (w - 2 * pad) / ((x1 - x0) * PX || 1), (h - 2 * pad) / ((y1 - y0) * PX || 1)));
-    this.view = { zoom: z, x: (w - (x1 - x0) * PX * z) / 2 - x0 * PX * z, y: Math.max(pad * 0.6, (h - (y1 - y0) * PX * z) / 2) - y0 * PX * z };
+    this.view = { zoom: z, x: (w - (x1 - x0) * PX * z) / 2 - x0 * PX * z, y: (h - (y1 - y0) * PX * z) / 2 - y0 * PX * z };
+    this.applyView();
+  }
+
+  /**
+   * The canvas changed size (a panel opened or closed, the window was resized): the drawing stays where it
+   * was on the screen, and a drawing that was wholly in view is kept wholly in view.
+   */
+  private onResize(): void {
+    const r = this.root.getBoundingClientRect();
+    const w = this.root.clientWidth, h = this.root.clientHeight;
+    const was = this.size;
+    if (!w || !h || !was.w || !was.h || (w === was.w && h === was.h && r.left === was.left && r.top === was.top)) {
+      this.size = { w, h, left: r.left, top: r.top };
+      this.drawOverlay();
+      return;
+    }
+    const whole = this.visibleShare(this.geo, was.w, was.h) > 0.999;
+    this.size = { w, h, left: r.left, top: r.top };
+    this.view = { ...this.view, x: this.view.x + was.left - r.left, y: this.view.y + was.top - r.top };
+    if (whole) this.contain();
     this.applyView();
   }
 
@@ -500,7 +602,7 @@ export class Canvas {
     r.addEventListener("blur", () => { this.space = false; });
     r.addEventListener("contextmenu", (ev) => { if (this.gesture) ev.preventDefault(); });
     r.addEventListener("pointerleave", () => { if (!this.gesture && this.hover) { this.hover = null; this.drawOverlay(); } });
-    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => { if (!this.fitted) this.refresh(); else this.drawOverlay(); }).observe(r);
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => { if (!this.fitted) this.refresh(); else this.onResize(); }).observe(r);
   }
 
   private schedule(fn: () => void): void {
@@ -1026,8 +1128,7 @@ export class Canvas {
       this.zoomBy(Math.exp(-ev.deltaY * (ev.deltaMode === 1 ? 0.05 : 0.0022)), ev.clientX - r.left, ev.clientY - r.top);
       return;
     }
-    // plain scrolling belongs to the page unless the canvas has the focus
-    if (document.activeElement !== this.root) return;
+    // draw fills the window and the page never scrolls: plain scrolling over the canvas pans it
     ev.preventDefault();
     const k = ev.deltaMode === 1 ? 24 : 1;
     this.view = { ...this.view, x: this.view.x - (ev.shiftKey && !ev.deltaX ? ev.deltaY : ev.deltaX) * k, y: this.view.y - (ev.shiftKey && !ev.deltaX ? 0 : ev.deltaY) * k };
@@ -1055,8 +1156,8 @@ export class Canvas {
       return;
     }
     if (mod && (k === "0" || k === "1")) { ev.preventDefault(); if (k === "0") this.zoomTo(1); else this.fit(); return; }
-    if (mod && (k === "=" || k === "+")) { ev.preventDefault(); this.zoomBy(1.2); return; }
-    if (mod && k === "-") { ev.preventDefault(); this.zoomBy(1 / 1.2); return; }
+    if (mod && (k === "=" || k === "+")) { ev.preventDefault(); this.zoomStep(1.2); return; }
+    if (mod && k === "-") { ev.preventDefault(); this.zoomStep(1 / 1.2); return; }
     if (!s.inSync) return;
     if (mod && k.toLowerCase() === "c") { ev.preventDefault(); this.copy(); return; }
     if (mod && k.toLowerCase() === "x") { ev.preventDefault(); if (this.copy()) this.remove(); return; }

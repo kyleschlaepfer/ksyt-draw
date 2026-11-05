@@ -764,6 +764,54 @@ test.describe("save and reopen", () => {
     await expect(page.locator(".draw-findings summary")).toContainText("what the check found");
   });
 
+  test("workspace: empty use cases and an actor placed, connected, named and labelled from the canvas alone, then saved and reopened", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openTool(page, "diagram use-case\nid desk\ntitle Help desk\n", "write", { panels: "default" });
+    await tab(page, "draw").click();
+    await expect(canvas(page)).toBeVisible();
+    await expect(page.locator(".draw-inspector")).toBeHidden();
+    const cv = (await canvas(page).boundingBox())!;
+    await page.locator('.draw-shape[data-kind="actor"]').click();
+    await page.mouse.click(cv.x + cv.width * 0.2, cv.y + cv.height * 0.4);
+    await page.locator('.draw-shape[data-kind="use-case"]').click();
+    await page.mouse.click(cv.x + cv.width * 0.5, cv.y + cv.height * 0.3);
+    await page.mouse.click(cv.x + cv.width * 0.5, cv.y + cv.height * 0.6);
+    await page.keyboard.press("Escape");
+    let s = await inspect(page);
+    const actor = s.nodes.find((n) => n.kind === "actor")!, [uc1, uc2] = s.nodes.filter((n) => n.kind === "use-case");
+    expect(s.nodes.every((n) => !n.label)).toBe(true);
+
+    // connect with the line tools: an association, then an include between the two goals
+    await page.getByRole("button", { name: "association", exact: true }).click();
+    await clickNode(page, actor.id);
+    await clickNode(page, uc1.id);
+    await page.getByRole("button", { name: "include", exact: true }).click();
+    await clickNode(page, uc1.id);
+    await clickNode(page, uc2.id);
+    await page.keyboard.press("Escape");
+    await expect.poll(async () => (await inspect(page)).edges.length).toBe(2);
+
+    // names typed in place, from the bar beside the selection
+    const bar = page.locator(".draw-selbar");
+    for (const [n, word] of [[actor, "Caller"], [uc1, "log a ticket"], [uc2, "look up account"]] as const) {
+      await clickNode(page, n.id);
+      await bar.getByRole("button", { name: /^(text|name)$/ }).click();
+      await page.keyboard.type(word);
+      await page.keyboard.press("Enter");
+    }
+    // the association's meaning changed and back from the same bar; still no properties panel
+    await clickEdge(page, actor.id, uc1.id);
+    await expect(bar.getByRole("combobox", { name: "what the line means" })).toHaveValue("--");
+    await expect(page.locator(".draw-inspector")).toBeHidden();
+    s = await inspect(page);
+    expect(s.nodes.map((n) => n.label).sort()).toEqual(["Caller", "log a ticket", "look up account"]);
+    expect(s.edges.map((e) => [e.from, e.to, e.kind])).toEqual([[actor.id, uc1.id, "association"], [uc1.id, uc2.id, "include"]]);
+    await page.screenshot({ path: "test-results/workspace-workflow.png" });
+
+    const reopened = await roundTrip(page, "project file", outDir("workspace"));
+    expect(reopened.after.nodes.map((n) => n.label).sort()).toEqual(["Caller", "log a ticket", "look up account"]);
+  });
+
   test("S: an activity with a resized lane, a placed and a sized shape, a bent line, a moved label and a styled line reopens exactly as saved, from a project file and from .ksd text", async ({ page }) => {
     await openTool(page, ksdOf("activity-lanes"), "draw");
     // a lane with a thickness: drag its divider

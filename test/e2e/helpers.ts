@@ -51,8 +51,16 @@ export interface Inspect {
 }
 const chalk = (): Chalk => (window as unknown as { chalk: Chalk }).chalk;
 
-/** Open the tool with a diagram, on a view, with an empty local draft. */
-export async function openTool(page: Page, text: string | null, tab: "write" | "draw" = "write"): Promise<void> {
+/**
+ * Open the tool with a diagram, on a view, with an empty local draft. Draw's properties start open here,
+ * as a remembered choice, because most tests work through them; `panels: "default"` opens draw the way a
+ * first visit does (properties closed).
+ */
+export async function openTool(page: Page, text: string | null, tab: "write" | "draw" = "write", o: { panels?: "default" | { library?: boolean; inspector?: boolean } } = {}): Promise<void> {
+  if (o.panels !== "default") {
+    const p = { library: true, inspector: true, ...(o.panels ?? {}) };
+    await page.addInitScript((v) => { try { if (!sessionStorage.getItem("chalk-test-panels")) { localStorage.setItem("chalk-draw-panels", v); sessionStorage.setItem("chalk-test-panels", "1"); } } catch { /* blocked */ } }, JSON.stringify(p));
+  }
   const hash = (text ? buildHash({ d: text }) : "") + (tab === "draw" ? `${text ? "&" : ""}tab=draw` : "");
   await page.goto("/" + (hash ? "#" + hash : ""));
   await page.waitForFunction(() => !!(window as unknown as { chalk?: unknown }).chalk);

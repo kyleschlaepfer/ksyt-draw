@@ -15,7 +15,11 @@ export default defineConfig({
     trace: "retain-on-failure",
     channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], channel: process.env.PLAYWRIGHT_CHANNEL || undefined } }],
+  projects: [
+    { name: "chromium", grepInvert: /a large diagram/, use: { ...devices["Desktop Chrome"], channel: process.env.PLAYWRIGHT_CHANNEL || undefined } },
+    // frame timings mean something only when nothing else is drawing: these run once the rest are done
+    { name: "timing", grep: /a large diagram/, dependencies: ["chromium"], use: { ...devices["Desktop Chrome"], channel: process.env.PLAYWRIGHT_CHANNEL || undefined } },
+  ],
   webServer: [
     {
       command: "npm run build && npx vite preview --port 4173 --strictPort",

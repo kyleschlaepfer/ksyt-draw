@@ -19,7 +19,7 @@ import { resizable } from "../../core/geom/shape";
 import { TYPE_NAME, aftermath, button, el, type App } from "../app";
 import type { Canvas } from "./canvas";
 
-export interface InspectorHost { say(msg: string): void; canvas: Canvas; app: App }
+export interface InspectorHost { say(msg: string): void; canvas: Canvas; app: App; close(): void }
 
 const KIND_WORD: Partial<Record<NodeKind, string>> = {
   "use-case": "use case", "flow-final": "flow final", io: "input / output", initial: "start (initial node)", final: "end (final node)", partition: "partition (swimlane)",
@@ -31,35 +31,34 @@ const num3 = (v: number): string => String(Math.round(v * 100) / 100);
 export class Inspector {
   readonly root: HTMLElement;
   private body: HTMLElement;
-  private toggle: HTMLButtonElement;
-  private manuallyCollapsed = false;
   private key = "";
   private pending = 0;
 
   constructor(private host: InspectorHost) {
-    const initiallyOpen = !!host.app.session.doc?.nodes.length;
-    this.root = el("aside", `draw-inspector${initiallyOpen ? "" : " is-collapsed"}`);
+    // closed until asked for: the canvas's own bar covers the everyday edits
+    this.root = el("aside", "draw-inspector is-collapsed");
     this.root.setAttribute("aria-label", "properties");
     const head = el("div", "inspector-head");
-    this.toggle = button("btn-quiet inspector-toggle", "properties");
-    this.toggle.setAttribute("aria-expanded", String(initiallyOpen));
-    this.toggle.addEventListener("click", () => {
-      const open = this.root.classList.toggle("is-collapsed") === false;
-      this.manuallyCollapsed = !open;
-      this.toggle.setAttribute("aria-expanded", String(open));
-    });
-    head.appendChild(this.toggle);
+    const close = button("btn-quiet inspector-close", "close", "hide the properties");
+    close.setAttribute("aria-label", "close properties");
+    close.addEventListener("click", () => host.close());
+    head.append(el("span", "inspector-title", "properties"), close);
     this.body = el("div", "inspector-body");
     this.root.append(head, this.body);
+  }
+
+  get open(): boolean { return !this.root.classList.contains("is-collapsed"); }
+  setOpen(open: boolean): void {
+    if (open === this.open) return;
+    this.root.classList.toggle("is-collapsed", !open);
+    if (open) this.update(true);
   }
 
   /** Something changed: rebuild after the browser has finished moving the focus, then give it back. */
   update(force = false): void {
     const s = this.host.app.session;
-    if (!s.doc?.nodes.length && !this.host.canvas.selection.size && !this.manuallyCollapsed) {
-      this.root.classList.add("is-collapsed");
-      this.toggle.setAttribute("aria-expanded", "false");
-    }
+    // a closed panel waits: it is rebuilt when it is opened
+    if (!this.open) { this.key = ""; return; }
     const key = `${s.inSync}|${[...this.host.canvas.selection].join(",")}|${s.text.length}:${hash(s.text)}`;
     if (key === this.key && !force) return;
     this.key = key;

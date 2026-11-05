@@ -1,9 +1,10 @@
 /**
- * The draw view: a shape palette down the left like a list, a compact toolbar, the canvas, a
- * properties panel that floats over its corner, and a status line. It edits the same document as
- * the write view, through the same session, so the two can't disagree.
+ * The draw view, a workspace that fills the window: one bar of tools across the top, the shape library
+ * down the left, the canvas, the properties on the right when asked for, and a status strip. What is
+ * selected gets its everyday actions in a small bar beside it on the canvas. It edits the same document
+ * as the write view, through the same session, so the two can't disagree.
  */
-import { CLASSIFIERS, CONTAINERS, KINDS_FOR, type ChalkDoc, type DiagramType } from "../../core/doc/types";
+import { CLASSIFIERS, CONTAINERS, KINDS_FOR, UNLABELED, edgeOp, type ChalkDoc, type DiagramType } from "../../core/doc/types";
 import * as cmd from "../../core/doc/commands";
 import { firstError, parseMember } from "../../core/doc/parse";
 import { printMember } from "../../core/doc/print";
@@ -17,6 +18,7 @@ import shrugSvg from "../art/shrug-neutral.svg?raw";
 import { TYPE_NAME, aftermath, button, el, menuButton, type App } from "../app";
 import { Canvas, type EditTarget } from "./canvas";
 import { svg } from "./dom";
+import { icon } from "./icons";
 import { Inspector } from "./inspector";
 import { InlineEditor } from "./inline-edit";
 
@@ -79,35 +81,58 @@ function relationGlyph(op: string): SVGSVGElement {
   return out;
 }
 
+/** Per-viewer layout of the workspace: which side zones are open. Kept in this browser only. */
+const PANELS_KEY = "chalk-draw-panels";
+interface Panels { library: boolean; inspector: boolean }
+function loadPanels(): Panels {
+  const wide = typeof matchMedia === "function" ? matchMedia("(min-width: 64rem)").matches : true;
+  const dflt = { library: wide, inspector: false };
+  try {
+    const v = JSON.parse(localStorage.getItem(PANELS_KEY) ?? "null") as Partial<Panels> | null;
+    if (!v || typeof v !== "object") return dflt;
+    // on a narrow screen the side zones lie over the canvas: they start closed whatever was remembered
+    return { library: wide && v.library !== false, inspector: wide && v.inspector === true };
+  } catch { return dflt; }
+}
+function savePanels(p: Panels): void {
+  try { localStorage.setItem(PANELS_KEY, JSON.stringify(p)); } catch { /* storage blocked: the layout is just not remembered */ }
+}
+
 export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; shown(): void; say(msg: string): void } {
   const { session } = app;
-  // ---------- layout ----------
-  const rail = el("div", "draw-side");
-  const main = el("div", "draw-main");
-  const context = el("div", "draw-context");
-  const contextWords = el("div", "draw-context-words");
-  const contextType = el("strong", "draw-type");
-  const contextTitle = el("span", "draw-title");
-  contextWords.append(contextType, contextTitle);
-  const changeType = button("btn-quiet", "change type", "start a new diagram in another notation; undo restores this one");
-  changeType.addEventListener("click", () => document.getElementById("new-diagram")?.click());
-  context.append(contextWords, changeType);
+  // ---------- layout: a bar across the top, the library, the canvas, the properties, a status strip ----------
+  // The canvas is the workspace; everything else is a thin edge around it or lies over it on demand.
+  const bar = el("div", "draw-bar");
   const toolbar = el("div", "draw-toolbar");
   toolbar.setAttribute("role", "toolbar");
   toolbar.setAttribute("aria-label", "drawing tools");
+  const context = el("div", "draw-context");
+  const contextType = el("strong", "draw-type");
+  const contextTitle = el("span", "draw-title");
+  context.append(contextType, contextTitle);
+  const rail = el("div", "draw-side");
+  rail.setAttribute("aria-label", "shape library");
+  rail.setAttribute("role", "region");
+  const stage = el("div", "draw-stage");
   const banner = el("p", "note stale-note draw-banner");
   banner.setAttribute("role", "status");
   banner.hidden = true;
-  const stage = el("div", "draw-stage");
-  const status = el("p", "play-status note");
-  status.setAttribute("aria-live", "polite");
   const proposal = el("div", "draw-proposal");
   proposal.hidden = true;
-  // what the check found, each finding a way to the shapes it is about
+  const foot = el("div", "draw-foot");
+  const status = el("p", "play-status note");
+  status.setAttribute("aria-live", "polite");
+  // what the check found: a count in the status strip that opens into a list over the canvas
   const found = el("details", "draw-findings");
   found.hidden = true;
-  main.append(context, toolbar, banner, stage, proposal, status, found);
-  panel.replaceChildren(rail, main);
+  foot.append(status, found);
+  // the canvas's direct actions for what is selected, beside the selection
+  const selbar = el("div", "draw-selbar");
+  selbar.setAttribute("role", "toolbar");
+  selbar.setAttribute("aria-label", "selection");
+  selbar.hidden = true;
+  bar.append(toolbar);
+  panel.replaceChildren(bar, rail, stage, foot);
 
   let sayTimer = 0;
   const summary = (): string => {
@@ -131,11 +156,22 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     changed: () => chrome(),
     editText: (t) => editText(t),
     relation: () => relation,
+    framed: () => placeSelbar(),
   });
-  const inspector = new Inspector({ say, canvas, app });
-  stage.append(canvas.root);
+  const inspector = new Inspector({ say, canvas, app, close: () => setPanels({ inspector: false }) });
+  stage.append(canvas.root, banner, proposal, selbar);
   panel.appendChild(inspector.root);
-  canvas.insetRight = 0;
+
+  // ---------- the side zones: open, closed, remembered ----------
+  let panels = loadPanels();
+  function setPanels(p: Partial<Panels>, remember = true): void {
+    panels = { ...panels, ...p };
+    panel.classList.toggle("library-collapsed", !panels.library);
+    inspector.setOpen(panels.inspector);
+    libraryBtn.setAttribute("aria-expanded", String(panels.library));
+    propsBtn.setAttribute("aria-expanded", String(panels.inspector));
+    if (remember) savePanels(panels);
+  }
 
   // undo and redo work from anywhere in the view, not only on the canvas: after a click in the panel or the
   // palette, or when the control that was clicked is gone and nothing has the focus, the keys still mean
@@ -156,7 +192,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
 
   // ---------- the palette ----------
   const shapes = el("section", "draw-sec");
-  shapes.append(el("h2", undefined, "shape library"), el("p", "note", "drag a symbol in, or choose it and click the canvas"));
+  shapes.append(el("h2", undefined, "shapes"));
   const palette = el("div", "draw-palette");
   shapes.appendChild(palette);
   const lines = el("section", "draw-sec");
@@ -164,17 +200,18 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
   const relSel = el("select");
   relSel.id = "draw-relation";
   const relField = el("label", "draw-field");
-  relField.append(el("span", undefined, "port drags use"), relSel);
-  lines.append(el("h2", undefined, "relationships"), el("p", "note", "choose a line and then choose its source and target, or drag a shape's connection dot"), relPalette, relField);
+  relField.append(el("span", undefined, "dragging from a dot makes"), relSel);
+  lines.append(el("h2", undefined, "lines"), relPalette, relField);
   relSel.addEventListener("change", () => { relation = relSel.value || null; });
-  rail.append(shapes, lines);
+  const hint = el("p", "note draw-hint", "Drag a shape in, or choose it and click. Choose a line, then click two shapes, or drag from a shape's dot.");
+  rail.append(shapes, lines, hint);
 
   let paletteType: DiagramType | null = null;
   function buildPalette(type: DiagramType): void {
     paletteType = type;
     palette.replaceChildren();
     for (const item of paletteFor(type)) {
-      const b = button("draw-shape", item.word, item.help);
+      const b = button("draw-shape", item.word, `${item.word}: ${item.help}`);
       b.replaceChildren(paletteGlyph(item.kind), el("span", undefined, item.word));
       b.dataset.kind = item.kind;
       b.addEventListener("pointerdown", (ev) => startPlacing(ev, item));
@@ -189,13 +226,13 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
       palette.appendChild(b);
     }
     relSel.replaceChildren();
-    const usual = el("option", undefined, "the usual for the two shapes");
+    const usual = el("option", undefined, "the usual one");
     usual.value = "";
     relSel.appendChild(usual);
     relPalette.replaceChildren();
     for (const r of cmd.RELATIONS[type]) {
       const o = el("option", undefined, r.word); o.value = r.op; o.title = r.help; relSel.appendChild(o);
-      const b = button("draw-relation-tool", r.word, `${r.help}. Choose source and target.`);
+      const b = button("draw-relation-tool", r.word, `${r.word}: ${r.help}. Then click the source and the target.`);
       b.dataset.op = r.op;
       b.setAttribute("aria-pressed", "false");
       b.replaceChildren(relationGlyph(r.op), el("span", undefined, r.word));
@@ -218,8 +255,10 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     let dragged = false;
     const again = canvas.placing === item.kind;
     canvas.beginPlace(item.kind, true);
+    // on a narrow screen the library lies over the canvas: it steps aside once the shape is on its way
+    const overlaid = matchMedia("(max-width: 63.99rem)").matches;
     const move = (e: PointerEvent): void => {
-      if (Math.hypot(e.clientX - sx, e.clientY - sy) > 6) dragged = true;
+      if (Math.hypot(e.clientX - sx, e.clientY - sy) > 6) { if (!dragged && overlaid) setPanels({ library: false }, false); dragged = true; }
       if (dragged) canvas.placeMove(e.clientX, e.clientY);
     };
     const up = (e: PointerEvent): void => {
@@ -231,46 +270,55 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
         if (e.type === "pointercancel" || !canvas.placeDrop(e.clientX, e.clientY)) { canvas.stopPlacing(); say("dropped outside the canvas: nothing added"); }
         else canvas.stopPlacing();
       } else if (again) { canvas.stopPlacing(); say("stopped placing"); }
-      else { say(`click the canvas to place the ${item.word} (Shift+click keeps placing, Escape stops)`); canvas.root.focus({ preventScroll: true }); }
+      else {
+        if (overlaid) setPanels({ library: false }, false);
+        say(`click the canvas to place the ${item.word}; it stays chosen until Escape`);
+        canvas.root.focus({ preventScroll: true });
+      }
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
   }
 
-  // ---------- the toolbar ----------
-  const tool = (word: string, title: string, run: () => void, id?: string): HTMLButtonElement => {
-    const b = button("btn-quiet", word, title);
-    if (id) b.id = id;
+  // ---------- the toolbar: one row, words beside small glyphs; the words go first when room runs short ----------
+  const tool = (word: string, title: string, run: () => void, o: { id?: string; glyph?: string; keep?: boolean } = {}): HTMLButtonElement => {
+    const b = button(`btn-quiet tb${o.keep ? " tb-keep" : ""}`, "", title);
+    if (o.id) b.id = o.id;
+    if (o.glyph) b.appendChild(icon(o.glyph));
+    b.appendChild(el("span", "tb-word", word));
+    b.setAttribute("aria-label", word);
     b.addEventListener("click", run);
     return b;
   };
-  const libraryBtn = tool("library", "show or hide the shape library", () => {
-    const shown = panel.classList.toggle("library-collapsed") === false;
-    libraryBtn.setAttribute("aria-expanded", String(shown));
-    say(shown ? "shape library shown" : "shape library hidden");
-  }, "draw-library");
-  libraryBtn.setAttribute("aria-expanded", "true");
-  const selectBtn = tool("select", "leave insertion or connector mode (Escape)", () => {
+  const libraryBtn = tool("shapes", "show or hide the shape library", () => {
+    setPanels({ library: !panels.library });
+    say(panels.library ? "shape library shown" : "shape library hidden");
+  }, { id: "draw-library", glyph: "shapes", keep: true });
+  const selectBtn = tool("select", "the pointer: select, move and resize (Escape)", () => {
     canvas.stopPlacing();
     if (canvas.connecting) canvas.stopConnectTool("selection tool"); else say("selection tool");
     canvas.root.focus({ preventScroll: true });
-  }, "draw-select");
-  const undoBtn = tool("undo", "undo (Ctrl+Z)", () => { say(session.undo() ? "undone" : "nothing to undo"); }, "draw-undo");
-  const redoBtn = tool("redo", "redo (Ctrl+Y)", () => { say(session.redo() ? "redone" : "nothing to redo"); }, "draw-redo");
-  const zoomOut = tool("−", "zoom out (Ctrl+-)", () => canvas.zoomBy(1 / 1.2));
-  zoomOut.setAttribute("aria-label", "zoom out");
-  const zoomLabel = tool("100%", "back to actual size (Ctrl+0)", () => canvas.zoomTo(1), "draw-zoom");
-  const zoomIn = tool("+", "zoom in (Ctrl++)", () => canvas.zoomBy(1.2));
-  zoomIn.setAttribute("aria-label", "zoom in");
-  const fitBtn = tool("fit", "show the whole diagram (Ctrl+1)", () => canvas.fit());
-  const snapBtn = tool("snap to grid", "keep shapes on an eighth-inch grid (hold Alt to place freely)", () => {
+  }, { id: "draw-select", glyph: "pointer" });
+  const undoBtn = tool("undo", "undo (Ctrl+Z)", () => { say(session.undo() ? "undone" : "nothing to undo"); }, { id: "draw-undo", glyph: "undo" });
+  const redoBtn = tool("redo", "redo (Ctrl+Y)", () => { say(session.redo() ? "redone" : "nothing to redo"); }, { id: "draw-redo", glyph: "redo" });
+  const zoomOut = tool("zoom out", "zoom out (Ctrl+-)", () => canvas.zoomStep(1 / 1.2), { glyph: "minus" });
+  zoomOut.classList.add("tb-icon");
+  const zoomLabel = button("btn-quiet tb tb-zoom", "100%", "back to actual size (Ctrl+0)");
+  zoomLabel.id = "draw-zoom";
+  zoomLabel.addEventListener("click", () => canvas.zoomStep(1 / canvas.view.zoom));
+  const zoomIn = tool("zoom in", "zoom in (Ctrl++)", () => canvas.zoomStep(1.2), { glyph: "plus" });
+  zoomIn.classList.add("tb-icon");
+  const fitBtn = tool("fit", "show the whole diagram (Ctrl+1)", () => canvas.fit(), { glyph: "fit" });
+  const snapBtn = tool("snap", "keep shapes on an eighth-inch grid (hold Alt to place freely)", () => {
     canvas.gridSnap = !canvas.gridSnap;
     snapBtn.setAttribute("aria-pressed", String(canvas.gridSnap));
     say(canvas.gridSnap ? "snapping to the grid" : "placing freely; shapes still line up with their neighbours");
-  });
+  }, { glyph: "grid" });
+  snapBtn.setAttribute("aria-label", "snap to grid");
   snapBtn.setAttribute("aria-pressed", "false");
-  const tidy = menuButton(button("btn-quiet", "tidy up", "hand shapes and lines back to automatic layout"), () => {
+  const tidyBtn = tool("tidy up", "hand shapes and lines back to automatic layout", () => {}, { glyph: "tidy", keep: true });
+  const tidy = menuButton(tidyBtn, () => {
     const d = session.doc;
     const sel = canvas.selectedNodes().filter((n) => n.place || n.size), selE = canvas.selectedEdges().filter((e) => e.route || e.labelPos);
     const any = !!d && (d.nodes.some((n) => n.place || n.size || n.thickness) || d.edges.some((e) => e.route || e.labelPos) || !!d.pool);
@@ -289,8 +337,99 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
       }) },
     ];
   });
-  const sep = (): HTMLElement => { const s = el("span", "toolbar-sep"); s.setAttribute("aria-hidden", "true"); return s; };
-  toolbar.append(libraryBtn, selectBtn, sep(), undoBtn, redoBtn, sep(), zoomOut, zoomLabel, zoomIn, fitBtn, sep(), snapBtn, tidy);
+  const propsBtn = tool("properties", "show or hide the properties of what is selected", () => {
+    setPanels({ inspector: !panels.inspector });
+    say(panels.inspector ? "properties shown" : "properties hidden");
+  }, { id: "draw-properties", glyph: "panel", keep: true });
+  const moreBtn = tool("more", "the diagram's type, theme and other settings", () => {}, { glyph: "more" });
+  moreBtn.classList.add("tb-icon");
+  const theme = (t: string): void => { document.querySelector<HTMLButtonElement>(`[data-theme-set="${t}"]`)?.click(); };
+  // on a phone the bar keeps only what is used most; the rest is here (and pinching zooms)
+  const narrow = (): boolean => matchMedia("(max-width: 34rem)").matches;
+  const more = menuButton(moreBtn, () => [
+    ...(narrow() ? [
+      { label: "redo", hint: session.redoLabel ? `redo ${session.redoLabel}` : "nothing to redo", disabled: !session.canRedo, run: () => redoBtn.click() },
+      { label: canvas.gridSnap ? "stop snapping to the grid" : "snap to the grid", run: () => snapBtn.click() },
+    ] : []),
+    { label: "start another kind of diagram", hint: "a new, blank diagram; undo brings this one back", run: () => document.getElementById("new-diagram")?.click() },
+    { label: "diagram settings", hint: "title, id, which way it runs, how it is drawn", run: () => { canvas.select([]); setPanels({ inspector: true }); } },
+    { label: "light theme", run: () => theme("light") },
+    { label: "dark theme", run: () => theme("dark") },
+    { label: "follow the system theme", run: () => theme("system") },
+  ]);
+  more.classList.add("menu-end");
+  const sep = (cls = ""): HTMLElement => { const s = el("span", `toolbar-sep ${cls}`); s.setAttribute("aria-hidden", "true"); return s; };
+  for (const b of [redoBtn, zoomOut, zoomIn, snapBtn]) b.classList.add("tb-narrow-hide");
+  const grow = el("span", "toolbar-grow");
+  toolbar.append(libraryBtn, context, sep(), selectBtn, sep(), undoBtn, redoBtn, sep(), zoomOut, zoomLabel, zoomIn, fitBtn, sep("tb-narrow-hide"), snapBtn, tidy, grow, propsBtn, more);
+  setPanels(panels, false);
+
+  // ---------- the selection's own actions, beside it on the canvas ----------
+  let selKey = "";
+  function buildSelbar(): void {
+    const d = session.doc;
+    const nodes = canvas.selectedNodes(), edges = canvas.selectedEdges();
+    const key = `${session.text.length}|${nodes.map((n) => n.uid + n.label).join(",")}|${edges.map((e) => e.uid + e.kind + e.navigable + e.meaning).join(",")}|${session.inSync}`;
+    if (key === selKey) return;
+    selKey = key;
+    selbar.replaceChildren();
+    if (!d || !session.inSync || nodes.length + edges.length === 0) return;
+    const act = (word: string, glyph: string, run: () => void, title = word): HTMLButtonElement => {
+      const b = button("btn-quiet sb", "", title);
+      b.append(icon(glyph), el("span", "tb-word", word));
+      b.setAttribute("aria-label", word);
+      b.addEventListener("click", run);
+      return b;
+    };
+    const remove = act("delete", "trash", () => canvas.remove(), "delete (Delete)");
+    if (edges.length === 1 && nodes.length === 0) {
+      const e = edges[0];
+      const rels = cmd.RELATIONS[d.meta.type];
+      const op = edgeOp(e, d.meta.type) === "->" && d.meta.type === "class" ? "-->" : edgeOp(e, d.meta.type);
+      const pick = el("select", "sb-select");
+      pick.setAttribute("aria-label", "what the line means");
+      pick.title = "what the line means";
+      for (const r of rels) { const o = el("option", undefined, r.word); o.value = r.op; o.title = r.help; pick.appendChild(o); }
+      pick.value = rels.some((r) => r.op === op) ? op : rels[0].op;
+      pick.addEventListener("change", () => {
+        const r = session.edit("change relationship", (x) => cmd.setRelation(x, e.uid, pick.value), { select: [e.uid] });
+        const w = rels.find((x) => x.op === pick.value);
+        say(r.ok ? `now ${w?.word}: ${w?.help}` : r.message ?? "");
+      });
+      selbar.append(
+        pick,
+        act("label", "pencil", () => editText({ type: "edge", uid: e.uid }), "write the line's label (Enter)"),
+        act("swap ends", "swap", () => { const r = session.edit("swap ends", (x) => cmd.swapEnds(x, e.uid), { select: [e.uid] }); say(r.ok ? "swapped the ends" : r.message ?? ""); }),
+        remove,
+      );
+    } else if (nodes.length === 1 && edges.length === 0) {
+      const n = nodes[0];
+      if (!UNLABELED.has(n.kind)) selbar.append(act(CLASSIFIERS.has(n.kind) ? "name" : "text", "pencil", () => editText({ type: "node", uid: n.uid }), "write in the shape (Enter or double-click)"));
+      selbar.append(remove);
+    } else {
+      selbar.append(el("span", "sb-count", `${nodes.length + edges.length} selected`), remove);
+    }
+    selbar.append(act("properties", "panel", () => setPanels({ inspector: true }), "all of its properties"));
+  }
+  function placeSelbar(): void {
+    // a drag redraws the overlay every frame: the bar does no work until it is over
+    if (canvas.busy) { selbar.hidden = true; return; }
+    buildSelbar();
+    const box = canvas.selectionBox();
+    // it steps aside while the pointer is on another shape, so that shape's connection dots are free to use
+    const elsewhere = canvas.hovered !== null && !canvas.selection.has(canvas.hovered);
+    if (!box || !selbar.childElementCount || inline.active || canvas.busy || elsewhere) { selbar.hidden = true; return; }
+    selbar.hidden = false;
+    const w = selbar.offsetWidth, h = selbar.offsetHeight;
+    const sw = stage.clientWidth, sh = stage.clientHeight;
+    let x = (box.x0 + box.x1) / 2 - w / 2;
+    // above the selection, clear of its connection dots, or below it when there is no room above
+    let y = box.y0 - h - 28;
+    if (y < 8) y = box.y1 + 28;
+    x = Math.max(8, Math.min(sw - w - 8, x));
+    y = Math.max(8, Math.min(sh - h - 8, y));
+    selbar.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  }
 
   // ---------- a previewed change: look first, then keep it or put it back ----------
   let pending: { label: string; fn: (d: ChalkDoc) => void } | null = null;
@@ -309,7 +448,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     const p = pending;
     pending = null;
     proposal.hidden = true;
-    canvas.endProposal();
+    canvas.endProposal(apply);
     if (p && apply) {
       const r = session.edit(p.label, p.fn, { hold: false });
       say(r.ok ? "tidied (undo puts it back the way you had it)" : r.message ?? "");
@@ -438,7 +577,9 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
       }
       ul.appendChild(li);
     }
-    found.replaceChildren(el("summary", undefined, `what the check found (${list.length})`), ul);
+    const head = el("summary");
+    head.append(icon("flag"), el("span", undefined, `what the check found (${list.length})`));
+    found.replaceChildren(head, ul);
   }
 
   // ---------- keeping the frame up to date ----------
@@ -455,6 +596,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     for (const b of relPalette.querySelectorAll<HTMLButtonElement>("button")) b.setAttribute("aria-pressed", String(canvas.connecting && relation === b.dataset.op));
     selectBtn.setAttribute("aria-pressed", String(!canvas.placing && !canvas.connecting));
     inspector.update();
+    placeSelbar();
   }
 
   function refresh(): void {
@@ -488,12 +630,12 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
       fix.addEventListener("click", () => app.showTab("write"));
       words.append(el("p", "hand", "The text has a mistake, so there's nothing to draw yet."), detail, fix);
       empty.append(who, words);
-      stage.replaceChildren(empty);
+      stage.replaceChildren(empty, banner);
       listFindings();
       say("");
       return;
     }
-    if (!stage.contains(canvas.root)) stage.replaceChildren(canvas.root);
+    if (!stage.contains(canvas.root)) stage.replaceChildren(canvas.root, banner, proposal, selbar);
     if (paletteType !== d.meta.type) buildPalette(d.meta.type);
     canvas.refresh();
     chrome();

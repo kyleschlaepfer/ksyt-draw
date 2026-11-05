@@ -1,0 +1,387 @@
+{
+ "1920x1080-light": {
+  "open": {
+   "viewport": [
+    1920,
+    1080
+   ],
+   "pageScrolls": false,
+   "pageHeight": 1080,
+   "canvas": {
+    "x": 200,
+    "y": 95,
+    "w": 1720,
+    "h": 949
+   },
+   "canvasShareOfViewport": 79,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 48,
+    "w": 1920,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": {
+    "x": 0,
+    "y": 95,
+    "w": 200,
+    "h": 949
+   },
+   "inspector": null,
+   "zoom": "100%"
+  },
+  "selected": {
+   "viewport": [
+    1920,
+    1080
+   ],
+   "pageScrolls": false,
+   "pageHeight": 1080,
+   "canvas": {
+    "x": 200,
+    "y": 95,
+    "w": 1720,
+    "h": 949
+   },
+   "canvasShareOfViewport": 79,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 48,
+    "w": 1920,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": {
+    "x": 0,
+    "y": 95,
+    "w": 200,
+    "h": 949
+   },
+   "inspector": null,
+   "zoom": "100%"
+  },
+  "zoomTrail": [
+   {
+    "zoom": "150%",
+    "resident": 1,
+    "clerk": 1
+   },
+   {
+    "zoom": "180%",
+    "resident": 0.99,
+    "clerk": 0.99
+   },
+   {
+    "zoom": "216%",
+    "resident": 0,
+    "clerk": 0.21
+   },
+   {
+    "zoom": "259%",
+    "resident": 0,
+    "clerk": 0
+   }
+  ]
+ },
+ "1920x1080-dark": {
+  "open": {
+   "viewport": [
+    1920,
+    1080
+   ],
+   "pageScrolls": false,
+   "pageHeight": 1080,
+   "canvas": {
+    "x": 200,
+    "y": 95,
+    "w": 1720,
+    "h": 949
+   },
+   "canvasShareOfViewport": 79,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 48,
+    "w": 1920,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": {
+    "x": 0,
+    "y": 95,
+    "w": 200,
+    "h": 949
+   },
+   "inspector": null,
+   "zoom": "100%"
+  }
+ },
+ "1440x900-light": {
+  "open": {
+   "viewport": [
+    1440,
+    900
+   ],
+   "pageScrolls": false,
+   "pageHeight": 900,
+   "canvas": {
+    "x": 200,
+    "y": 95,
+    "w": 1240,
+    "h": 769
+   },
+   "canvasShareOfViewport": 74,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 48,
+    "w": 1440,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": {
+    "x": 0,
+    "y": 95,
+    "w": 200,
+    "h": 769
+   },
+   "inspector": null,
+   "zoom": "100%"
+  },
+  "selected": {
+   "viewport": [
+    1440,
+    900
+   ],
+   "pageScrolls": false,
+   "pageHeight": 900,
+   "canvas": {
+    "x": 200,
+    "y": 95,
+    "w": 1240,
+    "h": 769
+   },
+   "canvasShareOfViewport": 74,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 48,
+    "w": 1440,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": {
+    "x": 0,
+    "y": 95,
+    "w": 200,
+    "h": 769
+   },
+   "inspector": null,
+   "zoom": "100%"
+  },
+  "zoomTrail": [
+   {
+    "zoom": "118%",
+    "resident": 1,
+    "clerk": 1
+   },
+   {
+    "zoom": "142%",
+    "resident": 0.42,
+    "clerk": 0.59
+   },
+   {
+    "zoom": "170%",
+    "resident": 0,
+    "clerk": 0
+   },
+   {
+    "zoom": "204%",
+    "resident": 0,
+    "clerk": 0
+   }
+  ]
+ },
+ "1440x900-dark": {
+  "open": {
+   "viewport": [
+    1440,
+    900
+   ],
+   "pageScrolls": false,
+   "pageHeight": 900,
+   "canvas": {
+    "x": 200,
+    "y": 95,
+    "w": 1240,
+    "h": 769
+   },
+   "canvasShareOfViewport": 74,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 48,
+    "w": 1440,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": {
+    "x": 0,
+    "y": 95,
+    "w": 200,
+    "h": 769
+   },
+   "inspector": null,
+   "zoom": "100%"
+  }
+ },
+ "1024x768-light": {
+  "open": {
+   "viewport": [
+    1024,
+    768
+   ],
+   "pageScrolls": false,
+   "pageHeight": 768,
+   "canvas": {
+    "x": 200,
+    "y": 95,
+    "w": 824,
+    "h": 637
+   },
+   "canvasShareOfViewport": 67,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 48,
+    "w": 1024,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": {
+    "x": 0,
+    "y": 95,
+    "w": 200,
+    "h": 637
+   },
+   "inspector": null,
+   "zoom": "76%"
+  },
+  "selected": {
+   "viewport": [
+    1024,
+    768
+   ],
+   "pageScrolls": false,
+   "pageHeight": 768,
+   "canvas": {
+    "x": 200,
+    "y": 95,
+    "w": 824,
+    "h": 637
+   },
+   "canvasShareOfViewport": 67,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 48,
+    "w": 1024,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": {
+    "x": 0,
+    "y": 95,
+    "w": 200,
+    "h": 637
+   },
+   "inspector": null,
+   "zoom": "76%"
+  },
+  "zoomTrail": [
+   {
+    "zoom": "76%",
+    "resident": 1,
+    "clerk": 1
+   },
+   {
+    "zoom": "92%",
+    "resident": 0.59,
+    "clerk": 0.71
+   },
+   {
+    "zoom": "110%",
+    "resident": 0,
+    "clerk": 0
+   },
+   {
+    "zoom": "132%",
+    "resident": 0,
+    "clerk": 0
+   }
+  ]
+ },
+ "390x844-light": {
+  "open": {
+   "viewport": [
+    390,
+    844
+   ],
+   "pageScrolls": false,
+   "pageHeight": 844,
+   "canvas": {
+    "x": 0,
+    "y": 136,
+    "w": 390,
+    "h": 672
+   },
+   "canvasShareOfViewport": 80,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 89,
+    "w": 390,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": null,
+   "inspector": null,
+   "zoom": "34%"
+  },
+  "selected": {
+   "viewport": [
+    390,
+    844
+   ],
+   "pageScrolls": false,
+   "pageHeight": 844,
+   "canvas": {
+    "x": 0,
+    "y": 136,
+    "w": 390,
+    "h": 672
+   },
+   "canvasShareOfViewport": 80,
+   "canvasBottomVisible": true,
+   "toolbar": {
+    "x": 0,
+    "y": 89,
+    "w": 390,
+    "h": 46
+   },
+   "toolbarRows": 1,
+   "library": null,
+   "inspector": null,
+   "zoom": "34%"
+  },
+  "zoomTrail": [
+   {
+    "zoom": "34%",
+    "resident": 1,
+    "clerk": 1
+   }
+  ]
+ }
+}

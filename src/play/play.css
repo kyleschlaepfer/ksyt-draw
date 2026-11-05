@@ -179,87 +179,139 @@ main { display: block; padding-bottom: var(--s-8); }
   .docs-body .table tr { border-bottom: 1px solid var(--rule); padding-bottom: 0.5rem; }
 }
 
-/* ---------- draw: a collapsible library, a dominant canvas and a docked inspector ---------- */
-.draw-editor { display: grid; grid-template-columns: 13rem minmax(0, 1fr) auto; gap: var(--s-2); align-items: start; }
-.draw-editor.library-collapsed { grid-template-columns: 0 minmax(0, 1fr) auto; }
+/* ---------- draw: an application that fills the window ----------
+   Write and the syntax are pages; draw is a workspace. While it is the view, the page's header, intro and
+   footer step aside, nothing scrolls but the canvas and the panels, and the views row becomes a thin app bar. */
+html[data-view="draw"], html[data-view="draw"] body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+html[data-view="draw"] #app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+html[data-view="draw"] .site-header, html[data-view="draw"] .site-footer, html[data-view="draw"] .tool-intro { display: none; }
+html[data-view="draw"] main.wrap { flex: 1; min-height: 0; max-width: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+html[data-view="draw"] .views { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+html[data-view="draw"] .views-row {
+  flex: none; flex-wrap: nowrap; align-items: center; gap: 0 var(--s-2); margin: 0; padding: 0 0.75rem;
+  min-height: 48px; border-bottom: 1px solid var(--rule);
+}
+html[data-view="draw"] .views-list { flex-wrap: nowrap; gap: 0 var(--s-2); margin-right: auto; }
+html[data-view="draw"] .views-tab { min-height: 44px; padding-block: 0.4rem 0.55rem; white-space: nowrap; }
+html[data-view="draw"] .doc-bar { flex-wrap: nowrap; flex: none; }
+html[data-view="draw"] .doc-bar .btn-quiet { white-space: nowrap; }
+html[data-view="draw"] #panel-draw { flex: 1; min-height: 0; }
+.app-brand { display: none; }
+html[data-view="draw"] .app-brand {
+  display: inline-flex; align-items: center; gap: 0.4rem; flex: none; margin-right: var(--s-1);
+  font: 1.35rem/1 var(--font-hand); color: var(--ink); text-decoration: none;
+}
+html[data-view="draw"] .app-brand svg { width: 1.7rem; height: auto; }
+html[data-view="draw"] .app-brand:hover { color: var(--accent-strong); }
+
+/* the workspace: tools across the top, library, canvas, properties, a status strip */
+.draw-editor {
+  display: grid; height: 100%; min-height: 0; position: relative;
+  grid-template-areas: "bar bar bar" "side stage insp" "foot foot foot";
+  grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.draw-bar { grid-area: bar; min-width: 0; border-bottom: 1px solid var(--rule); }
+.draw-side { grid-area: side; }
+.draw-stage { grid-area: stage; }
+.draw-inspector { grid-area: insp; }
+.draw-foot { grid-area: foot; }
 .draw-editor.library-collapsed .draw-side { display: none; }
-.draw-side { grid-column: 1; }
-.draw-main { grid-column: 2; }
-.draw-inspector { grid-column: 3; }
-@media (max-width: 56rem) { .draw-editor, .draw-editor.library-collapsed { grid-template-columns: 1fr; } }
-.draw-side { display: grid; gap: var(--s-3); }
-@media (max-width: 56rem) { .draw-side { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--s-2); } }
-.draw-sec { display: grid; gap: var(--s-1); align-content: start; padding-top: var(--s-2); border-top: 1px dashed var(--rule); }
-.draw-sec:first-child { padding-top: 0; border-top: 0; }
-.draw-sec h2, .draw-inspector h2 { font: var(--hand)/1.2 var(--font-hand); font-weight: 400; margin: 0; }
-.draw-sec .note { margin: 0; font-size: 1.1rem; }
+
+/* small pen glyphs for the editor's chrome, in currentColor */
+.ui-icon { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.ui-icon-grid path, .ui-icon-more path { stroke-width: 2.6; }
+
+/* the toolbar: one row; words beside the glyphs while there is room, then the glyphs alone (the word stays the name) */
+.draw-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 0 0.15rem; padding: 0.2rem 0.5rem; min-width: 0; }
+.draw-toolbar .btn-quiet, .draw-toolbar .tb {
+  display: inline-flex; align-items: center; gap: 0.35rem; flex: none; min-height: 40px; min-width: 40px; justify-content: center;
+  padding: 0 0.45rem; white-space: nowrap; font-weight: 300;
+}
+.draw-toolbar .btn-quiet:disabled { opacity: 0.45; }
+.draw-toolbar .tb-icon .tb-word { display: none; }
+.draw-toolbar .btn-quiet[aria-pressed="true"], .draw-toolbar .btn-quiet[aria-expanded="true"] { color: var(--ink); font-weight: 400; position: relative; }
+.draw-toolbar .btn-quiet[aria-pressed="true"]::after, .draw-toolbar .btn-quiet[aria-expanded="true"]::after {
+  content: ""; position: absolute; left: 0.3rem; right: 0.3rem; bottom: 0.2rem; height: 0.3em;
+  background: var(--accent); -webkit-mask: var(--stroke-underline) center / 100% 100% no-repeat; mask: var(--stroke-underline) center / 100% 100% no-repeat;
+}
+.toolbar-sep { width: 1px; height: 1.4rem; margin: 0 0.3rem; background: var(--rule); flex: none; }
+.toolbar-grow { flex: 1 1 0; min-width: 0.5rem; }
+#draw-zoom { min-width: 3.6em; font-variant-numeric: tabular-nums; }
+.draw-context { display: flex; align-items: baseline; gap: 0.6rem; min-width: 0; flex: 0 1 auto; padding: 0 0.4rem; overflow: hidden; }
+.draw-type { font: 400 var(--hand)/1.15 var(--font-hand); white-space: nowrap; }
+.draw-title { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 22rem; }
+.draw-toolbar .menu { flex: none; }
+@media (max-width: 80rem) {
+  .draw-toolbar .tb:not(.tb-keep) .tb-word { display: none; }
+  .draw-title { max-width: 14rem; }
+}
+@media (max-width: 64rem) {
+  .draw-toolbar .tb .tb-word { display: none; }
+  .draw-title { display: none; }
+}
+
+/* the library: glyph tiles and a short list of lines, no prose (each tile says what it is in its title) */
+.draw-side {
+  width: 12.5rem; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: var(--s-2); align-content: start;
+  padding: 0.75rem 0.65rem; background: var(--page); border-right: 1px solid var(--rule);
+}
+.draw-sec { display: grid; gap: 0.45rem; align-content: start; }
+.draw-sec h2 { font: 300 var(--hand-sm)/1.2 var(--font-hand); color: var(--ink-2); margin: 0; }
+.draw-hint { margin: 0; font-size: var(--text-sm); line-height: 1.35; color: var(--ink-2); }
+.draw-palette { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.35rem; }
+.draw-shape {
+  display: grid; place-items: center; align-content: center; gap: 0.15rem; min-width: 0;
+  font: 300 0.85rem/1.05 var(--font-body); color: var(--ink); background: var(--page-2); cursor: grab;
+  border: 1.5px solid var(--rule); border-radius: 6px;
+  padding: 0.35rem 0.2rem 0.3rem; min-height: 60px; touch-action: none; user-select: none;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.draw-shape > span { overflow: hidden; max-width: 100%; text-align: center; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.draw-shape .palette-glyph { width: 40px; height: 28px; }
+.palette-glyph, .relation-glyph { overflow: visible; stroke: currentColor; stroke-width: 1.7; fill: none; vector-effect: non-scaling-stroke; }
+.palette-glyph .glyph-fill, .relation-glyph .glyph-fill { fill: currentColor; }
+.draw-shape:hover { background: var(--wash); }
+.draw-shape:active { cursor: grabbing; }
+/* the armed shape is told by an outline and a heavier word as well as color */
+.draw-shape[aria-pressed="true"] { background: var(--wash); border-color: var(--accent); border-width: 2px; }
+.draw-shape[aria-pressed="true"] > span { font-weight: 700; }
+.relation-palette { display: grid; gap: 0.25rem; }
+.draw-relation-tool {
+  display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); align-items: center; gap: 0.35rem; width: 100%; min-height: 36px;
+  color: var(--ink); background: none; border: 1.5px solid transparent; border-radius: 6px; padding: 0.2rem 0.35rem;
+  font: 300 0.88rem/1.1 var(--font-body); text-align: left; cursor: crosshair;
+}
+.draw-relation-tool > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draw-relation-tool .relation-glyph { width: 2.6rem; height: 1rem; }
+.draw-relation-tool:hover { background: var(--wash); }
+.draw-relation-tool[aria-pressed="true"] { border-color: var(--accent); background: var(--wash); font-weight: 700; }
 .draw-field { display: grid; gap: 0.2rem; min-width: 0; }
-.draw-field > span { font: 300 1.1rem/1.2 var(--font-hand); color: var(--ink-2); }
+.draw-field > span { font: 300 1.05rem/1.2 var(--font-hand); color: var(--ink-2); }
 .draw-field input, .draw-field select, .draw-field textarea {
   width: 100%; min-width: 0; font: var(--text-sm)/1.35 var(--font-body); color: var(--ink); background: var(--page-2);
   border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.35rem 0.5rem; min-height: 40px;
 }
+.draw-side .draw-field select { min-height: 36px; font-size: 0.85rem; }
 .draw-field textarea { resize: vertical; }
 .draw-field input.mono, .member-row input { font-family: var(--font-mono); font-size: 0.9rem; }
 .draw-field input:focus-visible, .draw-field select:focus-visible, .draw-field textarea:focus-visible, .member-row input:focus-visible { border-color: var(--accent); }
 .draw-check { display: flex; align-items: center; gap: 0.5rem; min-height: 40px; font: var(--hand-sm)/1.2 var(--font-hand); }
 .draw-check input { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
-.draw-palette { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
-.draw-shape {
-  display: grid; place-items: center; align-content: center; gap: 0.2rem; min-width: 0;
-  font: 300 1rem/1.05 var(--font-body); color: var(--ink); background: var(--page-2); cursor: grab;
-  border: 1.5px solid var(--rule); border-radius: 6px;
-  padding: 0.4rem 0.25rem; min-height: 78px; touch-action: none; user-select: none;
-  transition: background-color var(--dur-fast) var(--ease-out);
-}
-.draw-shape > span { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.palette-glyph, .relation-glyph { overflow: visible; stroke: currentColor; stroke-width: 1.7; fill: none; vector-effect: non-scaling-stroke; }
-.palette-glyph .glyph-fill, .relation-glyph .glyph-fill { fill: currentColor; }
-.draw-shape:hover { background: var(--wash); }
-.draw-shape:active { cursor: grabbing; }
-/* the armed shape is told by words and an outline as well as color */
-.draw-shape[aria-pressed="true"] { background: var(--wash); border-color: var(--accent); }
-.draw-shape[aria-pressed="true"]::after { content: "placing"; font: 700 0.72rem/1 var(--font-body); }
-.relation-palette { display: grid; gap: 0.35rem; }
-.draw-relation-tool {
-  display: grid; grid-template-columns: 3rem minmax(0, 1fr); align-items: center; gap: 0.35rem; width: 100%;
-  color: var(--ink); background: var(--page-2); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.35rem 0.45rem;
-  font: 300 0.95rem/1.1 var(--font-body); text-align: left; cursor: crosshair;
-}
-.draw-relation-tool:hover { background: var(--wash); }
-.draw-relation-tool[aria-pressed="true"] { border-color: var(--accent); background: var(--wash); font-weight: 700; }
 
-.draw-main { min-width: 0; display: grid; gap: var(--s-1); }
-.draw-context { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); min-width: 0; }
-.draw-context-words { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; min-width: 0; }
-.draw-type { font: 400 var(--hand)/1.15 var(--font-hand); }
-.draw-title { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.draw-context .btn-quiet { min-height: 36px; flex: none; }
-.draw-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--s-2); }
-.draw-toolbar .btn-quiet { min-height: 40px; min-width: 32px; }
-.draw-toolbar .btn-quiet[aria-pressed="true"] { color: var(--ink); position: relative; }
-.draw-toolbar .btn-quiet[aria-pressed="true"]::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0.3rem; height: 0.3em;
-  background: var(--accent); -webkit-mask: var(--stroke-underline) center / 100% 100% no-repeat; mask: var(--stroke-underline) center / 100% 100% no-repeat;
-}
-.toolbar-sep { width: 1px; height: 1.4rem; background: var(--rule); }
-#draw-zoom { min-width: 3.4em; justify-content: center; font-variant-numeric: tabular-nums; }
-.draw-banner { margin: 0; }
-
-/* the stage holds the canvas, the floating properties panel and the in-place text field */
-.draw-stage { position: relative; min-width: 0; }
+/* the stage: the canvas, edge to edge, with what floats over it */
+.draw-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 .draw-canvas {
-  position: relative; height: clamp(34rem, 78vh, 68rem); overflow: hidden; touch-action: none; cursor: default;
-  background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px; user-select: none; -webkit-user-select: none;
+  position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: default;
+  background: var(--page); user-select: none; -webkit-user-select: none;
 }
-.draw-canvas:focus-visible { outline-offset: 2px; border-color: var(--accent); }
+.draw-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .draw-svg { display: block; width: 100%; height: 100%; max-width: none; }
 .draw-canvas .grid-dot { fill: var(--rule); }
 .draw-canvas.is-panning { cursor: grabbing; }
 .draw-canvas.is-placing { cursor: copy; }
 .draw-canvas.is-connecting { cursor: crosshair; }
 .draw-canvas.is-waiting { cursor: default; }
-.draw-stage.is-readonly .draw-canvas { border-style: dashed; }
+.draw-stage.is-readonly .draw-canvas { outline: 2px dashed var(--terra); outline-offset: -6px; }
 .draw-canvas .layer-texts { pointer-events: none; }
 .draw-canvas .world > g:not(.layer-hits) { pointer-events: none; }
 .draw-canvas .hit { fill: transparent; pointer-events: all; cursor: grab; }
@@ -269,6 +321,7 @@ main { display: block; padding-bottom: var(--s-8); }
 .draw-canvas .divider.row { cursor: row-resize; }
 .draw-canvas .ghost { opacity: 0.45; }
 .draw-stage.is-readonly .hit, .draw-stage.is-readonly .hit-line { cursor: default; }
+.draw-stage > .empty-state { margin: var(--s-4) auto; padding: 0 var(--s-3); }
 
 /* overlay: selection, handles, ports, guides. Sizes are in screen pixels whatever the zoom. */
 .draw-canvas .overlay * { vector-effect: non-scaling-stroke; }
@@ -306,22 +359,41 @@ main { display: block; padding-bottom: var(--s-8); }
 .draw-inline-center { text-align: center; }
 .draw-inline-left { text-align: left; }
 
-/* The contextual inspector is a docked third zone. Collapsing it returns space to the canvas. */
-.draw-inspector {
-  position: static; width: 18rem; max-width: 28vw; max-height: clamp(34rem, 78vh, 68rem);
-  display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px;
+/* the selection's own bar, beside it on the canvas */
+.draw-selbar {
+  position: absolute; left: 0; top: 0; z-index: 6; display: flex; align-items: center; gap: 0.1rem; padding: 0.2rem;
+  background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px; max-width: calc(100% - 1rem);
 }
-.inspector-head { display: flex; justify-content: flex-end; padding: 0 0.6rem; border-bottom: 1px dashed var(--rule); }
-.inspector-toggle { min-height: 36px; font-weight: 300; color: var(--ink-2); }
-.inspector-toggle::after { content: "hide"; margin-left: 0.5em; font-size: 0.8em; }
-.draw-inspector.is-collapsed .inspector-toggle::after { content: "show"; }
-.draw-inspector.is-collapsed { width: 3.25rem; max-width: 3.25rem; }
-.draw-inspector.is-collapsed .inspector-head { padding: 0; justify-content: center; }
-.draw-inspector.is-collapsed .inspector-toggle { padding-inline: 0.25rem; font-size: 0; }
-.draw-inspector.is-collapsed .inspector-toggle::after { margin-left: 0; font-size: 0.8rem; }
-.draw-inspector.is-collapsed .inspector-head { border-bottom: 0; }
-.draw-inspector.is-collapsed .inspector-body { display: none; }
-.inspector-body { overflow: auto; padding: 0.6rem 0.75rem 0.75rem; display: grid; gap: 0.6rem; align-content: start; }
+.draw-selbar[hidden] { display: none; }
+.draw-selbar .sb { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 36px; min-width: 36px; padding: 0 0.45rem; font-weight: 300; white-space: nowrap; }
+.draw-selbar .sb .ui-icon { width: 18px; height: 18px; }
+.draw-selbar .sb-select {
+  min-height: 34px; max-width: 12rem; font: var(--text-sm)/1.2 var(--font-body); color: var(--ink); background: var(--page-2);
+  border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.15rem 0.35rem; margin-right: 0.15rem;
+}
+.draw-selbar .sb-count { font: 300 var(--hand-sm)/1 var(--font-hand); color: var(--ink-2); padding: 0 0.45rem; white-space: nowrap; }
+@media (max-width: 40rem) { .draw-selbar .sb .tb-word { display: none; } }
+
+/* what floats over the top of the canvas: a stale-text warning, a tidy-up to keep or put back */
+.draw-banner, .draw-proposal {
+  position: absolute; z-index: 7; top: 0.6rem; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 1.5rem);
+  margin: 0; background: var(--page);
+}
+.draw-proposal { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); padding: 0.35rem 0.75rem; border: 1.5px dashed var(--accent); border-radius: 6px; }
+.draw-proposal[hidden], .draw-banner[hidden] { display: none; }
+.draw-proposal .note { margin: 0; }
+
+/* the properties: docked at the right when asked for, closed otherwise */
+.draw-inspector {
+  width: 18.5rem; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  background: var(--page); border-left: 1px solid var(--rule);
+}
+.draw-inspector.is-collapsed { display: none; }
+.inspector-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-1); padding: 0.1rem 0.25rem 0.1rem 0.75rem; border-bottom: 1px dashed var(--rule); }
+.inspector-title { font: 300 var(--hand-sm)/1.2 var(--font-hand); color: var(--ink-2); }
+.inspector-close { min-height: 36px; font-weight: 300; color: var(--ink-2); }
+.inspector-body { overflow: auto; overscroll-behavior: contain; padding: 0.6rem 0.75rem 0.75rem; display: grid; gap: 0.6rem; align-content: start; }
+.inspector-body h2 { font: var(--hand)/1.2 var(--font-hand); font-weight: 400; margin: 0; }
 .inspector-body .note { margin: 0; font-size: 1.05rem; line-height: 1.3; }
 .inspector-body .btn-quiet { min-height: 36px; }
 .inspector-row { display: flex; flex-wrap: wrap; gap: 0.3rem 0.75rem; align-items: end; }
@@ -331,24 +403,54 @@ main { display: block; padding-bottom: var(--s-8); }
 .inspector-section[open] { display: grid; gap: 0.5rem; }
 .member-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.2rem 0.5rem; align-items: center; }
 .member-row input { width: 100%; min-width: 0; color: var(--ink); background: var(--page-2); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.3rem 0.45rem; min-height: 36px; }
-@media (max-width: 56rem) {
-  .draw-editor.library-collapsed .draw-side { display: none; }
-  .draw-side, .draw-main, .draw-inspector { grid-column: 1; }
-  .draw-inspector, .draw-inspector.is-collapsed { width: auto; max-width: none; max-height: none; margin-top: var(--s-1); }
-  .draw-canvas { height: clamp(24rem, 62vh, 40rem); }
+
+/* the status strip: the last thing said on the left, what the check found on the right */
+.draw-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); height: 36px; min-width: 0;
+  padding: 0 0.75rem; border-top: 1px solid var(--rule); background: var(--page);
 }
-.draw-proposal { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); padding: 0.4rem 0.75rem; border: 1.5px dashed var(--accent); border-radius: 6px; }
-.draw-proposal .note { margin: 0; }
-.draw-main .play-status { margin-top: 0; }
-.draw-findings > summary { cursor: pointer; font: 300 var(--hand-sm)/1.3 var(--font-hand); color: var(--ink-2); min-height: 32px; }
-.draw-findings ul { list-style: none; margin: 0; padding: 0; max-width: var(--measure); }
+.draw-foot .play-status { margin: 0; min-height: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+.draw-findings { position: relative; flex: none; }
+.draw-findings[hidden] { display: none; }
+.draw-findings > summary {
+  display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; list-style: none;
+  font: 300 var(--hand-sm)/1.3 var(--font-hand); color: var(--ink-2); min-height: 32px; white-space: nowrap;
+}
+.draw-findings > summary::-webkit-details-marker { display: none; }
+.draw-findings > summary .ui-icon { width: 18px; height: 18px; }
+.draw-findings[open] > summary { color: var(--ink); }
+.draw-findings ul {
+  position: absolute; z-index: 25; right: 0; bottom: calc(100% + 0.35rem); width: min(32rem, calc(100vw - 1.5rem)); max-height: min(24rem, 55vh); overflow: auto;
+  list-style: none; margin: 0; padding: 0.25rem 0.75rem; background: var(--page); border: 1.5px solid var(--rule); border-radius: 6px;
+}
 .draw-findings li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 var(--s-2); align-items: start; padding: 0.5rem 0; border-top: 1px dashed var(--rule); }
+.draw-findings li:first-child { border-top: 0; }
 .draw-findings li p { margin: 0; font-size: var(--text-sm); }
 .draw-findings li .row { grid-column: 1; }
 .draw-findings li .fix { grid-column: 1; }
 .draw-findings li button { grid-column: 2; grid-row: 1 / span 2; }
 .draw-findings .sev { font: 400 var(--hand-sm)/1.3 var(--font-hand); }
 .draw-findings .sep { color: var(--ink-2); margin: 0 0.4em; }
+
+/* narrower windows: the canvas keeps the whole width, and the library and the properties lie over it */
+@media (max-width: 63.99rem) {
+  .draw-editor { grid-template-areas: "bar" "stage" "foot"; grid-template-columns: minmax(0, 1fr); }
+  .draw-side, .draw-inspector { grid-area: stage; z-index: 12; align-self: stretch; max-height: 100%; }
+  .draw-side { justify-self: start; width: min(13rem, calc(100% - 3rem)); }
+  .draw-inspector { justify-self: end; width: min(20rem, calc(100% - 3rem)); border-left: 1px solid var(--rule); }
+}
+@media (max-width: 34rem) {
+  html[data-view="draw"] .app-brand span { display: none; }
+  html[data-view="draw"] .views-row { flex-wrap: wrap; padding: 0 0.5rem; gap: 0 var(--s-1); min-height: 0; }
+  html[data-view="draw"] .views-list { margin-right: 0; }
+  html[data-view="draw"] .doc-bar { gap: 0 var(--s-1); }
+  .draw-toolbar .tb-narrow-hide { display: none; }
+  .draw-toolbar { padding-inline: 0.25rem; }
+  .draw-toolbar .tb, .draw-toolbar .btn-quiet { min-width: 38px; padding: 0 0.3rem; }
+  .draw-context { display: none; }
+  .toolbar-sep { margin: 0 0.1rem; }
+}
+
 
 /* ---------- export ---------- */
 .export-dialog {
