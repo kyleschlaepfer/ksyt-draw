@@ -47,6 +47,14 @@ for (const { name, ksd } of files) {
       got.files[format] = statSync(path).size;
       if (format === "svg") got.facts = (await page.locator("dialog.export-dialog .export-facts").textContent())?.trim();
     }
+    // the SVG again with its letters as shapes, for programs that ignore an embedded font
+    await page.locator('dialog.export-dialog input[name="export-format"][value="svg"]').check();
+    await page.locator("dialog.export-dialog details.export-more summary").click();
+    await page.locator('dialog.export-dialog input[name="export-text"][value="shapes"]').check();
+    await page.waitForTimeout(300);
+    const [shapes] = await Promise.all([page.waitForEvent("download", { timeout: 60000 }), page.locator("#export-download").click()]);
+    await shapes.saveAs(join(out, `${name}.${look}.shapes.svg`));
+    if (/<text|@font-face/.test(readFileSync(join(out, `${name}.${look}.shapes.svg`), "utf8"))) problems.push(`${name} ${look}: the shapes file still has text or fonts`);
     entry.looks[look] = got;
     console.log(`${look.padEnd(9)} ${name.padEnd(28)} ${got.facts}`);
     if (!/Layout check: pass/.test(got.facts ?? "")) problems.push(`${name} ${look}: ${got.facts}`);
@@ -83,8 +91,9 @@ if (!filter) {
   const md = ["# Export gallery", "",
     "Made by `node scripts/gallery.mjs`. Every file here came out of the export dialog of the running app.",
     "Each sheet shows the files as a slide or a document shows them: an image on a white page at 600, 420 and 240 px wide.",
+    "The script also writes each PNG (shown on the sheets) and each SVG with its letters as shapes (`*.shapes.svg`); those are large and are not kept in the repository.",
     "", "| Fixture | Files | Size and check (sketch) |", "|---|---|---|",
-    ...report.map((r) => `| [${r.name}](${r.name}.sheet.png) | ${["sketch", "precision"].flatMap((l) => ["svg", "png", "pdf"].map((f) => `[${l} ${f}](${r.name}.${l}.${f})`)).join(", ")} | ${r.looks.sketch.facts} |`),
+    ...report.map((r) => `| [${r.name}](${r.name}.sheet.png) | ${["sketch", "precision"].flatMap((l) => ["svg", "pdf"].map((f) => `[${l} ${f}](${r.name}.${l}.${f})`)).join(", ")} | ${r.looks.sketch.facts} |`),
     "", ...report.flatMap((r) => [`## ${r.name}`, "", `![${r.name} at three widths](${r.name}.sheet.png)`, ""])];
   writeFileSync(join(out, "README.md"), md.join("\n"));
 }

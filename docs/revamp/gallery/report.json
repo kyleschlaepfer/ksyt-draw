@@ -1,0 +1,359 @@
+[
+ {
+  "name": "activity-fork-either",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 107013,
+     "png": 92297,
+     "pdf": 27611
+    },
+    "facts": "485 x 583 px, 5.1 x 6.1 in. Smallest text 22px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 21305,
+     "png": 63719,
+     "pdf": 3997
+    },
+    "facts": "484 x 584 px, 5.0 x 6.1 in. Smallest text 18.9px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "activity-parallel",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 109472,
+     "png": 106859,
+     "pdf": 29609
+    },
+    "facts": "429 x 711 px, 4.5 x 7.4 in. Smallest text 22px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 22180,
+     "png": 73821,
+     "pdf": 4483
+    },
+    "facts": "428 x 712 px, 4.5 x 7.4 in. Smallest text 18.9px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "dangling",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 51679,
+     "png": 49071,
+     "pdf": 11728
+    },
+    "facts": "250 x 364 px, 2.6 x 3.8 in. Smallest text 22px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 18940,
+     "png": 34005,
+     "pdf": 3289
+    },
+    "facts": "239 x 359 px, 2.5 x 3.7 in. Smallest text 18.9px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "flow-approval",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 102919,
+     "png": 164646,
+     "pdf": 32331
+    },
+    "facts": "541 x 810 px, 5.6 x 8.4 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 23091,
+     "png": 115760,
+     "pdf": 4750
+    },
+    "facts": "527 x 807 px, 5.5 x 8.4 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "flow-unlabeled",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 91027,
+     "png": 134867,
+     "pdf": 27791
+    },
+    "facts": "541 x 630 px, 5.6 x 6.6 in. Smallest text 22px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 21989,
+     "png": 94512,
+     "pdf": 4384
+    },
+    "facts": "527 x 629 px, 5.5 x 6.6 in. Smallest text 18.9px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "usecase-actor-inside",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 109905,
+     "png": 100459,
+     "pdf": 25712
+    },
+    "facts": "367 x 594 px, 3.8 x 6.2 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 20916,
+     "png": 82732,
+     "pdf": 4736
+    },
+    "facts": "355 x 582 px, 3.7 x 6.1 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "usecase-include-reversed",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 103631,
+     "png": 86364,
+     "pdf": 22751
+    },
+    "facts": "755 x 220 px, 7.9 x 2.3 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 19716,
+     "png": 66440,
+     "pdf": 4155
+    },
+    "facts": "747 x 206 px, 7.8 x 2.1 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "usecase-is-flow",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 130721,
+     "png": 162869,
+     "pdf": 34693
+    },
+    "facts": "517 x 584 px, 5.4 x 6.1 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 22723,
+     "png": 133941,
+     "pdf": 5574
+    },
+    "facts": "508 x 573 px, 5.3 x 6.0 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "usecase-permit",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 151856,
+     "png": 215120,
+     "pdf": 43916
+    },
+    "facts": "1005 x 463 px, 10.5 x 4.8 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 22991,
+     "png": 181061,
+     "pdf": 5504
+    },
+    "facts": "997 x 451 px, 10.4 x 4.7 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "activity-decision-merge",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 102883,
+     "png": 186790,
+     "pdf": 32143
+    },
+    "facts": "663 x 877 px, 6.9 x 9.1 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 23214,
+     "png": 143748,
+     "pdf": 5034
+    },
+    "facts": "662 x 878 px, 6.9 x 9.1 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "activity-lanes",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 234873,
+     "png": 294547,
+     "pdf": 74640
+    },
+    "facts": "1043 x 1136 px, 10.9 x 11.8 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 27703,
+     "png": 217248,
+     "pdf": 5852
+    },
+    "facts": "1041 x 1134 px, 10.8 x 11.8 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "class-orders",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 123226,
+     "png": 236221,
+     "pdf": 39450
+    },
+    "facts": "471 x 920 px, 4.9 x 9.6 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 44471,
+     "png": 142810,
+     "pdf": 8374
+    },
+    "facts": "461 x 909 px, 4.8 x 9.5 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "class-shapes",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 148001,
+     "png": 201254,
+     "pdf": 40715
+    },
+    "facts": "396 x 772 px, 4.1 x 8.0 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 41827,
+     "png": 120209,
+     "pdf": 7828
+    },
+    "facts": "384 x 761 px, 4.0 x 7.9 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "dense",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 624257,
+     "png": 744412,
+     "pdf": 194043
+    },
+    "facts": "1757 x 2372 px, 18.3 x 24.7 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 40673,
+     "png": 565738,
+     "pdf": 8159
+    },
+    "facts": "1756 x 2370 px, 18.3 x 24.7 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "flow-branched",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 142551,
+     "png": 254924,
+     "pdf": 47699
+    },
+    "facts": "799 x 962 px, 8.3 x 10.0 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 26232,
+     "png": 182581,
+     "pdf": 5445
+    },
+    "facts": "788 x 959 px, 8.2 x 10.0 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "manual-layout",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 75841,
+     "png": 104696,
+     "pdf": 21664
+    },
+    "facts": "556 x 512 px, 5.8 x 5.3 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 21377,
+     "png": 77513,
+     "pdf": 4175
+    },
+    "facts": "549 x 509 px, 5.7 x 5.3 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ },
+ {
+  "name": "usecase-described",
+  "looks": {
+   "sketch": {
+    "files": {
+     "svg": 148842,
+     "png": 203276,
+     "pdf": 42720
+    },
+    "facts": "953 x 424 px, 9.9 x 4.4 in. Smallest text 20px. Layout check: pass."
+   },
+   "precision": {
+    "files": {
+     "svg": 22834,
+     "png": 167667,
+     "pdf": 5482
+    },
+    "facts": "948 x 413 px, 9.9 x 4.3 in. Smallest text 17.2px. Layout check: pass."
+   }
+  }
+ }
+]

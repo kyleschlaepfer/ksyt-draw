@@ -44,7 +44,8 @@ async function outline(t: TextEl): Promise<string> {
   for (const r of runs) {
     const f = await font(key, r.ext ? "ext" : "latin");
     const k = t.size / f.unitsPerEm;
-    const run = f.layout(r.s);
+    // a character neither file has is left out, as the PDF writer does, rather than drawn as an empty box
+    const run = f.layout([...r.s].filter((ch) => f.hasGlyphForCodePoint(ch.codePointAt(0)!)).join(""));
     let pen = 0;
     const glyphs = run.glyphs.map((g, i) => {
       const pos = run.positions[i];
