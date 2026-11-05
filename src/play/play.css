@@ -188,7 +188,7 @@ main { display: block; padding-bottom: var(--s-8); }
 
 .draw-main { min-width: 0; display: grid; gap: var(--s-1); }
 .draw-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--s-2); }
-.draw-toolbar .btn-quiet { min-height: 40px; }
+.draw-toolbar .btn-quiet { min-height: 40px; min-width: 32px; }
 .draw-toolbar .btn-quiet[aria-pressed="true"] { color: var(--ink); position: relative; }
 .draw-toolbar .btn-quiet[aria-pressed="true"]::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0.3rem; height: 0.3em;

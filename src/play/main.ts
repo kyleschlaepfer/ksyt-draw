@@ -185,6 +185,17 @@ function ensureDraw(): void {
 
 /** The view the address bar's current entry is for, and whether the view is changing because the reader moved through history. */
 let shownTab: Tab = "write", viaHistory = false;
+/** A code block too wide for the column scrolls sideways, so it has to take focus: then the arrow keys scroll it. */
+function reachableCode(): void {
+  for (const pre of docsPanel.querySelectorAll<HTMLElement>("pre")) {
+    if (pre.scrollWidth > pre.clientWidth || pre.scrollHeight > pre.clientHeight) pre.tabIndex = 0; else pre.removeAttribute("tabindex");
+  }
+}
+window.addEventListener("resize", () => { if (!docsPanel.hidden) reachableCode(); });
+// the code font arriving changes how wide the blocks are
+void document.fonts?.ready.then(() => { if (!docsPanel.hidden) reachableCode(); });
+document.fonts?.addEventListener?.("loadingdone", () => { if (!docsPanel.hidden) reachableCode(); });
+
 function onTab(tab: Tab): void {
   if (!app) { shownTab = tab; return; }
   // a change of view is a step the browser's back button undoes. The entry being left is brought up to date
@@ -194,6 +205,7 @@ function onTab(tab: Tab): void {
   shownTab = tab;
   if (tab === "draw") { ensureDraw(); draw?.shown(); }
   if (tab === "write") write?.shown();
+  if (tab === "syntax") reachableCode();
 }
 
 async function start(): Promise<void> {

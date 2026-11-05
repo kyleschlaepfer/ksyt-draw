@@ -91,7 +91,13 @@ export function mountFigure(host: HTMLElement, d: ChalkDoc, m: Measurer, o: Figu
   svg.style.minWidth = `${floorPx}px`;
   stage.appendChild(svg);
   figure.appendChild(stage);
-  if (floorPx > o.containerWidth) figure.appendChild(el("p", "note scroll-note", "wider than the screen: scroll sideways"));
+  if (floorPx > o.containerWidth) {
+    figure.appendChild(el("p", "note scroll-note", "wider than the screen: scroll sideways"));
+    // a region that scrolls has to be reachable without a pointer: focus it and the arrow keys scroll
+    stage.tabIndex = 0;
+    stage.setAttribute("role", "group");
+    stage.setAttribute("aria-label", "the figure, wider than the screen: the arrow keys scroll it sideways");
+  }
 
   const steps = scene.steps;
   let step = 0;
