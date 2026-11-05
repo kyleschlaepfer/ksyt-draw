@@ -7,7 +7,7 @@ import { resolve, drawnPath, gaps, type Geometry } from "../src/core/geom/resolv
 import { hits, pathLength } from "../src/core/geom/route";
 import { boxOf, contains, edgePoint, nodeSize, type NodeGeom } from "../src/core/geom/shape";
 import { buildScene, paintBounds, MARGIN, type Scene } from "../src/core/render/scene";
-import { sceneToSvg, portableSvg, esc } from "../src/core/render/svg";
+import { sceneToSvg, portableSvg, exportPalette, esc } from "../src/core/render/svg";
 import { checkScene } from "../src/core/qa";
 
 const dirs = [new URL("../fixtures/diagrams/", import.meta.url), new URL("../fixtures/v2/", import.meta.url)];
@@ -60,6 +60,23 @@ describe("layout: every fixture", () => {
         }
       }
     });
+    it(`${f}: no two elbow lines run along one channel, so two lines never read as one`, () => {
+      const elbows = g.edges.filter((e) => e.routeKind === "elbow" && !e.manual);
+      for (let i = 0; i < elbows.length; i++) for (let j = i + 1; j < elbows.length; j++) {
+        const a = elbows[i], b = elbows[j];
+        for (let m = 1; m < a.points.length; m++) for (let n = 1; n < b.points.length; n++) {
+          const [p0, p1, q0, q1] = [a.points[m - 1], a.points[m], b.points[n - 1], b.points[n]];
+          for (const k of [0, 1]) {
+            const u = 1 - k;
+            if (Math.abs(p0[k] - p1[k]) > 1e-6 || Math.abs(q0[k] - q1[k]) > 1e-6 || Math.abs(p0[k] - q0[k]) >= 0.1) continue;
+            const over = Math.min(Math.max(p0[u], p1[u]), Math.max(q0[u], q1[u])) - Math.max(Math.min(p0[u], p1[u]), Math.min(q0[u], q1[u]));
+            // two arrows may land on the same spot of the same shape, sharing the last stub and no more
+            const landing = a.to === b.to && m === a.points.length - 1 && n === b.points.length - 1 && over <= 0.33;
+            if (!landing) expect(over, `${a.from} -> ${a.to} and ${b.from} -> ${b.to} share a run`).toBeLessThanOrEqual(0.03);
+          }
+        }
+      }
+    });
     it(`${f}: resolving twice gives the same answer`, () => {
       expect(JSON.stringify([...resolve(d, stubMeasurer).nodes.values()])).toBe(JSON.stringify([...g.nodes.values()]));
       expect(resolve(d, stubMeasurer).edges.map((e) => e.points)).toEqual(g.edges.map((e) => e.points));
@@ -102,6 +119,20 @@ describe("use-case layout", () => {
     const t = g.texts.find((x) => x.name === `${inc.id}:stereotype`)!;
     expect(t.s).toBe("«include»");
     expect(t.cy).toBeLessThan(g.nodes.get("apply")!.cy);
+  });
+  it("a use case that only a right-hand actor uses stands in the far column, next to that actor", () => {
+    for (const [f, actor, uc, near] of [["usecase-permit.ksd", "clerk", "review", "apply"], ["usecase-described.ksd", "librarian", "catalog", "borrow"]] as const) {
+      const g = geos.get(f)!;
+      const a = g.nodes.get(actor)!, u = g.nodes.get(uc)!, n = g.nodes.get(near)!;
+      expect(u.cx, f).toBeGreaterThan(n.cx + n.w / 2);
+      expect(a.cy, f).toBeCloseTo(u.cy, 9);
+      // its line is short: it no longer runs the width of the system
+      const line = g.edges.find((e) => (e.from === actor && e.to === uc) || (e.from === uc && e.to === actor))!;
+      expect(pathLength(line.points), f).toBeLessThan(2);
+    }
+    // with nothing to keep in the near column there is no far one
+    const one = geo('diagram use-case\ntitle one actor, on the right\nactor a "A" right\nboundary s "S" {\n  use-case x "x"\n  use-case y "y"\n}\na -- x\na -- y');
+    expect(one.nodes.get("x")!.cx).toBeCloseTo(one.nodes.get("y")!.cx, 9);
   });
   it("a line that would cross a use case it doesn't join swings around it", () => {
     const g = geos.get("usecase-actor-inside.ksd")!;
@@ -158,6 +189,27 @@ describe("flow layout", () => {
       const ok = g.nodes.get("ok")!;
       expect(Math.hypot(t.x - ok.cx, t.cy - ok.cy)).toBeLessThan(ok.w);
     }
+  });
+  it("two answers under a wide decision stand out past its corners, so each line leaves a corner and turns once", () => {
+    const g = geos.get("activity-decision-merge.ksd")!;
+    const how = g.nodes.get("how")!;
+    const yes = g.edges.find((e) => e.from === "how" && e.to === "password")!, no = g.edges.find((e) => e.from === "how" && e.to === "code")!;
+    expect([yes.fromSide, yes.toSide, yes.points.length]).toEqual(["left", "top", 3]);
+    expect([no.fromSide, no.toSide, no.points.length]).toEqual(["right", "top", 3]);
+    expect(g.nodes.get("password")!.cx).toBeLessThanOrEqual(how.cx - how.w / 2 - 0.3 + 1e-6);
+    expect(g.nodes.get("code")!.cx).toBeGreaterThanOrEqual(how.cx + how.w / 2 + 0.3 - 1e-6);
+    // and the two paths come back into the merge at two different corners
+    const back = g.edges.filter((e) => e.to === "together");
+    expect(new Set(back.map((e) => e.toSide))).toEqual(new Set(["left", "right"]));
+    expect(back.map((e) => e.fromSide)).toEqual(["bottom", "bottom"]);
+  });
+  it("a later line keeps out of the channel an earlier one runs in", () => {
+    const g = geos.get("flow-branched.ksd")!;
+    const loop = g.edges.find((e) => e.from === "fixed" && e.to === "fix")!, help = g.edges.find((e) => e.from === "faq" && e.to === "done")!;
+    // the loop back leaves the decision level with the help article; the help article's line must not join it
+    expect(loop.fromSide).toBe("right");
+    expect(help.fromSide).toBe("bottom");
+    expect(help.toSide).toBe("right");
   });
   it("placed nodes sit where `at` says, and placing one moves no other", () => {
     const base = "diagram flowchart\ntitle t\nstart s\nprocess a\nprocess b\nend e\ns -> a\na -> b\nb -> e";
@@ -376,6 +428,16 @@ describe("portable svg (the export)", () => {
     const svg = portableSvg(sc, { fonts: { "hand-400": [{ data: "AAAA", range: "U+0000-00FF" }], "body-700": [{ data: "BBBB" }] } });
     expect(svg).toContain("@font-face{font-family:'Kalam';font-weight:400;src:url(data:font/woff2;base64,AAAA) format('woff2');unicode-range:U+0000-00FF}");
     expect(svg).not.toContain("BBBB");
+  });
+  it("with outlines, the letters are shapes: no text, no fonts, and each shape keeps its words as its name", () => {
+    const outlines = sc.texts.map((_, i) => `M${i} 0L1 1Z`);
+    const svg = portableSvg(sc, { outlines, fonts: { "hand-400": [{ data: "AAAA" }] } });
+    expect(svg).not.toContain("<text");
+    expect(svg).not.toContain("@font-face");
+    expect(svg).not.toContain("font-family");
+    sc.texts.forEach((t, i) => expect(svg).toContain(`<path d="M${i} 0L1 1Z" fill="${exportPalette("light", "page")[t.role]}"><title>${esc(t.s)}</title></path>`));
+    // a label with nothing to draw (only spaces) leaves nothing behind
+    expect(portableSvg(sc, { outlines: sc.texts.map(() => "") })).not.toContain('<path d=""');
   });
   it("padding is the margin around the ink, and size attributes can be set without changing the picture", () => {
     const d = docs.get("flow-approval.ksd")!, g = geos.get("flow-approval.ksd")!;

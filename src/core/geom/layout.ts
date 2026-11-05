@@ -29,6 +29,8 @@ let ranked: { sig: string; at: Map<string, [number, number]> } | null = null;
 export const LANE_PAD = 0.35;
 export const LANE_GAP = 0.4;
 export const LANE_MIN = 1.8;
+/** how far past a decision's corner its answer must stand for the line to leave the corner and turn once */
+const CORNER_REACH = 0.3;
 
 const place = (g: NodeGeom, n: DocNode): void => { if (n.place) { g.cx = n.place.x; g.cy = n.place.y; } };
 
@@ -58,20 +60,30 @@ function layoutFlow(d: ChalkDoc, m: Measurer, dirIn: "down" | "right"): Placemen
     const sig = [vertical ? "LR" : "TB", ranksep, ...[...nodes].map(([id, n]) => id + ":" + n.w.toFixed(3) + "x" + n.h.toFixed(3)),
       ...edges.map((e) => e.from + ">" + e.to + (e.kind === "generalization" || e.kind === "realization" ? "^" : ""))].join("|");
     if (ranked?.sig !== sig) {
-      const g = new dagre.graphlib.Graph({ multigraph: true });
-      g.setGraph({ rankdir: vertical ? "LR" : "TB", nodesep: 48, ranksep, edgesep: 24, marginx: 0, marginy: 0 });
-      g.setDefaultEdgeLabel(() => ({}));
-      for (const [id, n] of nodes) g.setNode(id, { width: n.w * PX, height: n.h * PX });
-      // dagre orders siblings by its DFS over successors in insertion order, which comes out mirrored;
-      // inserting the edges last-to-first keeps the author's file order left to right
-      for (const e of [...edges].reverse()) {
-        // a parent sits above its children whichever way the line was written
-        const up = e.kind === "generalization" || e.kind === "realization";
-        g.setEdge(up ? e.to : e.from, up ? e.from : e.to, {}, e.uid);
-      }
-      dagre.layout(g);
-      const at = new Map<string, [number, number]>();
-      for (const id of nodes.keys()) { const p = g.node(id); at.set(id, [p.x / PX, p.y / PX]); }
+      const rank = (room: Map<string, number>): Map<string, [number, number]> => {
+        const g = new dagre.graphlib.Graph({ multigraph: true });
+        g.setGraph({ rankdir: vertical ? "LR" : "TB", nodesep: 48, ranksep, edgesep: 24, marginx: 0, marginy: 0 });
+        g.setDefaultEdgeLabel(() => ({}));
+        for (const [id, n] of nodes) {
+          const extra = room.get(id) ?? 0;
+          g.setNode(id, { width: (n.w + (vertical ? 0 : extra)) * PX, height: (n.h + (vertical ? extra : 0)) * PX });
+        }
+        // dagre orders siblings by its DFS over successors in insertion order, which comes out mirrored;
+        // inserting the edges last-to-first keeps the author's file order left to right
+        for (const e of [...edges].reverse()) {
+          // a parent sits above its children whichever way the line was written
+          const up = e.kind === "generalization" || e.kind === "realization";
+          g.setEdge(up ? e.to : e.from, up ? e.from : e.to, {}, e.uid);
+        }
+        dagre.layout(g);
+        const at = new Map<string, [number, number]>();
+        for (const id of nodes.keys()) { const p = g.node(id); at.set(id, [p.x / PX, p.y / PX]); }
+        return at;
+      };
+      let at = rank(new Map());
+      // lanes set their own spacing across the flow
+      const room = lanes.length ? new Map<string, number>() : answerRoom(d, nodes, edges, at, vertical);
+      if (room.size) at = rank(room);
       ranked = { sig, at };
     }
     for (const [id, n] of nodes) {
@@ -102,6 +114,31 @@ function layoutFlow(d: ChalkDoc, m: Measurer, dirIn: "down" | "right"): Placemen
 
   if (lanes.length) frameLanes(d, m, nodes, lanes, horizontal);
   return { nodes, direction, bends: new Map() };
+}
+
+/**
+ * A decision's answers leave from its corners. That only works when the shapes they go to stand
+ * beyond those corners; when two answers on the next rank sit under a wide diamond instead, the
+ * lines have to hook back in from its point. This asks for the extra width that moves them out.
+ */
+function answerRoom(d: ChalkDoc, nodes: Map<string, NodeGeom>, edges: DocEdge[], at: Map<string, [number, number]>, vertical: boolean): Map<string, number> {
+  const room = new Map<string, number>();
+  const u = (id: string): number => at.get(id)![vertical ? 1 : 0], v = (id: string): number => at.get(id)![vertical ? 0 : 1];
+  for (const n of d.nodes) {
+    if (n.kind !== "decision" || !nodes.has(n.id)) continue;
+    const ahead = [...new Set(edges.filter((e) => e.from === n.id && e.to !== n.id && !e.route).map((e) => e.to))].filter((id) => v(id) > v(n.id) + 0.01);
+    // the answers on the nearest rank, side by side
+    const near = Math.min(...ahead.map(v));
+    const row = ahead.filter((id) => v(id) - near < 0.01).sort((a, b) => u(a) - u(b));
+    if (row.length < 2) continue;
+    const g = nodes.get(n.id)!;
+    const want = (vertical ? g.h : g.w) + 2 * CORNER_REACH;
+    const have = u(row[row.length - 1]) - u(row[0]);
+    if (have >= want - 1e-6) continue;
+    const each = (want - have) / (row.length - 1);
+    for (const id of row) room.set(id, Math.max(room.get(id) ?? 0, each));
+  }
+  return room;
 }
 
 /** Pull each automatic node into its lane: its rank along the flow stays, its place across the flow is the lane's. */
@@ -221,6 +258,13 @@ function layoutUseCase(d: ChalkDoc, m: Measurer): Placement {
     !linkedToActor.has(id) && edges.some((e) => e.from === id || e.to === id) &&
     edges.filter((e) => e.from === id || e.to === id).every((e) => e.kind === "include" || e.kind === "extend");
 
+  // a use case that only right-hand actors use stands in the far column, next to them
+  const actorSide = (id: string): "left" | "right" => (src.get(id)?.side === "right" ? "right" : "left");
+  const rightOnly = (id: string): boolean => {
+    const sides = edges.flatMap((e) => (e.from === id && kindOf(e.to) === "actor" ? [actorSide(e.to)] : e.to === id && kindOf(e.from) === "actor" ? [actorSide(e.from)] : []));
+    return sides.length > 0 && sides.every((sd) => sd === "right");
+  };
+
   const boundaries = d.nodes.filter((n) => n.kind === "boundary");
   const placedRow = new Map<string, number>();
   let cursorX = 0;
@@ -228,9 +272,13 @@ function layoutUseCase(d: ChalkDoc, m: Measurer): Placement {
   const placeColumns = (members: DocNode[], x0: number): { x1: number } => {
     const colA: Column = { items: [], rows: new Map() };
     const colB: Column = { items: [], rows: new Map() };
+    const far: NodeGeom[] = [];
+    // the far column is only worth having when something stays in the near one
+    const split = members.some((n) => n.kind === "use-case" && !onlyDependency(n.id) && !rightOnly(n.id));
     for (const n of members) {
       const g = nodes.get(n.id)!;
       if (n.kind === "use-case" && onlyDependency(n.id)) colB.items.push(g);
+      else if (n.kind === "use-case" && split && rightOnly(n.id)) far.push(g);
       else {
         colA.items.push(g);
         colA.rows.set(colA.items.length - 1, g);
@@ -238,16 +286,22 @@ function layoutUseCase(d: ChalkDoc, m: Measurer): Placement {
       }
     }
     // column B: the row of the first use case it connects to, pushed down if taken
-    for (const g of colB.items) {
+    const seat = (g: NodeGeom, anyRow: boolean): boolean => {
       const peers = ucPeers.get(g.id) ?? [];
-      let row = 0;
+      let row = anyRow ? 0 : -1;
       for (const p of peers) {
         if (placedRow.has(p)) { row = placedRow.get(p)!; break; }
       }
+      if (row < 0) return false;
       while (colB.rows.has(row)) row++;
       colB.rows.set(row, g);
       placedRow.set(g.id, row);
-    }
+      return true;
+    };
+    const waiting = colB.items.filter((g) => !seat(g, false));
+    // then the right-hand actors' own use cases, in the rows left free, and whatever hangs off those
+    for (const g of far) { colB.items.push(g); seat(g, true); }
+    for (const g of waiting) seat(g, true);
     const all = [...colA.items, ...colB.items];
     const colOf = new Map<string, Column>();
     for (const g of colA.items) colOf.set(g.id, colA);

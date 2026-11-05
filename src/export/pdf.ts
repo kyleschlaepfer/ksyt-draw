@@ -14,33 +14,7 @@ import { exportPalette } from "../core/render/svg";
 import { beyondLatin } from "./fonts";
 import { PAGES, type ExportOptions } from "./options";
 import { exportScene } from "./svg";
-
-type Loader = () => Promise<{ default: string }>;
-const WOFF: Record<string, { latin: Loader; ext: Loader }> = {
-  "hand-300": {
-    latin: () => import("@fontsource/kalam/files/kalam-latin-300-normal.woff?inline"),
-    ext: () => import("@fontsource/kalam/files/kalam-latin-ext-300-normal.woff?inline"),
-  },
-  "hand-400": {
-    latin: () => import("@fontsource/kalam/files/kalam-latin-400-normal.woff?inline"),
-    ext: () => import("@fontsource/kalam/files/kalam-latin-ext-400-normal.woff?inline"),
-  },
-  "body-400": {
-    latin: () => import("@fontsource/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-400-normal.woff?inline"),
-    ext: () => import("@fontsource/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-ext-400-normal.woff?inline"),
-  },
-  "body-700": {
-    latin: () => import("@fontsource/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-700-normal.woff?inline"),
-    ext: () => import("@fontsource/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-ext-700-normal.woff?inline"),
-  },
-};
-
-function bytes(dataUrl: string): Uint8Array {
-  const bin = atob(dataUrl.replace(/^data:[^,]*,/, ""));
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
+import { woffBytes } from "./woff";
 
 const hex = (c: string): RGB => rgb(parseInt(c.slice(1, 3), 16) / 255, parseInt(c.slice(3, 5), 16) / 255, parseInt(c.slice(5, 7), 16) / 255);
 
@@ -85,8 +59,7 @@ export async function exportPdf(d: ChalkDoc, m: Measurer, o: ExportOptions): Pro
     const id = `${key}/${which}`;
     let f = fonts.get(id);
     if (!f) {
-      const src = WOFF[key] ?? WOFF["hand-400"];
-      f = await pdf.embedFont(bytes((await src[which]()).default), { subset: true });
+      f = await pdf.embedFont(await woffBytes(key, which), { subset: true });
       fonts.set(id, f);
     }
     return f;

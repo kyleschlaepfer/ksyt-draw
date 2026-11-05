@@ -11,6 +11,8 @@ export interface ExportOptions {
   backdrop: Backdrop;
   /** space around the ink, inches */
   padding: number;
+  /** svg: write the letters as shapes, so the file looks the same in programs that ignore its fonts */
+  outlineText?: boolean;
   /** png: output pixels per CSS pixel (96 px per inch) */
   scale?: number;
   /** pdf: the page, and which way up */

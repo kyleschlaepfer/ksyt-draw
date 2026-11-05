@@ -10,7 +10,7 @@ import { CONTAINERS } from "../doc/types";
 import { LINE, NODE_PX, PX, SMALL_PX, type Measurer } from "../measure";
 import { catmull } from "../pen";
 import { layoutNodes } from "./layout";
-import { pathLength, pointAt, routeEdge, type RouteInput } from "./route";
+import { pathLength, pointAt, routeEdge, type RouteInput, type TakenRoute } from "./route";
 import { ACTOR_H, CLASS_PAD_X, boxOf, contains, type NodeGeom, type Pt } from "./shape";
 
 export type TextRole = "ink" | "ink-2" | "accent" | "accent-strong" | "terra";
@@ -473,6 +473,8 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
     return out2;
   };
   const out: EdgeGeom[] = [];
+  // where the lines before this one run, so a later line keeps out of their channels
+  const taken: TakenRoute[] = [];
   for (const e of d.edges) {
     const from = nodes.get(e.from), to = nodes.get(e.to);
     if (!from || !to || from === to || from.shape === "container" || from.shape === "lane" || to.shape === "container" || to.shape === "lane") continue;
@@ -480,7 +482,10 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
     pairSeen.set(k, i + 1);
     if (only && !only.has(e.uid)) {
       const was = known?.get(e.uid);
-      if (was) { note(leaves, e.from, was.fromSide); note(arrives, e.to, was.toSide); }
+      if (was) {
+        note(leaves, e.from, was.fromSide); note(arrives, e.to, was.toSide);
+        if (was.routeKind === "elbow") taken.push({ points: was.points, from: e.from, to: e.to });
+      }
       continue;
     }
     // -1, +1 for a pair; -1, 0, +1 for three; mirrored when the line runs the other way
@@ -498,7 +503,7 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
       else if (to.cy - to.h / 2 > from.cy + from.h / 2) { pf.from = "bottom"; pf.to = "top"; }
     }
     const r = routeEdge({
-      from, to, kind, gapFrom, gapTo, flow, lateral, prefer: pf,
+      from, to, kind, gapFrom, gapTo, flow, lateral, prefer: pf, taken,
       // bars take lines on both faces by design, and an undirected line has no leaving end
       ...(e.directed ? { sideCost: { from: from.shape === "bar" ? {} : costs(arrives, e.from), to: to.shape === "bar" ? {} : costs(leaves, e.to) } } : {}),
       obstacles: solid,
@@ -506,6 +511,7 @@ export function routeAll(d: ChalkDoc, nodes: Map<string, NodeGeom>, solid: NodeG
       ...(e.route?.via ? { via: e.route.via.map((p) => [p[0], p[1]] as Pt) } : bend ? { via: [bend] } : {}),
     });
     if (e.directed) { note(leaves, e.from, r.fromSide); note(arrives, e.to, r.toSide); }
+    if (kind === "elbow") taken.push({ points: r.points, from: e.from, to: e.to });
     out.push({
       uid: e.uid, id: e.id, kind: e.kind, from: e.from, to: e.to, points: r.points, smooth: !!bend, routeKind: kind, manual: !!e.route,
       fromSide: r.fromSide, toSide: r.toSide, blocked: r.blocked, step: e.step, directed: e.directed, dashed: isDashed(e),

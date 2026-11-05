@@ -30,7 +30,11 @@ export interface RouteInput {
   sideCost?: { from?: Partial<Record<Side, number>>; to?: Partial<Record<Side, number>> };
   /** 0 for the only line between two shapes; ±1, ±2 for parallel ones, which are spread apart */
   lateral?: number;
+  /** lines already routed: a new line keeps off their channels and crosses them as little as it can */
+  taken?: TakenRoute[];
 }
+
+export interface TakenRoute { points: Pt[]; from: string; to: string }
 
 export interface RouteResult { points: Pt[]; fromSide: Side; toSide: Side; blocked: boolean }
 
@@ -38,6 +42,10 @@ const STUB = 0.22;
 const BEND = 0.35;
 const PAD = 0.07;
 const SPREAD = 0.17;
+/** two parallel runs closer than this read as one line */
+const NEAR = 0.1;
+const SHARE = 5;
+const CROSS = 0.25;
 
 const same = (a: Pt, b: Pt): boolean => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
 
@@ -121,6 +129,17 @@ export function hits(pts: Pt[], obstacles: NodeGeom[], ends: { from?: NodeGeom; 
   return n;
 }
 
+/**
+ * In a flow, a route is as long as it is from center to center: measured between outlines, a wide
+ * shape's sides look nearer than they are, and lines start leaving sideways for no reason a reader
+ * can see.
+ */
+function reach(inp: RouteInput, fs: Side, ts: Side): number {
+  if (inp.flow === "none") return 0;
+  const half = (g: NodeGeom, side: Side): number => (g.shape === "bar" ? 0 : side === "left" || side === "right" ? g.w / 2 : g.h / 2);
+  return half(inp.from, fs) + half(inp.to, ts);
+}
+
 function bends(pts: Pt[]): number {
   return Math.max(0, pts.length - 2);
 }
@@ -134,6 +153,46 @@ function jogs(pts: Pt[]): number {
     if (L < 0.3) p += 0.6 * (1 - L / 0.3) + 0.2;
   }
   return p;
+}
+
+/**
+ * What a route costs against the lines already drawn. Running along another line's channel is the
+ * worst thing an elbow line can do short of crossing a shape: the two read as one line, and the
+ * picture then says something the text does not. Two lines that end at the same shape may land on
+ * the same spot, sharing the last short stub and no more. A plain crossing costs a little.
+ */
+function sharing(pts: Pt[], inp: RouteInput): number {
+  const taken = inp.taken;
+  if (!taken || !taken.length) return 0;
+  let cost = 0;
+  for (const t of taken) {
+    const merge = t.to === inp.to.id;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      const ah = Math.abs(a[1] - b[1]) < 1e-6, av = Math.abs(a[0] - b[0]) < 1e-6;
+      if (!ah && !av) continue;
+      for (let j = 1; j < t.points.length; j++) {
+        const c = t.points[j - 1], e = t.points[j];
+        const ch = Math.abs(c[1] - e[1]) < 1e-6, cv = Math.abs(c[0] - e[0]) < 1e-6;
+        if (!ch && !cv) continue;
+        if ((ah && ch && !(av && cv)) || (av && cv && !(ah && ch))) {
+          // parallel: do they run in one channel?
+          const k = ah ? 1 : 0, u = 1 - k;
+          if (Math.abs(a[k] - c[k]) >= NEAR) continue;
+          const over = Math.min(Math.max(a[u], b[u]), Math.max(c[u], e[u])) - Math.max(Math.min(a[u], b[u]), Math.min(c[u], e[u]));
+          if (over <= 0.03) continue;
+          if (merge && i === pts.length - 1 && j === t.points.length - 1 && over <= STUB + 0.1) continue;
+          cost += SHARE + 2 * over;
+        } else if (ah !== ch) {
+          // square to each other: a crossing when each passes through the other's inside
+          const h0 = ah ? a : c, h1 = ah ? b : e, v0 = ah ? c : a, v1 = ah ? e : b;
+          const x = v0[0], y = h0[1];
+          if (x > Math.min(h0[0], h1[0]) + 0.02 && x < Math.max(h0[0], h1[0]) - 0.02 && y > Math.min(v0[1], v1[1]) + 0.02 && y < Math.max(v0[1], v1[1]) - 0.02) cost += CROSS;
+        }
+      }
+    }
+  }
+  return cost;
 }
 
 /** A bar takes every line square-on, at the other shape's position along it. */
@@ -281,7 +340,7 @@ function elbowAuto(inp: RouteInput): RouteResult {
             if (slid && pts.length > 2) continue;
             const h = hits(pts, inp.obstacles, { from, to });
             const off = slid ? Math.abs(sf - lateral * SPREAD) + Math.abs(st - lateral * SPREAD) : 0;
-            const score = pathLength(pts) + BEND * bends(pts) + pen + 0.12 * off + jogs(pts) + 1000 * h;
+            const score = pathLength(pts) + reach(inp, fs, ts) + BEND * bends(pts) + pen + 0.12 * off + jogs(pts) + sharing(pts, inp) + 1000 * h;
             if (!best || score < best.score - 1e-9) best = { pts, fromSide: fs, toSide: ts, score, blocked: h > 0 };
           }
         }
@@ -301,7 +360,7 @@ function elbowAuto(inp: RouteInput): RouteResult {
       if (!mid) continue;
       const pts = simplify([S, ...mid, T]);
       const h = hits(pts, inp.obstacles, { from, to });
-      const score = pathLength(pts) + BEND * bends(pts) + sidePenalty(inp, fs, ts) + 1000 * h;
+      const score = pathLength(pts) + reach(inp, fs, ts) + BEND * bends(pts) + sidePenalty(inp, fs, ts) + sharing(pts, inp) + 1000 * h;
       if (!found || score < found.score) found = { pts, fromSide: fs, toSide: ts, score, blocked: h > 0 };
     }
   }

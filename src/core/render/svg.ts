@@ -138,6 +138,11 @@ export interface PortableOptions {
   backdrop?: Backdrop;
   /** base64 woff2 files by "family-weight" key (hand-300, hand-400, body-400, body-700), each with its unicode-range when it is a subset */
   fonts?: Partial<Record<string, FontFile[]>>;
+  /**
+   * Path data for each text, in the scene's order: the letters as shapes. With these the file holds
+   * no text and no fonts, so it looks the same in programs that ignore an embedded font.
+   */
+  outlines?: string[];
   idPrefix?: string;
   /** output size in px; default is the scene's natural size at 96 px per inch */
   width?: number;
@@ -171,7 +176,7 @@ export function portableSvg(sc: Scene, o: PortableOptions = {}): string {
   ];
   if (sc.desc) out.push(`<desc id="${did}">${esc(sc.desc)}</desc>`);
   const css: string[] = [];
-  const used = new Set(sc.texts.map((t) => `${t.family}-${t.weight}`));
+  const used = new Set(o.outlines ? [] : sc.texts.map((t) => `${t.family}-${t.weight}`));
   for (const key of [...used].sort()) {
     const [family, weight] = key.split("-") as ["hand" | "body", string];
     for (const file of o.fonts?.[key] ?? []) {
@@ -185,7 +190,12 @@ export function portableSvg(sc: Scene, o: PortableOptions = {}): string {
     out.push(...paintsToSvg(el.paints, color));
     out.push("</g>");
   }
-  for (const t of sc.texts) out.push(textTag(t, `font-family="${FONT_STACK[t.family]}" fill="${pal[t.role]}"`, true));
+  sc.texts.forEach((t, i) => {
+    const d = o.outlines?.[i];
+    // the label's words stay in the file as the shape's name, for a reader that asks
+    if (d !== undefined) { if (d) out.push(`<path d="${d}" fill="${pal[t.role]}"><title>${esc(t.s)}</title></path>`); }
+    else out.push(textTag(t, `font-family="${FONT_STACK[t.family]}" fill="${pal[t.role]}"`, true));
+  });
   out.push("</svg>");
   return out.join("\n");
 }

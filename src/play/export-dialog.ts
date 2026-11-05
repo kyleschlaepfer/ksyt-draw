@@ -6,16 +6,14 @@
  * rest sit under "more". Choices are remembered with the workspace.
  */
 import { PX } from "../core/measure";
-import { portableSvg } from "../core/render/svg";
-import { fontsFor } from "../export/fonts";
 import { DEFAULTS, PADDING, PAGES, type ExportFormat, type ExportOptions, type PagePreset } from "../export/options";
 import { exportPng, MAX_PIXELS } from "../export/png";
-import { exportScene } from "../export/svg";
+import { exportScene, sceneSvg } from "../export/svg";
 import { saveBlob } from "../export/save";
 import { button, el, type App } from "./app";
 
 type Ground = "white" | "page" | "clear" | "board";
-interface Choice { format: ExportFormat; look: "sketch" | "precision"; ground: Ground; padding: keyof typeof PADDING; scale: number; page: PagePreset; orientation: "portrait" | "landscape" }
+interface Choice { format: ExportFormat; look: "sketch" | "precision"; ground: Ground; padding: keyof typeof PADDING; scale: number; text: "letters" | "shapes"; page: PagePreset; orientation: "portrait" | "landscape" }
 
 const GROUND: Record<Ground, Pick<ExportOptions, "theme" | "backdrop">> = {
   white: { theme: "light", backdrop: "white" }, page: { theme: "light", backdrop: "page" },
@@ -35,10 +33,11 @@ export function openExportDialog(app: App, say: (msg: string) => void): void {
     ground: (["white", "page", "clear", "board"] as const).includes(saved.ground as Ground) ? (saved.ground as Ground) : "white",
     padding: saved.padding && saved.padding in PADDING ? saved.padding : "normal",
     scale: [1, 2, 3, 4].includes(Number(saved.scale)) ? Number(saved.scale) : 2,
+    text: saved.text === "shapes" ? "shapes" : "letters",
     page: saved.page && (saved.page === "fit" || saved.page in PAGES) ? saved.page : "fit",
     orientation: saved.orientation === "portrait" ? "portrait" : "landscape",
   };
-  const options = (): ExportOptions => ({ ...DEFAULTS, look: c.look, ...GROUND[c.ground], padding: PADDING[c.padding], scale: c.scale, page: c.page, orientation: c.orientation });
+  const options = (): ExportOptions => ({ ...DEFAULTS, look: c.look, ...GROUND[c.ground], padding: PADDING[c.padding], scale: c.scale, page: c.page, orientation: c.orientation, outlineText: c.format === "svg" && c.text === "shapes" });
 
   const dlg = el("dialog", "export-dialog");
   dialog = dlg;
@@ -83,9 +82,10 @@ export function openExportDialog(app: App, say: (msg: string) => void): void {
   more.appendChild(el("summary", undefined, "more"));
   const padding = group("space around it", "padding", [["tight", "tight"], ["normal", "normal"], ["roomy", "roomy"]]);
   const scale = group("PNG size", "scale", [["1", "1x"], ["2", "2x", "sharp on slides"], ["3", "3x"], ["4", "4x", "print"]]);
+  const text = group("SVG text", "text", [["letters", "letters", "can be searched and retyped; other programs may swap the font"], ["shapes", "shapes", "looks the same in every program"]]);
   const page = group<PagePreset>("PDF page", "page", [["fit", "the diagram's own size"], ["letter", "US Letter"], ["a4", "A4"], ["slide", "16:9 slide"]]);
   const orient = group("which way up", "orientation", [["landscape", "landscape"], ["portrait", "portrait"]]);
-  more.append(padding, scale, page, orient);
+  more.append(padding, scale, text, page, orient);
   form.append(format, look, ground, more);
 
   const actions = el("div", "actions");
@@ -105,6 +105,7 @@ export function openExportDialog(app: App, say: (msg: string) => void): void {
     app.workspace.export = { ...c };
     app.touchWorkspace();
     scale.hidden = c.format !== "png";
+    text.hidden = c.format !== "svg";
     page.hidden = c.format !== "pdf";
     orient.hidden = c.format !== "pdf" || c.page === "fit";
     copy.hidden = c.format === "pdf";
@@ -112,7 +113,7 @@ export function openExportDialog(app: App, say: (msg: string) => void): void {
     stageBox.dataset.ground = c.ground;
     const o = options();
     const { scene, qa } = exportScene(app.session.doc!, app.measurer, o);
-    const svg = portableSvg(scene, { theme: o.theme, backdrop: o.backdrop, fonts: await fontsFor(scene) });
+    const svg = await sceneSvg(scene, o);
     if (my !== token) return;
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
     const w = Math.round(scene.w * PX), h = Math.round(scene.h * PX);
@@ -140,7 +141,7 @@ export function openExportDialog(app: App, say: (msg: string) => void): void {
       try {
         if (c.format === "svg") {
           const { scene } = exportScene(doc, app.measurer, o);
-          saveBlob(new Blob([portableSvg(scene, { theme: o.theme, backdrop: o.backdrop, fonts: await fontsFor(scene) })], { type: "image/svg+xml" }), name());
+          saveBlob(new Blob([await sceneSvg(scene, o)], { type: "image/svg+xml" }), name());
         } else if (c.format === "png") {
           saveBlob((await exportPng(doc, app.measurer, o)).blob, name());
         } else {
@@ -168,7 +169,7 @@ export function openExportDialog(app: App, say: (msg: string) => void): void {
           note.textContent = "copied the picture";
         } else {
           const { scene } = exportScene(doc, app.measurer, o);
-          await navigator.clipboard.writeText(portableSvg(scene, { theme: o.theme, backdrop: o.backdrop, fonts: await fontsFor(scene) }));
+          await navigator.clipboard.writeText(await sceneSvg(scene, o));
           note.textContent = "copied the SVG text";
         }
       } catch {

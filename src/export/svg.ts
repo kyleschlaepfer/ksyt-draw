@@ -23,8 +23,16 @@ export function exportScene(d: ChalkDoc, m: Measurer, o: Pick<ExportOptions, "lo
   return { scene, qa: checkScene(scene, { minDisplayPx: 2000 }) };
 }
 
-/** A self-contained SVG file as text. */
-export async function exportSvg(d: ChalkDoc, m: Measurer, o: Pick<ExportOptions, "look" | "padding" | "backdrop" | "theme">, size?: { width: number; height: number }): Promise<string> {
-  const { scene } = exportScene(d, m, o);
+/** A scene as a self-contained SVG file's text: real text with its fonts inside, or the letters as shapes. */
+export async function sceneSvg(scene: Scene, o: Pick<ExportOptions, "backdrop" | "theme" | "outlineText">, size?: { width: number; height: number }): Promise<string> {
+  if (o.outlineText) {
+    const { outlineTexts } = await import("./outline");
+    return portableSvg(scene, { theme: o.theme, backdrop: o.backdrop, outlines: await outlineTexts(scene), ...(size ?? {}) });
+  }
   return portableSvg(scene, { theme: o.theme, backdrop: o.backdrop, fonts: await fontsFor(scene), ...(size ?? {}) });
+}
+
+/** A self-contained SVG file as text. */
+export async function exportSvg(d: ChalkDoc, m: Measurer, o: Pick<ExportOptions, "look" | "padding" | "backdrop" | "theme" | "outlineText">, size?: { width: number; height: number }): Promise<string> {
+  return sceneSvg(exportScene(d, m, o).scene, o, size);
 }
