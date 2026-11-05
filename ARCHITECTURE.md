@@ -1,10 +1,15 @@
-# KSyt Draw: architecture (v1 = embeddable diagrams)
+# Chalk: architecture (v2)
 
-2026-11-04. The diagram tool for kyleschlaepfer.com, starting with the part that can ship now: **text in, diagram out, embedded in any page.** The full drag-and-drop editor comes later and is built on the same core, so nothing here is throwaway.
+Chalk is the diagram tool for kyleschlaepfer.com. The repo, the deploy and the message protocol keep the name `ksyt-draw`. This file is the working map: what the pieces are, where they live, and how a diagram gets from text to ink. The reasons behind each choice are in [`docs/revamp/ARCHITECTURE_DECISIONS.md`](docs/revamp/ARCHITECTURE_DECISIONS.md) and are linked here by number, not repeated.
 
-## 1. What v1 is
+## 1. What it is
 
-A lesson page on kyleschlaepfer.com (or any page, like a professor's LMS) shows a live diagram: a use-case, activity or flowchart diagram, drawn in the same style as the videos, built from a few lines of text, optionally stepping through like a phased slide, with an optional panel that checks the notation using the same rules as `diagram-semantics-reviewer`.
+One diagram, two ways to edit it, one way to draw it.
+
+- **Write.** A few lines of `.ksd` text become a use-case, activity, class or flow diagram.
+- **Draw.** The same diagram on a canvas: place, connect, move, resize, restyle. Every change is written back into the text.
+- **Embed.** A read-only figure in an iframe on any page, built from text carried in the link.
+- **Export.** PNG, SVG and PDF files made for slides and reports.
 
 ```
 diagram use-case
@@ -18,145 +23,295 @@ resident -- apply
 apply -include-> pay
 ```
 
-| In v1 | Later (same core) |
-|---|---|
-| `/embed/`: read-only diagram from text, build-up steps, lint panel, theme sync | `/` becomes the full editor: drag, resize, swimlanes, free text |
-| `/`: a playground (text left, live preview right, lint, "copy embed code") | Structured Markdown export of diagrams and use-case descriptions |
-| Families: flowchart, activity, use-case | Sequence, state, class, ERD (the reviewer already has their rules) |
-| Download SVG | PNG/JPEG export at fit or 100% |
-| No backend, no accounts | Worker + D1/R2 if saving across devices is ever needed |
-
-**Not in v1:** freehand drawing (there is none, ever: shapes are predefined and the pen engine only renders them), editing by dragging, saving to an account.
+Still true from v1: shapes are predefined and nobody draws freehand; everything runs in the reader's browser; there is no backend and no account.
 
 ## 2. System shape
 
 ```
-kyleschlaepfer.com  (site repo, private, Astro)            chalk.kyleschlaepfer.com  (this repo)
-┌──────────────────────────────────────────────┐           ┌─────────────────────────────────────────┐
-│ lessons/permits.mdx                          │           │ /embed/   index.html + embed.ts          │
-│   <DiagramEmbed src="permit.ksd" caption=…/> │  iframe   │   reads #d=<compressed .ksd>             │
-│ ┌──────────────────────────────────────────┐ │ ────────▶ │   parse → lint → layout → render → SVG   │
-│ │ <iframe src="…/embed/#v=1&d=…&id=…">     │ │           │                                          │
-│ └──────────────────────────────────────────┘ │ ◀──────── │   postMessage: ready, resize, step, lint │
-│ figcaption + optional text alternative       │ ────────▶ │   postMessage: theme, step, load         │
-│ small host script: resize + theme sync       │           │ /         playground (same core, no iframe)│
-└──────────────────────────────────────────────┘           │ /assets/  JS, CSS, Kalam + Atkinson fonts │
-                                                           └─────────────────────────────────────────┘
-                                                             Cloudflare Workers, static assets only
+kyleschlaepfer.com  (site repo, Astro)                    chalk.kyleschlaepfer.com  (this repo)
+┌──────────────────────────────────────────────┐          ┌──────────────────────────────────────────┐
+│ lessons/permits.mdx                          │          │ /embed/   embed/index.html, src/embed     │
+│   <DiagramEmbed ksd={...} caption="..."/>    │  iframe  │   reads #v=1&d=<compressed .ksd>          │
+│ ┌──────────────────────────────────────────┐ │ ───────▶ │   parse, resolve, paint, check            │
+│ │ <iframe src=".../embed/#v=1&d=...&id=..."> │ │          │                                          │
+│ └──────────────────────────────────────────┘ │ ◀─────── │   postMessage: ready, resize, step, lint  │
+│ figcaption                                   │ ───────▶ │   postMessage: theme, step, load          │
+│ small host script: resize + theme sync       │          │ /         index.html, src/play            │
+└──────────────────────────────────────────────┘          │   write, draw, the syntax, export         │
+                                                          │ /assets/  JS, CSS, fonts                  │
+                                                          └──────────────────────────────────────────┘
+                                                            Cloudflare Workers, static assets only
 ```
 
-Everything happens in the reader's browser. The diagram text travels in the URL **hash**, which browsers never send to the server, so there's no backend, no database, nothing logged, and every diagram is a shareable link.
+The diagram text travels in the URL hash, which browsers never send to a server. The tool page also keeps the open diagram as a local draft in the browser (decision 15).
 
-## 3. Why these choices
+## 3. The pipeline
 
-| Decision | Why | Cost |
+Every surface (the write preview, the draw canvas, the embed, each export) runs the same stages. There is one answer to "where is everything" and one answer to "what does it look like" (decision 7).
+
+```
+.ksd text
+  │  parseSource()            src/core/doc/parse.ts     text -> ChalkDoc + statement map + diagnostics
+  ▼
+ChalkDoc                      src/core/doc/types.ts     the canonical document, schema version 2
+  │  resolve()                src/core/geom/resolve.ts  layout + router + label placement, in inches
+  ▼
+Geometry                                                every box, path and label position
+  │  buildScene()             src/core/render/scene.ts  one of two looks: sketch or precision
+  ▼
+Scene                                                   a display list of paints and text
+  ├─ sceneToSvg()             src/core/render/svg.ts    the page figure: theme role classes
+  ├─ elementMarkup()          src/core/render/svg.ts    the draw canvas, element by element
+  ├─ portableSvg()            src/core/render/svg.ts    the SVG export, and the source of the PNG
+  └─ exportPdf()              src/export/pdf.ts         vector PDF
+
+ChalkDoc ── review()          src/core/diagnostics.ts   the notation check (reviewer's rules + v2 rules)
+Scene ──── checkScene()       src/core/qa.ts            the layout check (ink through text, overlaps, clipping)
+ChalkDoc ── describeItems()   src/core/describe.ts      the text alternative
+```
+
+## 4. Module map
+
+`src/core/` has no DOM access, so all of it runs in Node tests. DOM code lives in `src/embed/`, `src/play/` and the browser-only parts of `src/export/`.
+
+| Folder | Files | What it holds |
 |---|---|---|
-| Separate subdomain and repo | The site repo is private; this may go open source, and its AutEk vs. channel filing is open. Separate deploys, separate stack, isolated failures. | Styles shared by copying `ksyt.css` (enforced by a test later); no shared browser storage (nothing needs it). |
-| iframe embed, not a script that injects into the page | Complete CSS/JS isolation both ways; works in an LMS that allows iframes; one origin to secure. | Height must be messaged (`resize`); theme must be messaged (`theme`). |
-| Text format (`.ksd`), not JSON | Kyle writes it in a lesson file in seconds; reads like the diagram. | A parser to maintain (small; reference parser and fixtures provided). |
-| Internal model = the reviewer's contract 1.0 | The linter is a port of `review_diagrams.py`'s `Review` class, checked against its real output. The future editor exports the same model. | None: it's already the house format. |
-| Pen engine ported to TypeScript, bit-compatible | Same strokes as the slides: an element named `pay` wobbles identically in a video and on the site. Already ported and verified (45 tests). | Port must be kept in step with `pen.py`. |
-| dagre for flow layout, a custom layout for use cases | Flows are layered graphs (dagre's job). Use-case diagrams aren't: actors outside, use cases inside a boundary, include/extend to the side. | Use-case layout is ~150 lines of our own code. |
-| Vanilla TypeScript + Vite, no UI framework | The embed is one SVG and four buttons. Small bundle, fast first paint inside someone else's page. | The future editor may want a framework; it can add one in its own entry. |
-| Cloudflare Workers static assets, no Worker script | Cloudflare's recommended path for new projects; static requests are free; `_headers` sets CSP and framing. | Wrangler config instead of Pages' dashboard flow. |
+| `src/core/doc/` | `types.ts` | `ChalkDoc`, node and edge kinds, style roles |
+| | `parse.ts` | the v2 parser: a superset of v1, with error recovery, a statement map and `adoptUids()` |
+| | `print.ts` | one printer per statement; `printDoc()` for a whole file |
+| | `sync.ts` | `syncSource()` (targeted edits) and `formatSource()` (tidy) |
+| | `commands.ts` | edit operations on a draft: add, move, resize, connect, rename, paste |
+| | `session.ts` | `Session`: the text, the last good document, its geometry, one undo history |
+| | `project.ts` | the `.chalk.json` project file; defensive reading of untrusted files |
+| | `contract.ts` | `toContract()`: the document as the reviewer's contract 1.0 |
+| `src/core/geom/` | `shape.ts` | each kind's size, outline, side anchors |
+| | `layout.ts` | dagre ranking for flows and classes, lanes, the use-case columns |
+| | `route.ts` | the router: straight lines, orthogonal elbows, an A* fallback |
+| | `resolve.ts` | `resolve()`: layout, routing, label placement, bounds |
+| | `arrange.ts` | snapping, align, distribute, match size |
+| `src/core/render/` | `scene.ts` | `buildScene()`, paints, framing |
+| | `sketch.ts` | the sketch look: pen strokes from `pen.ts` |
+| | `precision.ts` | the precision look: real strokes, exact corners |
+| | `svg.ts` | `sceneToSvg()` for the page, `portableSvg()` for files; all escaping |
+| `src/core/` | `pen.ts`, `pyrandom.ts` | bit-compatible ports of the slide skill's pen and CPython's random |
+| | `lint.ts` | the notation check: a port of the reviewer |
+| | `diagnostics.ts` | `review()`, `rulesV2()`, `allIssues()`: one list of findings for the UI |
+| | `qa.ts` | the layout check |
+| | `describe.ts` | the text alternative |
+| | `measure.ts` | the `Measurer` interface, the test stub, text sizes |
+| | `state.ts` | the URL hash |
+| | `parse.ts`, `model.ts` | the frozen v1 parser and the contract 1.0 types (see section 13) |
+| `src/export/` | `options.ts`, `svg.ts`, `png.ts`, `pdf.ts` | the export pipeline and its three writers |
+| | `outline.ts` | SVG text as shapes |
+| | `fonts.ts`, `woff.ts` | font data, loaded lazily |
+| | `save.ts` | hands a file to the browser's download |
+| `src/embed/` | `main.ts`, `figure.ts`, `download.ts`, `measure-dom.ts`, `embed.css` | the embed page; `mountFigure()` is shared with the write preview |
+| `src/play/` | `main.ts`, `app.ts`, `tabs.ts` | the tool page, its views row, `APP_NAME` |
+| | `write.ts`, `editor/` | the write view and the CodeMirror 6 editor |
+| | `draw/` | the draw view: `canvas.ts`, `inspector.ts`, `inline-edit.ts`, `index.ts`, `dom.ts` |
+| | `export-dialog.ts`, `files.ts`, `storage.ts`, `templates.ts`, `examples.ts` | export, the document bar, the local draft |
+| | `docs.html` | the in-app syntax reference |
 
-## 4. Repo layout (chalk.kyleschlaepfer.com)
+Around the source:
+
+| Path | What it is |
+|---|---|
+| `spec/` | the contract: text format, rendering, lint, embed protocol |
+| `reference/` | read-only Python and CSS sources the ports follow |
+| `fixtures/` | golden outputs from the Python reference; `fixtures/v2/` holds hand-written v2 examples |
+| `site/` | `DiagramEmbed.astro` and `draw-host.ts`, to copy into the site repo |
+| `scripts/` | scripts that drive a running app (section 15) |
+| `docs/GUIDE.md` | the user guide |
+| `docs/revamp/` | the revival's audits, decisions and galleries |
+| `public/_headers` | CSP, framing and caching |
+
+## 5. The document model
+
+`ChalkDoc` (`format: "chalk-doc"`, `version: 2`) keeps five layers apart (decision 1).
+
+| Layer | Fields | Rule |
+|---|---|---|
+| semantics | `kind`, `label`, `from`, `to`, `members`, `parent`, `ends` | what the diagram means |
+| geometry | `place`, `size`, `thickness`, `route`, `labelPos`, `pool` | only what the author fixed by hand; absent means automatic |
+| presentation | `style`, `meta.look` | theme roles, never hex |
+| authoring | `uid`, `id`, `step`, `describe`, `inline` | `uid` is the stable identity; `id` is the name people type |
+| persistence | `format`, `version`, `ext` | `ext` survives a save untouched |
+
+Four diagram types: `flowchart`, `activity`, `use-case`, `class`. Edge ids (`e1`, `e2`, ...) are derived from file order because the reviewer's findings use them; identity is the `uid`.
+
+## 6. Text and sync
+
+The `.ksd` text is complete. Hand-set positions, sizes, routes, label positions and styles live in a managed `layout { }` block at the end of the file, so a link, an embed and a saved file all carry the arrangement (decision 2). The grammar is in [`spec/diagram-text.md`](spec/diagram-text.md).
+
+- **Reading.** `parseSource()` returns the document, a statement map (which line declares which node or edge) and diagnostics with column ranges. It does not stop at the first mistake. A text with any error has `doc: null`.
+- **Writing.** A draw edit goes back into the text through `syncSource()`: each statement is printed for the old document and the new one, and only the lines whose print changed are replaced, added or removed. Comments, blank lines, order and spacing stay as the author left them (decision 3).
+- **Tidy.** `formatSource()` puts every line in its standard form and keeps comments and order.
+- **Identity across a re-parse.** `adoptUids()` gives a fresh parse the uids of the document it replaces: nodes by id, lines by their ends and kind.
+
+The native file is `.chalk.json` (`src/core/doc/project.ts`): the text, the model as inspectable JSON, and the workspace (viewport, export choices). Opening one re-parses the text with the same parser as anything typed; nothing from the file is trusted.
+
+## 7. The session
+
+`Session` (`src/core/doc/session.ts`) is the one open document. Both views read and change it; neither holds its own copy (decision 4).
+
+| Call | Used by | Does |
+|---|---|---|
+| `setText(text, label)` | Write; also new, open and a link | parses; a valid text becomes the document; typing within 1.2 s is one undo step. Opening a file is one undo step too, so undo brings back what was there |
+| `edit(label, fn)` | Draw | clones the document, applies commands, holds other shapes still, writes the text, records one undo step |
+| `undo()`, `redo()` | both | one history of text snapshots, 300 deep, with the selection |
+| `load(text)` | the constructor only | sets the first document with an empty history |
+
+**Text with a mistake** (decision 5). The last valid document stays on screen and `inSync` is false. Write underlines every bad line. Draw goes read-only until the text is fixed, so it can never overwrite a newer draft.
+
+## 8. Who owns the layout
+
+Layout is automatic until the author says otherwise (decision 6, awaiting the owner's sign-off).
+
+- A node without `place` is placed by the engine. A node with `place` keeps its slot in the automatic layout and is then moved to where the author put it, so the result is a pure function of the document.
+- **Hold still.** After a draw edit, `holdStill()` resolves the draft again. Any automatic shape the edit would have shifted gets a `place` where it already was. Moving one shape moves one shape. Then `makeRoom()` checks that holding still did not break the picture: a shape the edit newly crowds (a class that grew into its neighbour, a new labelled line between two close shapes) is pushed over just far enough. Edits that place or size a shape are left exactly as made.
+- One exception: when nothing is placed by hand and the whole diagram slides by the same amount, nothing is pinned. The canvas pans to cancel the slide.
+- "tidy up" and "let it find its own place" delete `place`, `size`, `route` and `labelPos`, which hands those parts back. Tidy up shows the result before it is kept.
+
+## 9. Geometry
+
+`resolve()` is three steps. Details and constants are in [`spec/rendering.md`](spec/rendering.md).
+
+1. **Layout** (`layout.ts`). dagre ranks flowcharts, activity diagrams and class diagrams. Partitions then pull each node into its lane. Use-case diagrams use their own columns: actors outside, use cases inside the boundary. `answerRoom()` re-ranks a flow with extra room so a decision's two answers stand past its corners. In a use-case diagram, a use case that only right-hand actors use stands in the far column, next to them.
+2. **Routing** (`route.ts`). Use-case lines run straight. Everything else is an orthogonal elbow: the router scores short patterns for every pair of sides and falls back to an A* search when all of them are blocked. Lines are routed in file order, and a later line keeps out of the channels earlier lines use (`sharing()`); a plain crossing costs a little. In a flow, route length is measured center to center (`reach()`). A line from a shape to itself goes round a corner of the shape (`loopRoute()`).
+3. **Labels** (`resolve.ts`). Each label tries spots beside its line and takes the clearest one.
+
+While a shape is dragged, `resolve()` takes a `partial` option and routes only the lines that touch the moved shapes.
+
+## 10. Two looks
+
+`buildScene()` paints the same geometry in one of two looks (decision 8).
+
+| Look | Ink | Text |
+|---|---|---|
+| `sketch` | filled polygons from `pen.ts`, seeded by `<diagram id>:<element id>` | Kalam |
+| `precision` | real strokes with exact corners and standard UML line ends | Atkinson Hyperlegible Next at 0.86 of the size |
+
+Geometry is always sized with the handwriting font, so positions, sizes and routes are identical in both looks. The look comes from the file's `look` line, and can be overridden by the embed's `look` parameter or the export dialog.
+
+## 11. Export
+
+Export is its own rendering target (decision 9). `exportScene()` builds a scene for the file from the document: no selection, grid or handle can be in it, because they were never there.
+
+| Format | Writer | Notes |
+|---|---|---|
+| SVG | `portableSvg()` | every color a plain attribute, an explicit background, fonts embedded, `textLength` on every text |
+| SVG, text as shapes | `src/export/outline.ts` | `ExportOptions.outlineText`: the letters as outlines, so the file looks the same in programs that ignore an embedded font |
+| PNG | `src/export/png.ts` | the same SVG rasterized by the browser at 1x to 4x, capped at 16,000,000 pixels |
+| PDF | `src/export/pdf.ts` | true vector with pdf-lib; text stays text, fonts subset and embedded (decision 11) |
+
+The PDF writer and the outline writer are large and load only when asked for. The review of the exported files is in [`docs/revamp/EXPORT_QUALITY_AUDIT.md`](docs/revamp/EXPORT_QUALITY_AUDIT.md), with every fixture in [`docs/revamp/gallery/`](docs/revamp/gallery/README.md).
+
+"download SVG" on the embed and in Write uses the same writer, in the look and theme on screen (decision 14).
+
+## 12. The tool page and the embed
+
+**The tool page** (`/`, `src/play/main.ts`) has three views in one row: write, draw, the syntax. The document bar beside them holds new, open, save and export.
+
+- Write is CodeMirror 6 in a shadow root (decision 10), loaded after first paint.
+- Draw is a purpose-built SVG canvas with no graph library (decision 12, awaiting the owner's sign-off), loaded the first time the view is opened.
+- The open diagram is saved to `localStorage` 300 ms after each change, and rides in the link while its compressed text is under 8,000 characters (decision 15).
+- `window.chalk` is a small scripting surface for the console and for tests: `getText`, `setText`, `valid`, `undo`, `redo`, `inspect`.
+
+**The embed** (`/embed/`, `src/embed/main.ts`) is unchanged in protocol: hash version `v=1`, the same messages, the same host rules. v2 adds one optional hash parameter, `look`. See [`spec/embed-protocol.md`](spec/embed-protocol.md).
+
+How the new surfaces look and behave is in [`docs/revamp/UX_DESIGN_SYSTEM.md`](docs/revamp/UX_DESIGN_SYSTEM.md). What had to stay the same is in [`docs/revamp/UI_PRESERVATION_CONTRACT.md`](docs/revamp/UI_PRESERVATION_CONTRACT.md).
+
+## 13. Ports and the reference
+
+| Port | Follows | Checked by |
+|---|---|---|
+| `src/core/pyrandom.ts` | CPython `random.Random`, `pen.seed_for` | `fixtures/prng.json`, `fixtures/seeds.json` |
+| `src/core/pen.ts` | `reference/pen.py` | `fixtures/pen/*.json` |
+| `src/core/lint.ts` | `reference/review_diagrams.py` | `fixtures/diagrams/*.lint.json` |
+| `src/core/parse.ts` | `reference/ksd_parse.py` | `fixtures/diagrams/*.json`, `fixtures/parse-errors.json` |
+
+Change behavior in the Python reference first, regenerate with `npm run fixtures`, then match it here. Never hand-edit fixture JSON.
+
+The parser is the one deliberate exception (decision 13). `src/core/parse.ts` stays a frozen port and is kept as the reference check. The parser the app runs is `src/core/doc/parse.ts`, which reads every v1 file to the same diagram with the same messages on the same lines, and adds partitions, classes, descriptions and the layout block. `src/core/lint.ts` still imports one helper (`pyRepr`) from the frozen file, and `src/core/model.ts` still holds the contract types the reviewer port reads.
+
+The v2 notation rules in `rulesV2()` (`src/core/diagnostics.ts`) are not a port. They follow the reviewer's conventions so they can move into it later. They have not yet been reviewed against the OMG UML 2.5.1 text; see [`spec/lint.md`](spec/lint.md).
+
+## 14. Tests
 
 ```
-ksyt-draw/
-├── CLAUDE.md                 rules for every Claude session in this repo
-├── ARCHITECTURE.md           this file
-├── spec/                     diagram-text.md, rendering.md, embed-protocol.md, lint.md
-├── reference/                read-only Python sources the port follows (pen.py, figure.py, diagrams.py,
-│                             review_diagrams.py, ksd_parse.py) + ksyt.css + diagrams-web.md
-├── fixtures/                 golden outputs from the Python code (generate.py regenerates them)
-├── src/
-│   ├── core/                 pure TypeScript, no DOM: runs in Node tests and in the browser
-│   │   ├── pyrandom.ts       DONE: CPython-compatible random + seed_for
-│   │   ├── pen.ts            DONE: pen.py port
-│   │   ├── model.ts          Diagram/Node/Edge types (contract 1.0 + web fields)
-│   │   ├── parse.ts          .ksd → Diagram (matches reference/ksd_parse.py)
-│   │   ├── lint.ts           port of review_diagrams.Review (matches fixtures/*.lint.json)
-│   │   ├── measure.ts        Measurer interface (browser: canvas; tests: fixed-width stub)
-│   │   ├── shapes.ts         one function per node kind and edge kind → Sketch + labels
-│   │   ├── layout-flow.ts    dagre layout for flowchart/activity
-│   │   ├── layout-usecase.ts actors / boundary / use cases
-│   │   ├── scene.ts          Diagram + layout → Scene (elements, texts, steps, frame)
-│   │   ├── svg.ts            Scene → SVG string (port of figure.Figure.svg; escapes all text)
-│   │   ├── qa.ts             label collision check (port of figure.Figure.check, canvas raster)
-│   │   ├── describe.ts       text alternative from the model
-│   │   └── state.ts          hash ⇄ {ksd, step, theme, lint, qa, id}
-│   ├── embed/                main.ts, embed.css (entry for embed/index.html)
-│   └── play/                 main.ts, play.css (entry for index.html)
-├── public/_headers           CSP, framing, caching (copied into dist/)
-├── index.html                playground page → /
-├── embed/index.html          embed page → /embed/
-├── test/                     vitest (core) + playwright (embed, playground)
-├── site/                     DiagramEmbed.astro + draw-host.ts to copy into the site repo
-├── package.json, tsconfig.json, vite.config.ts   DONE: verified to typecheck, test and build
-└── wrangler.jsonc            DONE: assets-only Worker, custom domain (passes wrangler deploy --dry-run)
+npm test            vitest, test/*.test.ts, Node only
+npm run test:e2e    playwright, test/e2e/*.spec.ts, Chromium against the production build
 ```
 
-## 5. Data flow inside the embed
+Unit tests, in 13 files. `npm test` prints the current count (460 when this was written, and rising):
 
-1. `state.ts` reads the hash: `v=1&d=<lz-string>&id=&step=&theme=&lint=&qa=`.
-2. `parse.ts` turns the text into a `Diagram` (contract 1.0 shape). A parse error renders a readable error card (line number and message) and posts `error`.
-3. `lint.ts` reviews it (same rule IDs, severities and confidence as the Python reviewer).
-4. Fonts load (`document.fonts.load` for Kalam 300 and 400) **before** measuring. Never measure with a fallback font.
-5. `layout-*.ts` places nodes (inches), `shapes.ts` draws each node and edge as named `Sketch`es seeded from `<diagram_id>:<element id>`, plus labels.
-6. `scene.ts` frames the ink tightly (0.2 in margin), tags every element and label with its build-up step.
-7. `svg.ts` emits the SVG (role classes, never hex); `embed/main.ts` mounts it, adds step controls if the diagram has steps, the "describe this figure" details, the lint panel if `lint=1`, and posts `ready` and `resize`.
+| File | Covers |
+|---|---|
+| `test/pyrandom.test.ts`, `test/pen.test.ts` | the ports against the Python fixtures |
+| `test/parse.test.ts` | the frozen v1 parser against the reference |
+| `test/doc-parse.test.ts` | the v2 parser: v1 files and v1 errors, error recovery, v2 syntax, identity |
+| `test/doc-sync.test.ts` | `printDoc`, targeted edits, containers, classes, `formatSource` |
+| `test/session.test.ts` | draw edits, one history, text with a mistake, the project file |
+| `test/model.test.ts` | commands, arranging, the router, diagnostics |
+| `test/render.test.ts` | layout of every fixture, lanes, classes, the two looks, page SVG, portable SVG, partial resolve |
+| `test/lint.test.ts`, `test/qa.test.ts`, `test/describe.test.ts`, `test/state.test.ts` | the notation check, the layout check, the text alternative, the hash |
+| `test/docs.test.ts` | the in-app reference against the parser, the rules and the embed parameters |
 
-The playground runs steps 2 to 7 directly on every keystroke (debounced), without an iframe.
+Browser tests run against `vite preview`, which serves `dist/` with the headers from `public/_headers`, so the production CSP is in force during the tests. They live in `test/e2e/`: `embed.spec.ts`, `fixtures.spec.ts`, `host.spec.ts`, `playground.spec.ts`, `draw.spec.ts` (scenarios A to L, driven by a real pointer) and `flows.spec.ts` (scenarios M to X). For the list of scenarios and the current count, see `docs/revamp/TEST_MATRIX.md`.
 
-## 6. Hosting and deploy
+## 15. Scripts
 
-- **Cloudflare Workers with static assets, no Worker script.** `wrangler.jsonc`:
-  ```jsonc
-  {
-    "name": "ksyt-draw",
-    "compatibility_date": "2026-11-01",
-    "assets": { "directory": "./dist", "not_found_handling": "404-page" },
-    "routes": [{ "pattern": "chalk.kyleschlaepfer.com", "custom_domain": true }]
-  }
-  ```
-  A custom domain creates the DNS record and certificate. Don't hand-create a `draw` CNAME first, or attaching it fails.
-- **Headers** in `public/_headers` (Vite copies it to `dist/`; it applies to static responses): a strict CSP everywhere, `frame-ancestors 'none'` on the playground, `frame-ancestors *` and `connect-src 'none'` on `/embed/*`, and long caching for hashed `/assets/*`. When several rules match, Cloudflare combines them, so the `/embed/*` rule removes the general CSP (`! Content-Security-Policy`) before setting its own. Check the real headers with `curl -sI` after the first deploy.
-- **Fonts** come from the `@fontsource` packages (imported in each page's entry), so Vite fingerprints them into `/assets/` and the CSP's `font-src 'self'` covers them. Nothing is loaded from a third-party CDN.
-- **CI:** connect the repo to Workers Builds (build `npm ci && npm run build`, deploy `npx wrangler deploy`), or deploy from a laptop with `npx wrangler deploy`. Run `npm test` before either.
-- **Preview:** `npx wrangler versions upload` gives a preview URL without touching production.
+Each needs a running app (`npm run dev`, or `npx vite preview --port 4173` after a build). None is part of `npm test`.
 
-## 7. Security model
+| Script | Makes |
+|---|---|
+| `node scripts/look.mjs <outDir> [base]` | screenshots of the running app, for a quick look |
+| `node scripts/smoke.mjs [base] [outDir]` | loads every view and downloads one file per export format |
+| `node scripts/shots.mjs <outDir> [base] [filter]` | every fixture through the embed, one contact sheet per look |
+| `node scripts/gallery.mjs [outDir] [base] [filter]` | `docs/revamp/gallery/`: every fixture exported in both looks as SVG, PNG and PDF, with a sheet at 600, 420 and 240 px |
+| `node scripts/capture-ui.mjs [outDir] [base]` | the three views in light and dark at 1440, 820 and 390 px, to set beside the v1 shots |
+| `node scripts/capture-baseline.mjs <outDir>`, `node scripts/capture-exports.mjs <outDir> [fixtureDir]` | the v1 evidence in `docs/revamp/baseline/` |
 
-The hash is attacker-controllable (anyone can craft a link), so:
+## 16. Hosting and deploy
 
-- **All text from the diagram is escaped** when it becomes SVG or HTML (`svg.ts` escapes `& < > " '`; DOM code uses `textContent`). No `innerHTML` with diagram content, ever. A test feeds `<script>`, `"><img onerror>` and `]]>` through every label path.
-- **Strict CSP** (above): no inline script, no `eval`, no network calls from the embed (`connect-src 'none'`).
-- **No state-changing actions in the embed**, so framing it anywhere carries no clickjacking risk worth blocking. The playground (which will grow into the editor) refuses framing.
-- **postMessage:** the embed posts only non-sensitive data (`ready`, `resize`, `step`, `lint`) with target `*`; it accepts `theme`, `step` and `load` from its parent only (`event.source === window.parent`), validates their shape, and treats `load` text exactly like hash text. The host accepts messages only when `event.origin === "https://chalk.kyleschlaepfer.com"` and `event.source` is one of its own iframes.
-- **iframe attributes on the host:** `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"` (same-origin is needed so the embed loads its own fonts and its messages carry a real origin; it's safe because the frame is cross-origin), `loading="lazy"`, `referrerpolicy="strict-origin-when-cross-origin"`.
+- **Cloudflare Workers with static assets, no Worker script.** `wrangler.jsonc` serves `./dist` on the custom domain `chalk.kyleschlaepfer.com`. The custom domain creates the DNS record and certificate; do not hand-create a `chalk` CNAME first.
+- **Headers** are in `public/_headers`, which Vite copies to `dist/`. A strict CSP everywhere (`script-src 'self'`, `style-src 'self'`, no inline script or style). The tool page refuses framing (`frame-ancestors 'none'`). `/embed/*` may be framed anywhere and makes no network calls (`connect-src 'none'`). Hashed `/assets/*` are cached for a year.
+- **Fonts** come from the `@fontsource` packages, so they are fingerprinted into `/assets/` and nothing loads from a third-party CDN.
+- **Deploy:** `npm run deploy` runs the unit tests, builds, and runs `wrangler deploy`. It needs `npx wrangler login` once. Kyle runs it.
 
-## 8. How it connects to the rest of the system
+## 17. Security model
+
+The hash is attacker-controlled: anyone can craft a link. A project file is untrusted too.
+
+- **All text from a diagram is escaped** when it becomes SVG (`esc()` in `src/core/render/svg.ts`) and reaches the DOM only as `textContent`. The draw canvas parses the core's SVG markup as an SVG document, never as HTML (`src/play/draw/dom.ts`). The one `innerHTML` on the tool page is the static syntax reference, which is authored content.
+- **Strict CSP**, tested: the browser tests run with the production headers.
+- **Opening a file** (`openFile()` in `src/core/doc/project.ts`) re-parses the text and rebuilds the model field by field. Files over 4 MB are refused.
+- **postMessage.** The embed posts only non-sensitive data with target `*`, and accepts `theme`, `step` and `load` from its parent only, after checking their shape. `load` text takes the same parse and escape path as hash text.
+- **No state-changing action in the embed**, so framing it anywhere is safe. The tool page cannot be framed.
+
+## 18. How it connects to the rest of the system
 
 | Piece | Relationship |
 |---|---|
-| `whiteboard-lecture-slides` | Source of `pen.py` and the UML primitives in `diagrams.py`. The port follows them; fixtures prove it. When `pen.py` changes: copy into `reference/`, rerun `fixtures/generate.py`, fix `pen.ts` until tests pass. |
-| `diagram-semantics-reviewer` | Source of the rules. `lint.ts` is a port of `Review`; fixtures come from the real script. New rules land there first, then here. |
-| `ksyt-web-design` | Source of tokens, `ksyt.css`, button and figure styles, the "describe this figure" pattern, and the house rules (no em dashes, never say "hand-drawn" about the videos or art, Kalam + Atkinson only). The embed copies `ksyt.css` rather than inventing styles. |
-| Video workflow | A lesson that needs a diagram gets a `.ksd` file next to its lesson file; `DiagramEmbed` points at it. |
+| `whiteboard-lecture-slides` | source of `pen.py` and the shape recipes in `diagrams.py` |
+| `diagram-semantics-reviewer` | source of the notation rules; new rules land there first |
+| `ksyt-web-design` | source of tokens, `ksyt.css`, buttons, the "describe this figure" pattern and the house rules |
+| Video workflow | a lesson that needs a diagram gets a `.ksd` file next to its lesson file; `DiagramEmbed` points at it |
 
-## 9. Decisions for Kyle (defaults chosen so work can start)
+## 19. Decisions for Kyle
 
-| # | Decision | Default in this plan | Alternative |
+Carried over from v1 (the defaults are what the code does):
+
+| # | Decision | Default | Alternative |
 |---|---|---|---|
-| D1 | Repo name and visibility | `ksyt-draw`, private until the editor is worth sharing | Public now, as the channel's open-source tool |
-| D2 | Who may embed `/embed/` | Anyone (`frame-ancestors *`): professors can drop it into Canvas or a course site | Allowlist: `https://kyleschlaepfer.com https://*.kyleschlaepfer.com` |
+| D1 | Repo name and visibility | `ksyt-draw`, private | public, as the channel's open-source tool |
+| D2 | Who may embed `/embed/` | anyone (`frame-ancestors *`) | an allowlist of kyleschlaepfer.com origins |
 | D3 | Subdomain | `chalk.kyleschlaepfer.com` | `tools.` with `/draw/` under it |
-| D4 | Build-up start state | Step 1 of N, like `ksyt.js` figures (reader clicks through) | Final state first, "replay" button |
+| D4 | Build-up start state | step 1 of N, the reader clicks through | final state first, with a replay button |
 
-## 10. Roadmap after v1
+New in v2, both awaiting sign-off, both written up in `docs/revamp/ARCHITECTURE_DECISIONS.md`:
 
-1. Editor at `/`: drag and resize existing nodes (layout overrides written back as `at X Y` lines, so text stays the source of truth), then free text and swimlanes.
-2. Structured Markdown export (use-case descriptions, activity steps) from the same model.
-3. More families: sequence, state, class, ERD; their rules already exist in `reference/review_diagrams.py`.
-4. PNG export; then, only if needed, saved diagrams (Worker + D1).
+| # | Decision | Default | Alternative |
+|---|---|---|---|
+| 6 | What other shapes do when one is edited | they hold still | automatic shapes re-flow, with an animation |
+| 12 | The draw canvas | purpose-built on the core's geometry | React Flow as the interaction shell |

@@ -258,8 +258,16 @@ file reopens exactly as it looked.
 - any automatic shape the edit would shift by more than 0.004 in is given a `place` where it
   already is, in the same undo step;
 - a partition whose thickness would change keeps its thickness;
-- the status line says how many were held ("2 other shapes now hold their place (tidy up lets them
-  go)");
+- the status line says how many were held ("2 others stay put (tidy up lets them go)"); the shape
+  the edit was about is not counted among the others;
+- a second exception, because holding still must not break the picture: when the edit leaves two
+  shapes with less room between them than they need, `Session.makeRoom()` pushes the neighbour over
+  just far enough, and whatever it then crowds after it. The room needed is 1 in between shapes
+  joined by a line with multiplicities or role names, 0.55 in for a line with a name or a stereotype,
+  0.3 in for a bare line, 0.08 in otherwise. A pair that was
+  already that close before the edit is left alone, and so is everything when the edit itself placed
+  or sized a shape (that is the author arranging things). Inside a partition a shape is only pushed
+  along its lane. The status line says "made room: 1 shape moved over";
 - one exception: if nothing in the diagram is placed by hand and the whole layout slid by one
   uniform amount (a wider box re-centers its column), nothing is pinned and the canvas pans by that
   amount, so nothing appears to move;
@@ -283,6 +291,10 @@ shapes that would otherwise have moved, and says so.
 
 **Consequences.**
 - The picture is stable under every Draw edit, and each edit is one undo step whatever it pinned.
+- Before `makeRoom()`, a class that gained members grew over the class below it from the fifth
+  member, and a line drawn between two use cases that sat close came out 0.38 in long with its
+  stereotype across both outlines. Both were found by the browser tests (scenarios Q and P in
+  `test/e2e/flows.spec.ts`) and are covered there and in `test/session.test.ts`.
 - Known problem 4 in `CONTINUE.MD`: adding or connecting a shape in an all-automatic diagram often
   changes dagre's answer for others, so they get placed. After a few Draw edits most of a diagram
   can be hand-placed. Tidy up reverses it, but the owner may find the pinning too eager.
