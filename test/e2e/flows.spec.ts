@@ -1565,7 +1565,7 @@ test.describe("refresh and back", () => {
     await tab(page, "the syntax").click();
     await expect(page.locator("#panel-syntax")).toBeVisible();
     await page.goBack();
-    await expect(page).toHaveURL(/\/#.*tab=draw/);
+    await expect(page).not.toHaveURL(/tab=/);
     await expect(tab(page, "draw")).toHaveAttribute("aria-selected", "true");
     expect(await inspect(page)).toEqual(before);
     // text changed on a later view is still there after going back: the entry is a view, not a version

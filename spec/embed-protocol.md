@@ -120,7 +120,7 @@ Still called "playground" in the embed's footer link. Its name on the page is Ch
 - **draw:** the same diagram on a canvas. Every change is written back into the text.
 - **the syntax:** the reference, `src/play/docs.html`.
 - The page starts with the hash's `d`, else the local draft, else the permit-portal example.
-- The hash carries `d` and, when the view is not write, `tab=draw` or `tab=syntax`. It is rewritten with `history.replaceState` after each change, so the URL can be shared. Once the compressed text is over 8,000 characters the link stops carrying the diagram; the local draft and a saved file still hold it.
+- The hash carries `d` and, when the view is not draw, `tab=write` or `tab=syntax` (`tab=draw` is still read). A link with no `tab` opens on draw. It is rewritten with `history.replaceState` after each change, so the URL can be shared. Once the compressed text is over 8,000 characters the link stops carrying the diagram; the local draft and a saved file still hold it.
 - Neither `copy embed code` nor `copy link` adds `look`. A diagram that should always be drawn in the precision look says so in its own text, with a `look precision` line.
 
 How to use the tool page is in `docs/GUIDE.md`.

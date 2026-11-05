@@ -61,7 +61,8 @@ export async function openTool(page: Page, text: string | null, tab: "write" | "
     const p = { library: true, inspector: true, ...(o.panels ?? {}) };
     await page.addInitScript((v) => { try { if (!sessionStorage.getItem("chalk-test-panels")) { localStorage.setItem("chalk-draw-panels", v); sessionStorage.setItem("chalk-test-panels", "1"); } } catch { /* blocked */ } }, JSON.stringify(p));
   }
-  const hash = (text ? buildHash({ d: text }) : "") + (tab === "draw" ? `${text ? "&" : ""}tab=draw` : "");
+  // draw is the view a bare link opens on; write has to be asked for
+  const hash = (text ? buildHash({ d: text }) : "") + (tab === "write" ? `${text ? "&" : ""}tab=write` : "");
   await page.goto("/" + (hash ? "#" + hash : ""));
   await page.waitForFunction(() => !!(window as unknown as { chalk?: unknown }).chalk);
   if (tab === "draw") await expect(page.locator(".draw-canvas .layer-nodes > g").first()).toBeAttached();

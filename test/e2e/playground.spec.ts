@@ -13,7 +13,7 @@ test.describe("playground", () => {
   });
 
   test("starts with the example, typing updates the preview and the hash", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/#tab=write");
     await expect(page.locator(".ksd-editor .cm-content")).toBeVisible();
     await expect.poll(() => getText(page)).toMatch(/diagram use-case/);
     await expect(page.locator("#preview svg.ksyt-fig")).toBeVisible();
@@ -28,7 +28,7 @@ test.describe("playground", () => {
   });
 
   test("a parse error shows its line, then clears", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/#tab=write");
     await expect(page.locator(".ksd-editor .cm-content")).toBeVisible();
     await fillEditor(page, "diagram flowchart\ntitle t\nprocess a\nprocess a");
     // the last version that worked stays up, marked as out of date; the bad line is named and underlined
@@ -43,7 +43,7 @@ test.describe("playground", () => {
   });
 
   test("copy embed code gives an iframe whose src reproduces the diagram; copy link and site line work", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/#tab=write");
     await expect(page.locator(".ksd-editor .cm-content")).toBeVisible();
     await fillEditor(page, ksdOf("flow-approval"));
     await expect(page.locator("#preview svg title")).toHaveText("After review, a request takes exactly one of two paths");
@@ -64,7 +64,7 @@ test.describe("playground", () => {
     await page.goto(src);
     await expect(page.locator("svg title")).toHaveText("After review, a request takes exactly one of two paths");
 
-    await page.goto("/");
+    await page.goto("/#tab=write");
     await expect(page.locator(".ksd-editor .cm-content")).toBeVisible();
     await fillEditor(page, ksdOf("flow-approval"));
     await expect(page.locator("#preview svg title")).toHaveText("After review, a request takes exactly one of two paths");
@@ -82,7 +82,7 @@ test.describe("playground", () => {
   test("hostile text in the playground renders literally", async ({ page }) => {
     let dialogs = 0;
     page.on("dialog", async (d) => { dialogs++; await d.dismiss(); });
-    await page.goto("/");
+    await page.goto("/#tab=write");
     await expect(page.locator(".ksd-editor .cm-content")).toBeVisible();
     await fillEditor(page, 'diagram flowchart\ntitle <img src=x onerror=alert(1)>\nprocess a "<b>bold</b>"\nprocess b\na -> b');
     await expect(page.locator("#preview svg title")).toHaveText("<img src=x onerror=alert(1)>");
@@ -94,7 +94,7 @@ test.describe("playground", () => {
 
   test("stacks on a phone", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 800 });
-    await page.goto("/");
+    await page.goto("/#tab=write");
     await expect(page.locator("#preview svg.ksyt-fig")).toBeVisible();
     const ta = await page.locator(".ksd-editor").boundingBox();
     const pv = await page.locator("#preview").boundingBox();
@@ -105,22 +105,24 @@ test.describe("playground", () => {
 });
 
 test.describe("folder tabs and the syntax reference", () => {
-  test("write, draw and syntax views, with real tab semantics and arrow keys", async ({ page }) => {
+  test("a bare link opens on draw; write, draw and syntax views, with real tab semantics and arrow keys", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("h1")).toHaveText("Chalk (beta)");
     const write = page.getByRole("tab", { name: "write" });
     const draw = page.getByRole("tab", { name: "draw" });
-    await expect(write).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator("#panel-draw")).toBeHidden();
-    await draw.click();
     await expect(draw).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#panel-draw")).toBeVisible();
     await expect(page.locator("#panel-draw .draw-canvas svg.ksyt-fig")).toBeVisible();
     await expect(page.locator("#panel-write")).toBeHidden();
-    expect(await page.evaluate(() => location.hash)).toContain("tab=draw");
-    await page.keyboard.press("ArrowLeft");
+    expect(await page.evaluate(() => location.hash)).not.toContain("tab=");
+    await write.click();
     await expect(write).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("h1")).toHaveText("Chalk (beta)");
     await expect(page.locator("#panel-write")).toBeVisible();
+    await expect(page.locator("#panel-draw")).toBeHidden();
+    expect(await page.evaluate(() => location.hash)).toContain("tab=write");
+    await page.keyboard.press("ArrowRight");
+    await expect(draw).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#panel-draw")).toBeVisible();
     expect(await page.evaluate(() => location.hash)).not.toContain("tab=");
     await page.keyboard.press("End");
     await expect(page.getByRole("tab", { name: "the syntax" })).toHaveAttribute("aria-selected", "true");

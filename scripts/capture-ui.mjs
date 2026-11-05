@@ -61,21 +61,21 @@ const NEAR_START = { x: 60, y: 8 };
 const PERMIT = "fixtures/diagrams/usecase-permit.ksd";
 for (const theme of ["light", "dark"]) {
   for (const width of [1440, 820, 390]) {
-    await shot(`write-${theme}-${width}`, { width, theme, url: withDoc(PERMIT) });
-    await shot(`draw-${theme}-${width}`, { width, theme, url: withDoc(PERMIT, "draw") });
+    await shot(`write-${theme}-${width}`, { width, theme, url: withDoc(PERMIT, "write") });
+    await shot(`draw-${theme}-${width}`, { width, theme, url: withDoc(PERMIT) });
     await shot(`syntax-${theme}-${width}`, { width, theme, url: "/#tab=syntax", full: false });
   }
-  await shot(`draw-lanes-${theme}-1440`, { width: 1440, theme, url: withDoc("fixtures/v2/activity-lanes.ksd", "draw") });
-  await shot(`draw-class-${theme}-1440`, { width: 1440, theme, url: withDoc("fixtures/v2/class-orders.ksd", "draw"), act: (p) => clickShape(p, "Order") });
-  await shot(`draw-selected-node-${theme}-1440`, { width: 1440, theme, url: withDoc(PERMIT, "draw"), act: (p) => clickShape(p, "apply") });
-  await shot(`draw-selected-edge-${theme}-1440`, { width: 1440, theme, url: withDoc(PERMIT, "draw"), act: (p) => clickLine(p, "apply", "pay") });
+  await shot(`draw-lanes-${theme}-1440`, { width: 1440, theme, url: withDoc("fixtures/v2/activity-lanes.ksd") });
+  await shot(`draw-class-${theme}-1440`, { width: 1440, theme, url: withDoc("fixtures/v2/class-orders.ksd"), act: (p) => clickShape(p, "Order") });
+  await shot(`draw-selected-node-${theme}-1440`, { width: 1440, theme, url: withDoc(PERMIT), act: (p) => clickShape(p, "apply") });
+  await shot(`draw-selected-edge-${theme}-1440`, { width: 1440, theme, url: withDoc(PERMIT), act: (p) => clickLine(p, "apply", "pay") });
   await shot(`write-linked-${theme}-1440`, {
-    width: 1440, theme, url: withDoc(PERMIT),
+    width: 1440, theme, url: withDoc(PERMIT, "write"),
     // the cursor on a declaration: its line is marked, and so is its shape in the figure
     act: async (p) => { await p.locator(".ksd-editor .cm-line", { hasText: "use-case apply" }).click({ position: NEAR_START }); },
   });
   await shot(`write-mistake-${theme}-1440`, {
-    width: 1440, theme, url: withDoc(PERMIT),
+    width: 1440, theme, url: withDoc(PERMIT, "write"),
     act: async (p) => { await p.locator(".ksd-editor .cm-line", { hasText: "use-case track" }).click({ position: NEAR_START }); await p.keyboard.press("End"); await p.keyboard.type(" sideways"); },
   });
   await shot(`export-${theme}-1440`, {
@@ -83,7 +83,7 @@ for (const theme of ["light", "dark"]) {
     act: async (p) => { await p.locator("#open-export").click(); await p.waitForSelector("dialog.export-dialog[open] .export-preview img[src]"); },
   });
 }
-await shot("draw-phone-selected-light-390", { width: 390, height: 800, url: withDoc(PERMIT, "draw"), act: (p) => clickShape(p, "apply") });
+await shot("draw-phone-selected-light-390", { width: 390, height: 800, url: withDoc(PERMIT), act: (p) => clickShape(p, "apply") });
 await browser.close();
 console.log(problems.length ? "PROBLEMS:\n" + problems.join("\n") : `captured to ${out}, no browser errors`);
 process.exitCode = problems.length ? 1 : 0;

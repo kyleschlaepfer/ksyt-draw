@@ -5,7 +5,8 @@
  * switch.
  *
  * One Session holds the open diagram for both views. It is kept in this browser as a local draft,
- * and short diagrams also ride in the link (the hash: d and tab), so a link is still a file.
+ * and short diagrams also ride in the link (the hash: d and tab), so a link is still a file. A link
+ * that names no view opens on draw.
  */
 import "@fontsource/kalam/300.css";
 import "@fontsource/kalam/400.css";
@@ -36,11 +37,13 @@ const REPO = "https://github.com/kyleschlaepfer/ksyt-draw";
 const LINK_LIMIT = 8000;
 
 // ---------- hash state (d plus tab) ----------
+/** The view the page opens on when the link names none. It is the one view the hash never spells out. */
+const HOME_TAB: Tab = "draw";
 function tabFromHash(): Tab {
   const t = new URLSearchParams(location.hash.slice(1)).get("tab");
-  if (t === "draw") return "draw";
+  if (t === "write") return "write";
   if (t === "syntax" || t === "docs") return "syntax";
-  return "write";
+  return HOME_TAB;
 }
 /** Marks a history entry the tool wrote itself, as opposed to a link someone followed or typed. */
 const OURS = { chalk: 1 };
@@ -49,7 +52,7 @@ const isOurs = (): boolean => !!(history.state && (history.state as { chalk?: nu
 function writeHash(ksd: string, tab: Tab, push = false): boolean {
   const fits = compress(ksd).length <= LINK_LIMIT;
   let h = fits ? buildHash({ d: ksd }) : "v=1";
-  if (tab !== "write") h += `&tab=${tab}`;
+  if (tab !== HOME_TAB) h += `&tab=${tab}`;
   if (push) history.pushState(OURS, "", "#" + h); else history.replaceState(OURS, "", "#" + h);
   return fits;
 }
