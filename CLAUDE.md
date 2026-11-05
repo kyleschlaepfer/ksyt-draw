@@ -1,6 +1,6 @@
-# KSyt Draw (draw.kyleschlaepfer.com)
+# Chalk, repo ksyt-draw (draw.kyleschlaepfer.com)
 
-Diagram tool for Kyle Schlaepfer's KSyt channel site. v1: text in (`.ksd`), diagram out, embeddable by iframe, drawn in the same style as the videos, with the diagram reviewer's notation check. Read `ARCHITECTURE.md` first; the specs in `spec/` are the contract.
+Diagram tool for Kyle Schlaepfer's KSyt channel site. Its name on the page is Chalk (one constant, `APP_NAME` in `src/play/main.ts`); the repo, the deploy and the message protocol keep the `ksyt-draw` name. v1: text in (`.ksd`), diagram out, embeddable by iframe, drawn in the same style as the videos, with the diagram reviewer's notation check. Read `ARCHITECTURE.md` first; the specs in `spec/` are the contract.
 
 ## Ground rules
 

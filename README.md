@@ -1,4 +1,4 @@
-# KSyt Draw
+# Chalk (ksyt-draw)
 
 Diagrams for kyleschlaepfer.com: write a few lines of text, get a use-case, activity or flowchart diagram in the same style as the videos, embeddable in any page, with the same notation check as the slide reviewer.
 

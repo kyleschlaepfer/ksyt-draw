@@ -12,11 +12,14 @@ import { PX } from "../core/measure";
 import { lint, statusWords } from "../core/lint";
 import { checkScene } from "../core/qa";
 import { canvasMeasurer } from "../embed/measure-dom";
-import { errorCard, svgElementFrom } from "../embed/figure";
+import { svgElementFrom } from "../embed/figure";
+import shrugSvg from "./art/shrug-neutral.svg?raw";
 
 export interface DrawHost {
   getText(): string;
   setText(text: string): void;
+  /** switch to the write view (the link in the empty state) */
+  goWrite(): void;
 }
 
 interface PaletteItem { kind: string; word: string; help: string }
@@ -109,7 +112,7 @@ export function mountDraw(panel: HTMLElement, host: DrawHost): { refresh(): void
   const canvas = el("div", "draw-canvas");
   canvas.tabIndex = 0;
   canvas.setAttribute("aria-label", "drawing");
-  const status = el("p", "play-status");
+  const status = el("p", "play-status note");
   status.setAttribute("aria-live", "polite");
   main.append(canvas, status);
   panel.replaceChildren(side, main);
@@ -642,7 +645,27 @@ export function mountDraw(panel: HTMLElement, host: DrawHost): { refresh(): void
       d = null;
       scene = null;
       svg = null;
-      canvas.replaceChildren(errorCard("The text has a mistake. Fix it on the write tab first.", e instanceof ParseError ? e.msg : String(e), e instanceof ParseError ? e.line : null));
+      // the empty-state pattern: the narrator, one line, one link that fixes it
+      const empty = el("div", "empty-state");
+      const who = el("div", "narrator");
+      who.setAttribute("aria-hidden", "true");
+      const art = svgElementFrom(shrugSvg);
+      art.removeAttribute("role");
+      art.removeAttribute("aria-labelledby");
+      who.appendChild(art);
+      const line = el("p", "hand", "The text has a mistake, so there's nothing to draw yet.");
+      const detail = el("p", "note");
+      if (e instanceof ParseError) {
+        detail.append(e.line ? `line ${e.line}: ` : "");
+        detail.appendChild(el("code", undefined, e.msg));
+      } else detail.textContent = String(e);
+      const fix = el("a", "btn-quiet", "fix it on the write view");
+      fix.href = "#";
+      fix.addEventListener("click", (ev) => { ev.preventDefault(); host.goWrite(); });
+      const words = el("div");
+      words.append(line, detail, fix);
+      empty.append(who, words);
+      canvas.replaceChildren(empty);
       say("");
       renderSelection();
       return;

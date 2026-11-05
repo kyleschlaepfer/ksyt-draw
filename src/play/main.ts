@@ -1,8 +1,7 @@
 /**
- * The playground page (spec/embed-protocol.md §5), laid out as a folder with two tabs:
- *   write: the text playground (sub-tab "playground") and the syntax reference (sub-tab "the syntax")
- *   draw:  empty for now; the drag and drop editor goes here
- * State lives in the hash: d (the diagram) and tab (play, docs, draw).
+ * The tool page at / (spec/embed-protocol.md §5), laid out like a page on kyleschlaepfer.com:
+ * wordmark, the tool's name and one line on what it does, three views in a nav row (write, draw,
+ * the syntax), a footer with the theme switch. State lives in the hash: d (the diagram) and tab.
  */
 import "@fontsource/kalam/300.css";
 import "@fontsource/kalam/400.css";
@@ -10,19 +9,26 @@ import "@fontsource/atkinson-hyperlegible-next/400.css";
 import "@fontsource/atkinson-hyperlegible-next/700.css";
 import "@fontsource/atkinson-hyperlegible-mono/400.css";
 import "../embed/embed.css";
+import "./strokes.css";
 import "./play.css";
 import docsHtml from "./docs.html?raw";
+import markSvg from "./art/mark.svg?raw";
 import { parse, ParseError } from "../core/parse";
 import { buildHash, parseHash } from "../core/state";
 import { canvasMeasurer, loadFonts, type FontStatus } from "../embed/measure-dom";
-import { errorCard, mountFigure, type Mounted } from "../embed/figure";
+import { errorCard, mountFigure, svgElementFrom, type Mounted } from "../embed/figure";
 import { downloadSvg } from "../embed/download";
 import { makeTabs } from "./tabs";
 import { DEFAULT_EXAMPLE, EXAMPLES } from "./examples";
 import { mountDraw } from "./draw";
 
+/** The tool's name. One place to change it. */
+export const APP_NAME = "Chalk";
+const SITE = "https://kyleschlaepfer.com";
+const REPO = "https://github.com/kyleschlaepfer/ksyt-draw";
+
 const TYPE_NAME: Record<string, string> = { flowchart: "Flowchart", activity: "Activity diagram", "use-case": "Use-case diagram" };
-type Tab = "play" | "docs" | "draw";
+type Tab = "write" | "draw" | "syntax";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] => {
   const e = document.createElement(tag);
@@ -34,22 +40,60 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 // ---------- hash state (d plus tab) ----------
 function tabFromHash(): Tab {
   const t = new URLSearchParams(location.hash.slice(1)).get("tab");
-  return t === "docs" || t === "draw" ? t : "play";
+  if (t === "draw") return "draw";
+  if (t === "syntax" || t === "docs") return "syntax";
+  return "write";
 }
 function writeHash(ksd: string, tab: Tab): void {
   let h = buildHash({ d: ksd });
-  if (tab !== "play") h += `&tab=${tab}`;
+  if (tab !== "write") h += `&tab=${tab}`;
   history.replaceState(null, "", "#" + h);
 }
 
-// ---------- page ----------
-const app = document.getElementById("app") as HTMLElement;
-const head = el("header", "play-head");
-head.append(el("h1", undefined, "KSyt Draw"), el("p", "note", "a few lines of text in, a diagram out. Everything stays in this page; the link holds the diagram."));
+// ---------- theme switch (a per-viewer convenience; the embed follows the host instead) ----------
+const THEME_KEY = "ksyt-theme";
+function applyTheme(t: string | null): void {
+  if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  else document.documentElement.removeAttribute("data-theme");
+  for (const b of document.querySelectorAll<HTMLButtonElement>("[data-theme-set]")) {
+    b.setAttribute("aria-pressed", String(b.dataset.themeSet === (t ?? "system")));
+  }
+}
 
-// playground sub-panel
-const playPanel = el("div", "play");
-playPanel.id = "sub-play";
+// ---------- page ----------
+document.title = APP_NAME;
+const app = document.getElementById("app") as HTMLElement;
+
+const skip = el("a", "skip-link", "skip to content");
+skip.href = "#main";
+
+const header = el("header", "site-header");
+const wrapHead = el("div", "wrap");
+const wordmark = el("a", "wordmark");
+wordmark.href = SITE;
+const mark = svgElementFrom(markSvg);
+mark.setAttribute("aria-hidden", "true");
+mark.removeAttribute("role");
+mark.removeAttribute("aria-labelledby");
+wordmark.append(mark, "kyle schlaepfer");
+wrapHead.appendChild(wordmark);
+header.appendChild(wrapHead);
+
+const main = el("main", "wrap");
+main.id = "main";
+const intro = el("div", "tool-intro");
+intro.append(
+  el("h1", undefined, APP_NAME),
+  el("p", "tool-line", "A few lines of text, and you get a use-case, activity or flow diagram in the same style as the videos, with the same notation check the videos get."),
+);
+const meta = el("p", "meta");
+meta.append(el("span", undefined, "beta"), el("span", undefined, "use case, activity, flowchart"), el("span", undefined, "nothing leaves your browser; the link is the file"));
+intro.appendChild(meta);
+main.appendChild(intro);
+
+// write view
+const writePanel = el("div", "play");
+writePanel.id = "panel-write";
 const editor = el("div", "play-editor");
 const label = el("label", undefined, "diagram text");
 label.htmlFor = "ksd";
@@ -58,64 +102,91 @@ ta.id = "ksd";
 ta.spellcheck = false;
 ta.setAttribute("autocapitalize", "off");
 ta.setAttribute("autocomplete", "off");
-const status = el("p", "play-status");
+const status = el("p", "play-status note");
 status.setAttribute("aria-live", "polite");
 const actions = el("div", "actions");
-const btnLink = el("button", "btn-quiet", "copy link");
 const btnEmbed = el("button", "btn", "copy embed code");
+const btnLink = el("button", "btn-quiet", "copy link");
 const btnSite = el("button", "btn-quiet", "copy for the site");
-const btnSvg = el("button", "btn-quiet", "download SVG");
+const btnSvg = el("button", "btn-quiet");
+const dlIcon = el("span", "icon icon-download");
+dlIcon.setAttribute("aria-hidden", "true");
+btnSvg.append(dlIcon, "download SVG");
 for (const b of [btnLink, btnEmbed, btnSite, btnSvg]) b.type = "button";
-actions.append(btnLink, btnEmbed, btnSite, btnSvg);
+actions.append(btnEmbed, btnLink, btnSite, btnSvg);
 editor.append(label, ta, actions, status);
 const preview = el("div", "play-preview");
 preview.id = "preview";
-playPanel.append(editor, preview);
+writePanel.append(editor, preview);
 
-// docs sub-panel: static authored content, never diagram text
-const docsPanel = el("div", "docs");
-docsPanel.id = "sub-docs";
-docsPanel.innerHTML = docsHtml;
-
-// draw panel: the editor, working on the same text
+// draw view
 const drawPanel = el("div", "draw-editor");
 drawPanel.id = "panel-draw";
 let playDirty = false;
 const draw = mountDraw(drawPanel, {
   getText: () => ta.value,
   setText: (t) => { ta.value = t; writeHash(t, currentTab()); playDirty = true; },
+  goWrite: () => showTab("write"),
 });
 
-const writePanel = el("div", "write-panel");
-writePanel.id = "panel-write";
-const subTabs = makeTabs(
-  [{ id: "play", label: "playground", panel: playPanel }, { id: "docs", label: "the syntax", panel: docsPanel }],
-  { label: "write", cls: "subtabs", onChange: (id) => { onTab(id as Tab); } },
-);
-writePanel.appendChild(subTabs.root);
-const folder = makeTabs(
-  [{ id: "write", label: "write", panel: writePanel }, { id: "draw", label: "draw", panel: drawPanel }],
-  { label: "KSyt Draw", cls: "folder", onChange: (id) => { onTab(id === "draw" ? "draw" : (subTabs.current() as Tab)); } },
-);
-app.replaceChildren(head, folder.root);
+// the syntax view: static authored content, never diagram text
+const docsPanel = el("div", "docs");
+docsPanel.id = "panel-syntax";
+docsPanel.innerHTML = docsHtml;
 
+const views = makeTabs(
+  [
+    { id: "write", label: "write", panel: writePanel },
+    { id: "draw", label: "draw", panel: drawPanel },
+    { id: "syntax", label: "the syntax", panel: docsPanel },
+  ],
+  { label: "views", cls: "views", onChange: (id) => onTab(id as Tab) },
+);
+main.appendChild(views.root);
+
+const footer = el("footer", "site-footer");
+const wrapFoot = el("div", "wrap");
+wrapFoot.appendChild(el("p", "note", "diagrams are checked with the same rules as the videos. If one gets flagged, that's the point."));
+const siteLink = el("a", undefined, "kyleschlaepfer.com");
+siteLink.href = SITE;
+const repoLink = el("a", undefined, "source on GitHub");
+repoLink.href = REPO;
+const themeBar = el("div", "theme-switch");
+themeBar.setAttribute("role", "group");
+themeBar.setAttribute("aria-label", "theme");
+for (const t of ["light", "dark", "system"]) {
+  const b = el("button", "btn-quiet", t);
+  b.type = "button";
+  b.dataset.themeSet = t;
+  b.addEventListener("click", () => {
+    try { if (t === "system") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, t); } catch { /* storage blocked: follow the system */ }
+    applyTheme(t === "system" ? null : t);
+  });
+  themeBar.appendChild(b);
+}
+wrapFoot.append(siteLink, repoLink, themeBar);
+footer.appendChild(wrapFoot);
+
+app.replaceChildren(skip, header, main, footer);
+let savedTheme: string | null = null;
+try { savedTheme = localStorage.getItem(THEME_KEY); } catch { /* ignore */ }
+applyTheme(savedTheme);
+
+// ---------- behavior ----------
 let fontStatus: FontStatus | null = null;
 let mounted: Mounted | null = null;
 let timer: number | null = null;
 let renderToken = 0;
 let renderedHidden = false;
 
-function currentTab(): Tab {
-  return folder.current() === "draw" ? "draw" : (subTabs.current() as Tab);
-}
+const currentTab = (): Tab => views.current() as Tab;
 function showTab(tab: Tab): void {
-  if (tab === "draw") folder.select("draw");
-  else { folder.select("write"); subTabs.select(tab); }
+  views.select(tab);
 }
 function onTab(tab: Tab): void {
   writeHash(ta.value, tab);
   if (tab === "draw") draw.refresh();
-  if (tab === "play" && (renderedHidden || playDirty)) { playDirty = false; void render(); }
+  if (tab === "write" && (renderedHidden || playDirty)) { playDirty = false; void render(); }
 }
 
 function say(msg: string): void {
@@ -141,7 +212,7 @@ async function render(): Promise<void> {
   if (!fontStatus) fontStatus = await loadFonts();
   if (token !== renderToken) return;
   const keep = mounted?.step ?? 0;
-  renderedHidden = playPanel.hidden || preview.clientWidth === 0;
+  renderedHidden = writePanel.hidden || preview.clientWidth === 0;
   mounted = mountFigure(preview, d, canvasMeasurer, {
     initialStep: keep, lint: true, qa: true, containerWidth: Math.max(100, preview.clientWidth || 800), fontStatus, idPrefix: d.diagram_id || "fig",
   });
@@ -169,7 +240,7 @@ docsPanel.addEventListener("click", (ev) => {
     const ex = EXAMPLES[btn.dataset.example!];
     if (!ex) return;
     ta.value = ex;
-    showTab("play");
+    showTab("write");
     void render().then(() => { say(`loaded the ${btn.dataset.example} example`); ta.focus(); });
     return;
   }
@@ -195,7 +266,7 @@ async function copy(text: string, what: string): Promise<void> {
   }
 }
 
-function header(key: string): string | undefined {
+function header_(key: string): string | undefined {
   return ta.value.split(/\r?\n/).map((l) => l.trim()).find((l) => l.startsWith(key + " "))?.slice(key.length + 1).trim();
 }
 
@@ -218,20 +289,20 @@ const camel = (slug: string) => slug.replace(/[^A-Za-z0-9]+(.)?/g, (_, c: string
 
 btnLink.addEventListener("click", () => void copy(`${location.origin}/#${buildHash({ d: ta.value })}`, "link"));
 btnEmbed.addEventListener("click", () => {
-  const id = header("id") ?? "diagram";
-  const type = header("diagram") ?? "";
-  const title = `${TYPE_NAME[type] ?? "Diagram"}: ${header("title") ?? ""}`;
+  const id = header_("id") ?? "diagram";
+  const type = header_("diagram") ?? "";
+  const title = `${TYPE_NAME[type] ?? "Diagram"}: ${header_("title") ?? ""}`;
   void copy(embedSnippet(location.origin, ta.value, id, title), "embed code");
 });
 btnSite.addEventListener("click", () => {
-  const id = header("id") ?? "diagram";
+  const id = header_("id") ?? "diagram";
   const name = camel(id);
-  const caption = (header("title") ?? "").replace(/"/g, "'");
+  const caption = (header_("title") ?? "").replace(/"/g, "'");
   void copy(`import ${name} from "../../diagrams/${id}.ksd?raw";\n<DiagramEmbed ksd={${name}} caption="${caption}" />`, "component line");
 });
 btnSvg.addEventListener("click", () => { if (mounted) void downloadSvg(mounted.scene); });
 
-// start: the diagram from the link, else the example; the tab from the link
+// start: the diagram from the link, else the example; the view from the link
 const initial = parseHash(location.hash);
 ta.value = initial.d ?? DEFAULT_EXAMPLE;
 showTab(tabFromHash());

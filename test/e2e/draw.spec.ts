@@ -115,8 +115,10 @@ test.describe("draw tab", () => {
 
   test("a parse error on the write tab blocks the draw tab with a message, not a crash", async ({ page }) => {
     await page.goto("/#" + buildHash({ d: "diagram flowchart\ntitle t\nwidget w" }) + "&tab=draw");
-    await expect(page.locator(".draw-canvas .error-card")).toContainText("Fix it on the write tab first");
-    await expect(page.locator(".draw-canvas .error-card code")).toHaveText("unknown kind 'widget'");
+    await expect(page.locator(".draw-canvas .empty-state")).toContainText("there's nothing to draw yet");
+    await expect(page.locator(".draw-canvas .empty-state code")).toHaveText("unknown kind 'widget'");
+    await page.getByRole("link", { name: "fix it on the write view" }).click();
+    await expect(page.getByRole("tab", { name: "write" })).toHaveAttribute("aria-selected", "true");
   });
 
   test("the title and type edits write back, and the write tab's preview follows", async ({ page }) => {
