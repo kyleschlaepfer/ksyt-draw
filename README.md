@@ -51,7 +51,7 @@ For the browser tests, install Chromium once with `npx playwright install chromi
 | [`spec/rendering.md`](spec/rendering.md) | layout, routing, the two looks, the layout check |
 | [`spec/lint.md`](spec/lint.md) | the notation check |
 | [`spec/embed-protocol.md`](spec/embed-protocol.md) | the embed URL and messages |
-| `src/play/docs.html` | the syntax reference shown in the app under "the syntax" |
+| `src/play/docs.html` | the syntax reference shown in the app under write, "the syntax" |
 | [`docs/revamp/ARCHITECTURE_DECISIONS.md`](docs/revamp/ARCHITECTURE_DECISIONS.md) | why v2 is built the way it is, decision by decision |
 | [`docs/revamp/UX_DESIGN_SYSTEM.md`](docs/revamp/UX_DESIGN_SYSTEM.md) | how the tool looks and behaves |
 | [`docs/revamp/UI_PRESERVATION_CONTRACT.md`](docs/revamp/UI_PRESERVATION_CONTRACT.md) | what had to stay the same from v1 |
@@ -67,7 +67,7 @@ For the browser tests, install Chromium once with `npx playwright install chromi
 | `src/core/` | everything without a DOM: the document, the parser, layout, routing, the two looks, the checks |
 | `src/export/` | SVG, PNG and PDF writers |
 | `src/embed/` | the embed page |
-| `src/play/` | the tool page: write, draw, the syntax, export |
+| `src/play/` | the tool page: draw, write (editor and the syntax), export |
 | `test/` | unit tests; `test/e2e/` holds the browser tests |
 | `fixtures/` | golden outputs from the Python reference; `fixtures/v2/` holds hand-written v2 examples |
 | `reference/` | read-only Python and CSS sources the ports follow |

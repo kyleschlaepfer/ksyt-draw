@@ -1,6 +1,6 @@
 # The diagram text format (.ksd), v2
 
-One diagram per file. The text is the whole diagram: what it means, and anything the author arranged by hand. This file states the grammar and the contract. The full reference with every kind, message and example is the in-app page `src/play/docs.html` ("the syntax" view).
+One diagram per file. The text is the whole diagram: what it means, and anything the author arranged by hand. This file states the grammar and the contract. The full reference with every kind, message and example is the in-app page `src/play/docs.html` (write, "the syntax").
 
 ## 1. Sources of truth
 

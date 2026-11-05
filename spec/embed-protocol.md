@@ -115,10 +115,10 @@ The site component `site/DiagramEmbed.astro` takes `ksd`, `caption`, `title`, `h
 
 Still called "playground" in the embed's footer link. Its name on the page is Chalk.
 
-- Three views in one row: write, draw, the syntax. A document bar beside them: new, open, save, export.
+- Two views in one row, draw first: draw, write. A document bar beside them: new, open, save, export. Write has its own quieter row under it with two pages: the editor and the syntax. Write keeps the page it was last on.
 - **write:** the editor and the live figure, using the same core as the embed (no iframe). The figure is redrawn 150 ms after the last keystroke. Under it: the notation check with the layout check always on. Buttons: `copy embed code` (the iframe snippet above with the current `d`, the diagram's id and its title), `copy link` (the tool page's URL), `copy for the site` (the import line and the `<DiagramEmbed ...>` line), `download SVG`.
 - **draw:** the same diagram on a canvas. Every change is written back into the text.
-- **the syntax:** the reference, `src/play/docs.html`.
+- **the syntax** (a page of write): the reference, `src/play/docs.html`.
 - The page starts with the hash's `d`, else the local draft, else the permit-portal example.
 - The hash carries `d` and, when the view is not draw, `tab=write` or `tab=syntax` (`tab=draw` is still read). A link with no `tab` opens on draw. It is rewritten with `history.replaceState` after each change, so the URL can be shared. Once the compressed text is over 8,000 characters the link stops carrying the diagram; the local draft and a saved file still hold it.
 - Neither `copy embed code` nor `copy link` adds `look`. A diagram that should always be drawn in the precision look says so in its own text, with a `look precision` line.

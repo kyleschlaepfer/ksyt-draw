@@ -37,7 +37,7 @@ kyleschlaepfer.com  (site repo, Astro)                    chalk.kyleschlaepfer.c
 │ └──────────────────────────────────────────┘ │ ◀─────── │   postMessage: ready, resize, step, lint  │
 │ figcaption                                   │ ───────▶ │   postMessage: theme, step, load          │
 │ small host script: resize + theme sync       │          │ /         index.html, src/play            │
-└──────────────────────────────────────────────┘          │   write, draw, the syntax, export         │
+└──────────────────────────────────────────────┘          │   draw, write (+ the syntax), export      │
                                                           │ /assets/  JS, CSS, fonts                  │
                                                           └──────────────────────────────────────────┘
                                                             Cloudflare Workers, static assets only
@@ -210,7 +210,7 @@ The PDF writer and the outline writer are large and load only when asked for. Th
 
 ## 12. The tool page and the embed
 
-**The tool page** (`/`, `src/play/main.ts`) has three views in one row: write, draw, the syntax. The document bar beside them holds new, open, save and export.
+**The tool page** (`/`, `src/play/main.ts`) has two views in one row: draw (where it opens) and write. Write has a second, quieter row of its own: the editor and the syntax reference. The document bar beside the views holds new, open, save and export.
 
 - Write is CodeMirror 6 in a shadow root (decision 10), loaded after first paint.
 - Draw is a purpose-built SVG canvas with no graph library (decision 12, awaiting the owner's sign-off), loaded the first time the view is opened.

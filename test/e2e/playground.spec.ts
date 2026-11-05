@@ -124,8 +124,28 @@ test.describe("folder tabs and the syntax reference", () => {
     await expect(draw).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#panel-draw")).toBeVisible();
     expect(await page.evaluate(() => location.hash)).not.toContain("tab=");
-    await page.keyboard.press("End");
-    await expect(page.getByRole("tab", { name: "the syntax" })).toHaveAttribute("aria-selected", "true");
+    // the main row is draw then write; the syntax is a page of write, in write's own row
+    await expect(page.getByRole("tablist", { name: "views" }).getByRole("tab")).toHaveText(["draw", "write"]);
+    await write.click();
+    const editor = page.getByRole("tab", { name: "editor" });
+    const syntax = page.getByRole("tab", { name: "the syntax" });
+    await expect(page.getByRole("tablist", { name: "write" }).getByRole("tab")).toHaveText(["editor", "the syntax"]);
+    await expect(editor).toHaveAttribute("aria-selected", "true");
+    await syntax.click();
+    await expect(syntax).toHaveAttribute("aria-selected", "true");
+    await expect(write).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#panel-syntax")).toBeVisible();
+    await expect(page.locator("#panel-editor")).toBeHidden();
+    expect(await page.evaluate(() => location.hash)).toContain("tab=syntax");
+    await page.keyboard.press("ArrowLeft");
+    await expect(editor).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#panel-editor")).toBeVisible();
+    expect(await page.evaluate(() => location.hash)).toContain("tab=write");
+    // write remembers its page: draw and back again lands on the page it was on
+    await syntax.click();
+    await draw.click();
+    await write.click();
+    await expect(syntax).toHaveAttribute("aria-selected", "true");
     expect(await page.evaluate(() => location.hash)).toContain("tab=syntax");
     // the theme switch in the footer
     await page.getByRole("button", { name: "dark" }).click();
@@ -151,6 +171,7 @@ test.describe("folder tabs and the syntax reference", () => {
     await page.goto("/#tab=docs");
     await page.locator('button[data-example="activity"]').first().click();
     await expect(page.getByRole("tab", { name: "write" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "editor" })).toHaveAttribute("aria-selected", "true");
     await expect.poll(() => getText(page)).toMatch(/diagram activity/);
     await expect(page.locator("#preview svg title")).toHaveText("A new hire's laptop and badge are prepared at the same time");
     await expect(page.locator(".phase-status")).toHaveText("step 1 of 3");
@@ -158,7 +179,8 @@ test.describe("folder tabs and the syntax reference", () => {
   });
   test("opening on the syntax tab still renders the playground correctly when switched to", async ({ page }) => {
     await page.goto("/#tab=docs");
-    await page.getByRole("tab", { name: "write" }).click();
+    await expect(page.getByRole("tab", { name: "write" })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "editor" }).click();
     await expect(page.locator("#preview svg.ksyt-fig")).toBeVisible();
     const box = await page.locator("#preview svg.ksyt-fig").boundingBox();
     expect(box!.width).toBeGreaterThan(300);

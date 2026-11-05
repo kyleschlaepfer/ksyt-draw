@@ -37,11 +37,12 @@ await page.waitForSelector(".draw-canvas .layer-nodes > g", { state: "attached" 
 await page.waitForTimeout(400);
 await page.screenshot({ path: join(out, "draw-class.png") });
 
+await page.getByRole("tab", { name: "write" }).click();
 await page.getByRole("tab", { name: "the syntax" }).click();
 await page.waitForSelector("#panel-syntax h2");
 console.log("syntax: up");
 
-await page.getByRole("tab", { name: "write" }).click();
+await page.getByRole("tab", { name: "editor" }).click();
 await page.locator("#open-export").click();
 await page.waitForSelector("dialog.export-dialog[open] .export-preview img[src]");
 await page.waitForTimeout(400);

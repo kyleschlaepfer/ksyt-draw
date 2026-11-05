@@ -22,7 +22,7 @@ const PX = 96;
 type Pt = [number, number];
 
 const inline = (page: Page): Locator => page.locator(".draw-inline");
-const tab = (page: Page, name: "write" | "draw" | "the syntax"): Locator => page.getByRole("tab", { name, exact: true });
+const tab = (page: Page, name: "write" | "draw" | "editor" | "the syntax"): Locator => page.getByRole("tab", { name, exact: true });
 const near = (a: number, b: number, tol = 2.5): boolean => Math.abs(a - b) <= tol;
 /** Two frames: long enough for the properties panel to rebuild after a change. */
 const settle = (page: Page): Promise<void> => page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
@@ -1535,17 +1535,20 @@ test.describe("refresh and back", () => {
     await page.goto("/embed/");
     await openTool(page, CLAIMS, "draw");
     const before = await edit(page);
+    await tab(page, "write").click();
     await tab(page, "the syntax").click();
     await expect(page.locator("#panel-syntax")).toBeVisible();
-    // a change of view is one step of the browser's history: the first back returns to the drawing, the second leaves the tool
+    // a change of view is one step of the browser's history: back goes to write's editor, then the drawing, then leaves the tool
+    await page.goBack();
+    await expect(tab(page, "editor")).toHaveAttribute("aria-selected", "true");
     await page.goBack();
     await expect(tab(page, "draw")).toHaveAttribute("aria-selected", "true");
     await page.goBack();
     await expect(page).toHaveURL(/\/embed\/$/);
-    await page.goForward();
-    await page.waitForFunction(() => !!(window as unknown as { chalk?: unknown }).chalk);
-    await page.goForward();
-    await page.waitForFunction(() => !!(window as unknown as { chalk?: unknown }).chalk);
+    for (let i = 0; i < 3; i++) {
+      await page.goForward();
+      await page.waitForFunction(() => !!(window as unknown as { chalk?: unknown }).chalk);
+    }
     const now = await inspect(page);
     expect(now.text).toBe(before.text);
     expect(picture(now)).toEqual(picture(before));
@@ -1562,8 +1565,11 @@ test.describe("refresh and back", () => {
     await page.goto("/embed/");
     await openTool(page, CLAIMS, "draw");
     const before = await edit(page);
+    await tab(page, "write").click();
     await tab(page, "the syntax").click();
     await expect(page.locator("#panel-syntax")).toBeVisible();
+    await page.goBack();
+    await expect(tab(page, "editor")).toHaveAttribute("aria-selected", "true");
     await page.goBack();
     await expect(page).not.toHaveURL(/tab=/);
     await expect(tab(page, "draw")).toHaveAttribute("aria-selected", "true");

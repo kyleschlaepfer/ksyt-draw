@@ -1,8 +1,8 @@
 /**
  * The tool page at / (spec/embed-protocol.md §5), laid out like a page on kyleschlaepfer.com:
- * wordmark, the tool's name and one line on what it does, three views in a nav row (write, draw,
- * the syntax) with the document's new / open / save / export beside them, a footer with the theme
- * switch.
+ * wordmark, the tool's name and one line on what it does, two views in a nav row (draw, write) with
+ * the document's new / open / save / export beside them, a footer with the theme switch. Write has a
+ * second, quieter row of its own: the editor and the syntax reference.
  *
  * One Session holds the open diagram for both views. It is kept in this browser as a local draft,
  * and short diagrams also ride in the link (the hash: d and tab), so a link is still a file. A link
@@ -100,23 +100,35 @@ meta.append(el("span", undefined, "use case, activity, class, flowchart"), el("s
 intro.appendChild(meta);
 main.appendChild(intro);
 
-const writePanel = el("div", "play");
-writePanel.id = "panel-write";
 const drawPanel = el("div", "draw-editor");
 drawPanel.id = "panel-draw";
-// the syntax view: static authored content, never diagram text
+// write holds two pages of its own: the editor with its figure, and the syntax reference beside it
+const writePanel = el("div", "write-view");
+writePanel.id = "panel-write";
+const editorPanel = el("div", "play");
+editorPanel.id = "panel-editor";
+// the syntax: static authored content, never diagram text
 const docsPanel = el("div", "docs");
 docsPanel.id = "panel-syntax";
 docsPanel.innerHTML = docsHtml;
 
+/** While one view change is being made from code, the two tab sets stay quiet and it is reported once. */
+let selecting = false;
 const views = makeTabs(
   [
-    { id: "write", label: "write", panel: writePanel },
     { id: "draw", label: "draw", panel: drawPanel },
+    { id: "write", label: "write", panel: writePanel },
+  ],
+  { label: "views", cls: "views", onChange: () => { if (!selecting) onTab(currentTab()); } },
+);
+const writePages = makeTabs(
+  [
+    { id: "editor", label: "editor", panel: editorPanel },
     { id: "syntax", label: "the syntax", panel: docsPanel },
   ],
-  { label: "views", cls: "views", onChange: (id) => onTab(id as Tab) },
+  { label: "write", cls: "subviews", onChange: () => { if (!selecting) onTab(currentTab()); } },
 );
+writePanel.appendChild(writePages.root);
 // the views and the document's actions share one row
 const viewsRow = el("div", "views-row");
 views.list.replaceWith(viewsRow);
@@ -156,7 +168,7 @@ wrapFoot.append(siteLink, repoLink, themeBar);
 footer.appendChild(wrapFoot);
 
 appRoot.replaceChildren(skip, header, main, footer);
-document.documentElement.dataset.view = "write";
+document.documentElement.dataset.view = "draw";
 let savedTheme: string | null = null;
 try { savedTheme = localStorage.getItem(THEME_KEY); } catch { /* ignore */ }
 applyTheme(savedTheme);
@@ -170,7 +182,17 @@ let app: App | null = null;
 let persistTimer: number | null = null;
 let storageOk = true;
 
-const currentTab = (): Tab => views.current() as Tab;
+/** The view as the address names it: draw, write's editor, or write's syntax page. */
+const currentTab = (): Tab => (views.current() === "draw" ? "draw" : writePages.current() === "syntax" ? "syntax" : "write");
+/** Show a view by its address name, reporting the change once. */
+function selectView(tab: Tab): void {
+  const before = currentTab();
+  selecting = true;
+  if (tab === "draw") views.select("draw");
+  else { writePages.select(tab === "syntax" ? "syntax" : "editor"); views.select("write"); }
+  selecting = false;
+  if (currentTab() !== before) onTab(currentTab());
+}
 const say = (msg: string): void => { (currentTab() === "draw" && draw ? draw : write)?.say(msg); };
 
 function persist(): void {
@@ -197,7 +219,7 @@ function ensureDraw(): void {
 }
 
 /** The view the address bar's current entry is for, and whether the view is changing because the reader moved through history. */
-let shownTab: Tab = "write", viaHistory = false;
+let shownTab: Tab = "draw", viaHistory = false;
 /** A code block too wide for the column scrolls sideways, so it has to take focus: then the arrow keys scroll it. */
 function reachableCode(): void {
   for (const pre of docsPanel.querySelectorAll<HTMLElement>("pre")) {
@@ -235,13 +257,13 @@ async function start(): Promise<void> {
   app = {
     session, measurer: canvasMeasurer, fonts,
     workspace: (!fromLink || fromLink === draft?.text ? draft?.workspace : undefined) ?? {},
-    showTab: (tab) => views.select(tab),
+    showTab: selectView,
     currentTab,
     open: (text, label, identities) => { session.setText(text, label, identities); },
     touchWorkspace: schedulePersist,
   };
   const a = app;
-  write = mountWrite(writePanel, a);
+  write = mountWrite(editorPanel, a);
   const files = mountFiles(a, say, () => { void import("./export-dialog").then(({ openExportDialog }) => openExportDialog(a, say)); });
   viewsRow.appendChild(files.root);
   session.subscribe((origin) => {
@@ -258,7 +280,7 @@ async function start(): Promise<void> {
     // back, not the back button. Anything else is a link, and a link brings its own diagram.
     const ours = isOurs();
     viaHistory = true;
-    views.select(tabFromHash());
+    selectView(tabFromHash());
     viaHistory = false;
     shownTab = currentTab();
     if (ours) writeHash(session.text, currentTab());
@@ -273,7 +295,7 @@ async function start(): Promise<void> {
       const ex = EXAMPLES[btn.dataset.example!];
       if (!ex) return;
       a.open(ex, `load the ${btn.dataset.example} example`);
-      views.select("write");
+      selectView("write");
       write?.say(`loaded the ${btn.dataset.example} example (undo brings back what was here)`);
       return;
     }
@@ -315,7 +337,7 @@ async function start(): Promise<void> {
   };
 
   viaHistory = true;
-  views.select(tabFromHash());
+  selectView(tabFromHash());
   viaHistory = false;
   shownTab = currentTab();
   if (currentTab() === "draw") ensureDraw();
