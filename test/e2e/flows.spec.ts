@@ -736,8 +736,8 @@ test.describe("save and reopen", () => {
     await page.getByRole("button", { name: "dependency", exact: true }).click();
     await clickNode(page, "Class3");
     await clickNode(page, "Class3");
-    await expect(page.locator(".draw-findings summary")).toContainText("what the check found");
-    await page.locator(".draw-findings summary").click();
+    await expect(page.locator("#draw-check")).toContainText(/[0-9]+ notation warnings?/);
+    await page.locator("#draw-check").click();
     await expect(page.locator(".draw-findings")).toContainText("can't depend on itself");
     await page.locator(".draw-findings li", { hasText: "can't depend on itself" }).getByRole("button", { name: "show it" }).click();
     await expect(page.locator(".overlay .sel")).toHaveCount(1);
@@ -761,7 +761,7 @@ test.describe("save and reopen", () => {
     expect(picture(reopened.after)).toEqual(picture(built));
     expect(reopened.after.nodes.filter((n) => n.label === "")).toHaveLength(4);
     expect(reopened.after.edges.some((e) => e.from === "Class3" && e.to === "Class3" && e.kind === "dependency")).toBe(true);
-    await expect(page.locator(".draw-findings summary")).toContainText("what the check found");
+    await expect(page.locator("#draw-check")).toContainText(/[0-9]+ notation warnings?/);
   });
 
   test("workspace: empty use cases and an actor placed, connected, named and labelled from the canvas alone, then saved and reopened", async ({ page }) => {

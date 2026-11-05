@@ -122,10 +122,17 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
   const foot = el("div", "draw-foot");
   const status = el("p", "play-status note");
   status.setAttribute("aria-live", "polite");
-  // what the check found: a count in the status strip that opens into a list over the canvas
-  const found = el("details", "draw-findings");
+  // the notation check: a plain count at the right of the status strip that opens a list upward, over the canvas's corner
+  const checkBtn = button("btn-quiet draw-check-toggle", "", "what the notation check found");
+  checkBtn.id = "draw-check";
+  checkBtn.setAttribute("aria-expanded", "false");
+  checkBtn.setAttribute("aria-controls", "draw-findings");
+  checkBtn.hidden = true;
+  const found = el("section", "draw-findings");
+  found.id = "draw-findings";
+  found.setAttribute("aria-label", "notation check");
   found.hidden = true;
-  foot.append(status, found);
+  foot.append(status, checkBtn, found);
   // the canvas's direct actions for what is selected, beside the selection
   const selbar = el("div", "draw-selbar");
   selbar.setAttribute("role", "toolbar");
@@ -135,12 +142,8 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
   panel.replaceChildren(bar, rail, stage, foot);
 
   let sayTimer = 0;
-  const summary = (): string => {
-    const d = session.doc;
-    if (!d) return "";
-    const r = review(d);
-    return `notation check: ${statusWords(r.status)}${r.findings.length ? ` (${r.findings.length})` : ""}`;
-  };
+  // with nothing to report, the strip says how to get around (the check's own count is beside it)
+  const summary = (): string => session.doc ? "drag empty space to move around · Shift+drag to select an area · Ctrl+wheel zooms" : "";
   const say = (msg: string): void => {
     status.textContent = msg || summary();
     window.clearTimeout(sayTimer);
@@ -203,7 +206,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
   relField.append(el("span", undefined, "dragging from a dot makes"), relSel);
   lines.append(el("h2", undefined, "lines"), relPalette, relField);
   relSel.addEventListener("change", () => { relation = relSel.value || null; });
-  const hint = el("p", "note draw-hint", "Drag a shape in, or choose it and click. Choose a line, then click two shapes, or drag from a shape's dot.");
+  const hint = el("p", "note draw-hint", "Drag a shape in, or choose it and click. Choose a line, then click two shapes, or drag from a shape's dot. Drag empty space to move around; Shift+drag selects an area.");
   rail.append(shapes, lines, hint);
 
   let paletteType: DiagramType | null = null;
@@ -547,39 +550,77 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
 
   // ---------- the notation check's findings ----------
   let foundKey = "";
+  const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
+  function setFindingsOpen(open: boolean, focus = false): void {
+    if (open === !found.hidden) return;
+    found.hidden = !open;
+    checkBtn.setAttribute("aria-expanded", String(open));
+    if (open) {
+      // never taller than the canvas above the strip, so it never runs off the top of the window
+      found.style.maxHeight = `${Math.max(160, Math.min(384, stage.clientHeight - 24))}px`;
+      document.addEventListener("pointerdown", outsideFindings, true);
+      if (focus) found.querySelector<HTMLElement>("button")?.focus();
+    } else {
+      document.removeEventListener("pointerdown", outsideFindings, true);
+      if (focus) checkBtn.focus();
+    }
+  }
+  // a press on the canvas or anywhere else closes the list, as a menu would
+  const outsideFindings = (ev: Event): void => { if (!found.contains(ev.target as Node) && !checkBtn.contains(ev.target as Node)) setFindingsOpen(false); };
+  checkBtn.addEventListener("click", () => setFindingsOpen(found.hidden, true));
+  found.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); setFindingsOpen(false, true); } });
+
   function listFindings(): void {
     const d = session.doc;
-    const list = d ? (sortFindings(review(d).findings) as RuleFinding[]) : [];
-    const key = JSON.stringify(list.map((f) => [f.severity, f.rule_id, f.location, f.problem]));
-    found.hidden = !list.length;
+    const r = d ? review(d) : null;
+    const list = r ? (sortFindings(r.findings) as RuleFinding[]) : [];
+    const key = JSON.stringify([r?.status, list.map((f) => [f.severity, f.rule_id, f.location, f.problem])]);
+    checkBtn.hidden = !d;
     if (key === foundKey) return;
     foundKey = key;
-    if (!d || !list.length) { found.replaceChildren(); return; }
+    // the count in words: warnings first, suggestions after, or a plain all clear
+    const notes = list.filter((f) => f.severity === "suggestion").length, warnings = list.length - notes;
+    const words = !list.length ? "no notation issues"
+      : [warnings ? plural(warnings, "notation warning") : "", notes ? plural(notes, warnings ? "suggestion" : "notation suggestion") : ""].filter((x) => x).join(", ");
+    checkBtn.replaceChildren(icon(list.length ? "flag" : "check"), el("span", undefined, words));
+    checkBtn.classList.toggle("has-findings", warnings > 0);
+    checkBtn.setAttribute("aria-label", `notation check: ${words}`);
+    if (!d || !r) { found.replaceChildren(); setFindingsOpen(false); return; }
+
+    const head = el("div", "findings-head");
+    const close = button("btn-quiet findings-close", "close", "close the list (Escape)");
+    close.addEventListener("click", () => setFindingsOpen(false, true));
+    head.append(el("h2", undefined, `notation check: ${statusWords(r.status)}`), close);
+    const body: HTMLElement[] = [head];
+    if (!list.length) body.push(el("p", "note findings-empty", "Nothing to fix. The check runs again after every change."));
     const ul = el("ul");
     for (const f of list) {
       const at = locate(f, d);
       const uids = [...at.nodes.map((id) => d.nodes.find((n) => n.id === id)?.uid ?? ""), ...at.edges].filter((u) => u);
       const li = el("li");
-      const head = el("p", "row");
-      head.append(el("span", "sev", f.severity), el("span", "sep", "·"), el("span", undefined, f.problem));
-      li.appendChild(head);
+      li.dataset.severity = f.severity;
+      const row = el("p", "row");
+      row.append(el("span", "sev", f.severity), el("span", undefined, f.problem));
+      li.appendChild(row);
       if (f.minimal_fix) li.appendChild(el("p", "fix note", f.minimal_fix));
       if (uids.length) {
-        const show = button("btn-quiet", "show it", "select what this is about on the canvas");
+        const show = button("btn-quiet", "show it", "select what this is about and bring it into view");
         show.addEventListener("click", () => {
           // the document may have changed since the list was made
           const live = uids.filter((u) => session.doc?.nodes.some((n) => n.uid === u) || session.doc?.edges.some((e) => e.uid === u));
-          if (!live.length) return;
+          if (!live.length) { say("that part of the diagram is gone"); return; }
+          // the list steps aside, as a menu does once something in it is chosen, so nothing covers the canvas
+          setFindingsOpen(false);
           canvas.select(live);
-          canvas.reveal(live[0]);
+          canvas.revealAll(live);
+          canvas.root.focus({ preventScroll: true });
         });
         li.appendChild(show);
       }
       ul.appendChild(li);
     }
-    const head = el("summary");
-    head.append(icon("flag"), el("span", undefined, `what the check found (${list.length})`));
-    found.replaceChildren(head, ul);
+    if (list.length) body.push(ul);
+    found.replaceChildren(...body);
   }
 
   // ---------- keeping the frame up to date ----------
@@ -640,7 +681,7 @@ export function mountDraw(panel: HTMLElement, app: App): { refresh(): void; show
     canvas.refresh();
     chrome();
     listFindings();
-    if (!status.textContent || status.textContent.startsWith("notation check")) say("");
+    if (!status.textContent || status.textContent === summary() || status.textContent.startsWith("drag empty space")) say("");
   }
 
   let stale = true;

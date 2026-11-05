@@ -113,7 +113,7 @@ The status line under them says what the diagram is and how its checks went: "Us
 
 ## 4. Draw
 
-The draw view has a collapsible graphical shape and relationship library on the left, a toolbar and large canvas in the middle, a collapsible properties panel on the right, and a status line that says what just happened. The header names the current diagram type. “Change type” starts another blank diagram rather than converting or dropping the current diagram's objects.
+The draw view fills the window. One row of tools runs across the top, with the diagram type and title; the shape and line library is on the left ("shapes" shows or hides it); the canvas takes the rest; the properties open on the right when you ask for them ("properties"); and a status strip along the bottom says what just happened, with the notation check's count at its right. A selected shape or line gets a small bar of its everyday actions beside it. "Start another kind of diagram", under "more", starts another blank diagram rather than converting or dropping the current diagram's objects.
 
 Everything you do here is written into the text. Switch to write at any time to see it.
 
@@ -131,7 +131,7 @@ The list changes with the diagram type. A shape dropped on a partition or a boun
 
 - Click a shape or a line.
 - Shift+click adds to the selection or takes away from it.
-- Drag on empty canvas to select with a box. Hold Shift to add to what is selected.
+- Hold Shift and drag on empty canvas to select with a box; it adds to what is selected. (A plain drag on empty canvas moves the view, and a plain click there clears the selection.)
 - Ctrl+A selects every shape and line.
 - Escape clears the selection.
 
@@ -165,10 +165,10 @@ Two routes:
 1. Point at a shape, then drag one of its side dots to another shape; or
 2. Choose a relationship in the left library, then choose its source and target. With the canvas focused, arrow keys select the first shape, Enter chooses it, Tab moves to the next shape, and Enter completes the line.
 
-- The relationship library is scoped to the diagram type. The smaller “port drags use” choice changes what a dot drag creates. Left alone, it is the usual relationship for the two shapes: an arrow in a flow, an association from an actor to a use case, «include» between two use cases, a realization from a class to an interface.
+- The relationship library is scoped to the diagram type. The smaller "dragging from a dot makes" choice changes what a dot drag creates. Left alone, it is the usual relationship for the two shapes: an arrow in a flow, an association from an actor to a use case, «include» between two use cases, a realization from a class to an interface.
 - A new line out of a decision opens its label at once, because every exit of a decision needs one.
 - A line may return to the same shape; it is drawn as a loop.
-- Notation mistakes are not refused. The line remains on the canvas and in the saved document, while “what the check found” explains the issue and offers “show it.” Missing objects, broken source text, and other technical failures still block an edit.
+- Notation mistakes are not refused. The line remains on the canvas and in the saved document, while the notation check's count at the right of the status strip (for example "1 notation warning") opens a list that explains the issue and offers "show it", which selects the part and brings it into view. Missing objects, broken source text, and other technical failures still block an edit.
 
 ### Reconnect
 
@@ -194,7 +194,7 @@ The panel shows what is selected.
 
 | Selected | The panel shows |
 |---|---|
-| nothing | **diagram**: the current type, title, id, which way it runs, drawn as (sketch or precision). Under "more": checked as, narration, the text alternative. Use “change type” above the canvas to start another notation |
+| nothing | **diagram**: the current type, title, id, which way it runs, drawn as (sketch or precision). Under "more": checked as, narration, the text alternative. Use "start another kind of diagram" under "more" to start another notation |
 | one shape | its kind, text, id; where it is inside; x, y, width and height in inches; build-up (the step it shows from); look (fill, color, weight); delete |
 | an actor | also which side it stands on |
 | a class or interface | also its attributes and operations, stereotype, abstract |
@@ -237,8 +237,10 @@ The keys work anywhere in the draw view: on the canvas, and after a click on a b
 
 - Toolbar: zoom out, the zoom figure (click for actual size), zoom in, "fit".
 - Ctrl+wheel, or a pinch on a trackpad, zooms about the pointer. The range is 20% to 400%.
-- Hold Space and drag, or drag with the middle button, to pan.
-- With the canvas focused, the wheel pans. Shift+wheel pans sideways.
+- Drag empty canvas to pan. Holding Space, a drag anywhere on the canvas pans, shapes included; so does a drag with the middle button. Escape during a pan puts the view back.
+- The wheel pans; Shift+wheel pans sideways.
+- From the keyboard, Ctrl+arrow keys pan (Shift for a bigger step).
+- Panning only moves the view: nothing in the diagram moves, and nothing is saved to the text.
 
 ### What "placed" means
 
@@ -545,7 +547,8 @@ The editor is CodeMirror, and its other standard keys for moving, selecting and 
 | Alt+A, Alt+O | add an attribute or operation to the selected class or interface, then edit it inline |
 | any letter or digit | start replacing the selected shape's text or the selected line's label |
 | Escape | cancel what you are doing, or clear the selection |
-| Space, held | pan by dragging |
+| Space, held | pan by dragging, even over a shape |
+| Ctrl+arrow keys | pan the view; with Shift, a bigger step |
 | Ctrl+0 | actual size |
 | Ctrl+1 | fit the whole diagram |
 | Ctrl+= or Ctrl++ | zoom in |

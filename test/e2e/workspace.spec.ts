@@ -298,3 +298,243 @@ test.describe("narrow windows and switching views", () => {
     });
   }
 });
+
+test.describe("the notation check in the status strip", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  const REVERSED = ksdOf("usecase-include-reversed");
+
+  test("a clear count opens a list upward, inside the window, and closes by its button, close, Escape or a click away", async ({ page }) => {
+    await openTool(page, REVERSED, "draw", { panels: "default" });
+    const toggle = page.locator("#draw-check");
+    await expect(toggle).toHaveText("1 notation warning");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const strip = (await page.locator(".draw-foot").boundingBox())!;
+    const t = (await toggle.boundingBox())!;
+    expect(t.y).toBeGreaterThanOrEqual(strip.y);
+    expect(t.y + t.height).toBeLessThanOrEqual(strip.y + strip.height);
+    expect(strip.x + strip.width - (t.x + t.width)).toBeLessThan(16);
+
+    await toggle.click();
+    const list = page.locator(".draw-findings");
+    await expect(list).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const b = (await list.boundingBox())!, cv = (await canvas(page).boundingBox())!;
+    expect(b.y).toBeGreaterThanOrEqual(cv.y);
+    expect(b.y + b.height).toBeLessThanOrEqual(strip.y);
+    expect(b.x + b.width).toBeLessThanOrEqual(1440);
+    // severity, the problem, the fix and a way to the element
+    const item = list.locator("li").first();
+    await expect(item.locator(".sev")).toHaveText("major");
+    await expect(item).toContainText("appears reversed");
+    await expect(item.getByRole("button", { name: "show it" })).toBeVisible();
+
+    await list.getByRole("button", { name: "close" }).click();
+    await expect(list).toBeHidden();
+    await expect(toggle).toBeFocused();
+    await toggle.click();
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    await toggle.click();
+    await page.mouse.click(cv.x + 40, cv.y + 40);
+    await expect(list).toBeHidden();
+  });
+
+  test("with nothing to report it says so", async ({ page }) => {
+    await openTool(page, USECASE, "draw", { panels: "default" });
+    await expect(page.locator("#draw-check")).toHaveText("no notation issues");
+    await page.locator("#draw-check").click();
+    await expect(page.locator(".draw-findings")).toContainText("Nothing to fix");
+  });
+
+  test("show it selects what the finding is about, brings it into view and closes the list", async ({ page }) => {
+    await openTool(page, REVERSED, "draw", { panels: "default" });
+    for (let i = 0; i < 6; i++) await page.getByRole("button", { name: "zoom in" }).click();
+    const cv = (await canvas(page).boundingBox())!;
+    await page.mouse.move(cv.x + cv.width / 2, cv.y + cv.height / 2);
+    await page.mouse.wheel(-3000, -2000);
+    await page.locator("#draw-check").click();
+    await page.locator(".draw-findings").getByRole("button", { name: "show it" }).click();
+    const marks = page.locator(".overlay .sel, .overlay .sel-line");
+    await expect(marks.first()).toBeAttached();
+    // the list closed, the canvas has the focus, and what the finding is about is in view
+    await expect(page.locator(".draw-findings")).toBeHidden();
+    await expect(canvas(page)).toBeFocused();
+    for (const m of await marks.all()) {
+      const b = (await m.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(cv.x);
+      expect(b.y).toBeGreaterThanOrEqual(cv.y);
+      expect(b.x + b.width).toBeLessThanOrEqual(cv.x + cv.width);
+      expect(b.y + b.height).toBeLessThanOrEqual(cv.y + cv.height);
+    }
+  });
+});
+
+test.describe("moving around in select mode", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  const world = (page: Page) => page.locator(".draw-canvas .world").getAttribute("transform");
+  const translate = async (page: Page): Promise<[number, number]> => {
+    const m = /translate\(([-0-9.]+) ([-0-9.]+)\)/.exec((await world(page)) ?? "")!;
+    return [parseFloat(m[1]), parseFloat(m[2])];
+  };
+  /** a point on the canvas with nothing under it (only the dot grid), with room around it to drag */
+  const emptySpot = async (page: Page): Promise<[number, number]> => page.evaluate(() => {
+    const c = document.querySelector(".draw-canvas")!.getBoundingClientRect();
+    for (let y = c.bottom - 30; y > c.top + 100; y -= 20) for (let x = c.left + 30; x < c.right - 200; x += 20) {
+      const e = document.elementFromPoint(x, y);
+      if (e?.classList.contains("grid")) return [x, y] as [number, number];
+    }
+    throw new Error("no empty canvas");
+  });
+
+  for (const presses of [0, 3, -3]) {
+    test(`dragging empty canvas pans the view and only the view (zoom steps ${presses})`, async ({ page }) => {
+      await openTool(page, USECASE, "draw", { panels: "default" });
+      for (let i = 0; i < Math.abs(presses); i++) await page.getByRole("button", { name: presses > 0 ? "zoom in" : "zoom out" }).click();
+      const before = await inspect(page);
+      const z = await zoom(page);
+      const t0 = await translate(page);
+      const at = await emptySpot(page);
+      await page.mouse.move(at[0], at[1]);
+      await page.mouse.down();
+      await page.mouse.move(at[0] + 60, at[1] - 40, { steps: 4 });
+      // follows the pointer while dragging
+      let t = await translate(page);
+      expect(Math.abs(t[0] - t0[0] - 60)).toBeLessThan(1.5);
+      expect(Math.abs(t[1] - t0[1] + 40)).toBeLessThan(1.5);
+      await page.mouse.move(at[0] + 150, at[1] - 90, { steps: 6 });
+      await page.mouse.up();
+      t = await translate(page);
+      expect(Math.abs(t[0] - t0[0] - 150)).toBeLessThan(1.5);
+      expect(Math.abs(t[1] - t0[1] + 90)).toBeLessThan(1.5);
+      expect(await zoom(page)).toBeCloseTo(z, 5);
+      // the document did not change: same text, same geometry, nothing placed
+      const after = await inspect(page);
+      expect(after.text).toBe(before.text);
+      expect(after.nodes.map((n) => [n.id, n.x, n.y, n.placed])).toEqual(before.nodes.map((n) => [n.id, n.x, n.y, n.placed]));
+      expect(after.canUndo).toBe(before.canUndo);
+    });
+  }
+
+  test("a click on empty canvas clears the selection without moving the view; a drag keeps the selection", async ({ page }) => {
+    await openTool(page, USECASE, "draw", { panels: "default" });
+    await clickNode(page, "pay");
+    const at = await emptySpot(page);
+    const t0 = await world(page);
+    await page.mouse.move(at[0], at[1]);
+    await page.mouse.down();
+    await page.mouse.move(at[0] + 80, at[1] - 20, { steps: 5 });
+    await page.mouse.up();
+    await expect(page.locator(".overlay .sel")).toHaveCount(1);
+    const t1 = await world(page);
+    expect(t1).not.toBe(t0);
+    await page.mouse.click(at[0], at[1]);
+    await expect(page.locator(".overlay .sel")).toHaveCount(0);
+    expect(await world(page)).toBe(t1);
+  });
+
+  test("dragging a shape moves the shape, not the view", async ({ page }) => {
+    await openTool(page, USECASE, "draw", { panels: "default" });
+    const t0 = await world(page);
+    const p = await box(page, "pay");
+    const z = await zoom(page);
+    await page.mouse.move(p.cx, p.cy);
+    await page.mouse.down();
+    await page.mouse.move(p.cx + 96, p.cy + 48, { steps: 8 });
+    await page.mouse.up();
+    expect(await world(page)).toBe(t0);
+    const after = (await inspect(page)).nodes.find((n) => n.id === "pay")!;
+    expect(after.placed).toBe(true);
+    const moved = await box(page, "pay");
+    expect(Math.abs(moved.cx - p.cx - 96)).toBeLessThan(0.15 * 96 * z + 2);
+  });
+
+  test("Shift+drag on empty canvas draws a selection box; Escape calls off a pan and puts the view back", async ({ page }) => {
+    await openTool(page, USECASE, "draw", { panels: "default" });
+    const a = await box(page, "apply"), t = await box(page, "track");
+    const t0 = await world(page);
+    await page.keyboard.down("Shift");
+    await page.mouse.move(a.x - 14, a.y - 14);
+    await page.mouse.down();
+    await page.mouse.move(Math.max(a.x + a.width, t.x + t.width) + 14, t.y + t.height + 14, { steps: 8 });
+    await expect(page.locator(".overlay .marquee")).toHaveCount(1);
+    await page.mouse.up();
+    await page.keyboard.up("Shift");
+    await expect(page.locator(".overlay .sel")).toHaveCount(2);
+    expect(await world(page)).toBe(t0);
+
+    const at = await emptySpot(page);
+    await page.mouse.move(at[0], at[1]);
+    await page.mouse.down();
+    await page.mouse.move(at[0] + 120, at[1] - 60, { steps: 5 });
+    expect(await world(page)).not.toBe(t0);
+    await page.keyboard.press("Escape");
+    expect(await world(page)).toBe(t0);
+    await page.mouse.up();
+  });
+
+  test("Space+drag pans even over a shape; the middle button pans; Ctrl+arrows pan from the keyboard", async ({ page }) => {
+    await openTool(page, USECASE, "draw", { panels: "default" });
+    const before = await inspect(page);
+    const p = await box(page, "pay");
+    await canvas(page).focus();
+    let t0 = await translate(page);
+    await page.keyboard.down(" ");
+    await page.mouse.move(p.cx, p.cy);
+    await page.mouse.down();
+    await page.mouse.move(p.cx - 70, p.cy + 30, { steps: 5 });
+    await page.mouse.up();
+    await page.keyboard.up(" ");
+    let t = await translate(page);
+    expect(Math.abs(t[0] - t0[0] + 70)).toBeLessThan(1.5);
+    expect((await inspect(page)).text).toBe(before.text);
+
+    t0 = t;
+    const q = await box(page, "pay");
+    await page.mouse.move(q.cx, q.cy);
+    await page.mouse.down({ button: "middle" });
+    await page.mouse.move(q.cx + 50, q.cy, { steps: 5 });
+    await page.mouse.up({ button: "middle" });
+    t = await translate(page);
+    expect(Math.abs(t[0] - t0[0] - 50)).toBeLessThan(1.5);
+
+    t0 = t;
+    await canvas(page).focus();
+    await page.keyboard.press("Control+ArrowLeft");
+    t = await translate(page);
+    expect(t[0] - t0[0]).toBe(80);
+    expect((await inspect(page)).text).toBe(before.text);
+  });
+
+  test("the shape and line tools still place and connect: an armed shape, a line tool and a port drag", async ({ page }) => {
+    await openTool(page, USECASE, "draw", { panels: "default" });
+    const cv = (await canvas(page).boundingBox())!;
+    const t0 = await world(page);
+    // an armed shape: a click on empty canvas places it, it does not pan
+    await page.locator('.draw-shape[data-kind="use-case"]').click();
+    await page.mouse.click(cv.x + cv.width * 0.5, cv.y + cv.height - 60);
+    await page.keyboard.press("Escape");
+    let s = await inspect(page);
+    const added = s.nodes.find((n) => !["resident", "clerk", "portal", "apply", "track", "review", "pay", "waiver"].includes(n.id))!;
+    expect(added.kind).toBe("use-case");
+    expect(await world(page)).toBe(t0);
+    // a line tool: clicks pick the ends
+    await page.getByRole("button", { name: "association", exact: true }).click();
+    await clickNode(page, "clerk");
+    await clickNode(page, added.id);
+    await page.keyboard.press("Escape");
+    s = await inspect(page);
+    expect(s.edges.some((e) => e.from === "clerk" && e.to === added.id)).toBe(true);
+    // a port drag still makes a line rather than panning
+    const from = await box(page, "resident");
+    await page.mouse.move(from.cx, from.cy);
+    const port = (await page.locator('.overlay .port[data-port="bottom"]').boundingBox())!;
+    const to = await box(page, added.id);
+    const t1 = await world(page);
+    await page.mouse.move(port.x + port.width / 2, port.y + port.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.cx, to.cy, { steps: 10 });
+    await page.mouse.up();
+    expect(await world(page)).toBe(t1);
+    expect((await inspect(page)).edges.some((e) => e.from === "resident" && e.to === added.id)).toBe(true);
+  });
+});

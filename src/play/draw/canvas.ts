@@ -44,7 +44,8 @@ const GRID = 0.125;
 const MIN_ZOOM = 0.2, MAX_ZOOM = 4;
 
 type Gesture =
-  | { type: "pan"; sx: number; sy: number; vx: number; vy: number }
+  /** a pan; `click`: it began on empty canvas, so letting go without moving is a click that clears the selection */
+  | { type: "pan"; sx: number; sy: number; vx: number; vy: number; moved: boolean; click: boolean }
   | { type: "marquee"; from: Pt; to: Pt; add: boolean }
   | { type: "move"; start: Pt; ids: string[]; boxes: Box[]; moved: boolean; clicked: string; wasSelected: boolean; dx: number; dy: number }
   | { type: "resize"; id: string; handle: Handle; box: Box; start: Pt; next: Box | null }
@@ -94,7 +95,7 @@ export class Canvas {
     this.root.tabIndex = 0;
     this.root.setAttribute("role", "application");
     this.root.setAttribute("aria-roledescription", "drawing canvas");
-    this.root.setAttribute("aria-label", "drawing canvas: Tab steps through shapes, arrows nudge, Enter edits or completes a connector, Delete removes, Escape lets go");
+    this.root.setAttribute("aria-label", "drawing canvas: drag empty space to move around, Shift+drag to select an area, Ctrl+arrows move the view, Tab steps through shapes, arrows nudge, Enter edits or completes a connector, Delete removes, Escape lets go");
     this.svgEl = svg("svg", { class: "draw-svg ksyt-fig", width: "100%", height: "100%" });
     this.svgEl.setAttribute("aria-hidden", "true");
     const defs = svg("defs");
@@ -628,7 +629,7 @@ export class Canvas {
     if (ev.button === 1 || (ev.button === 0 && this.space)) {
       ev.preventDefault();
       capture();
-      this.gesture = { type: "pan", sx: ev.clientX, sy: ev.clientY, vx: this.view.x, vy: this.view.y };
+      this.gesture = { type: "pan", sx: ev.clientX, sy: ev.clientY, vx: this.view.x, vy: this.view.y, moved: false, click: false };
       this.drawOverlay();
       return;
     }
@@ -713,15 +714,10 @@ export class Canvas {
       }
       return;
     }
-    if (ev.pointerType === "touch") {
-      capture();
-      this.gesture = { type: "pan", sx: ev.clientX, sy: ev.clientY, vx: this.view.x, vy: this.view.y };
-      if (!ev.shiftKey) this.select([]);
-      return;
-    }
     capture();
-    if (!ev.shiftKey) this.select([]);
-    this.gesture = { type: "marquee", from: p, to: p, add: ev.shiftKey };
+    // empty canvas: Shift+drag draws a selection box; a plain drag moves the view, and a plain click lets go of the selection
+    if (ev.shiftKey && ev.pointerType !== "touch") { this.gesture = { type: "marquee", from: p, to: p, add: true }; return; }
+    this.gesture = { type: "pan", sx: ev.clientX, sy: ev.clientY, vx: this.view.x, vy: this.view.y, moved: false, click: true };
   }
 
   /** The shapes a drag moves: the selected ones, plus everything inside a selected boundary. */
@@ -763,6 +759,9 @@ export class Canvas {
     }
     switch (g.type) {
       case "pan":
+        // a few pixels of wobble in a click is not a pan
+        if (!g.moved && Math.hypot(ev.clientX - g.sx, ev.clientY - g.sy) < 4) break;
+        if (!g.moved) { g.moved = true; this.drawOverlay(); }
         this.view = { ...this.view, x: g.vx + ev.clientX - g.sx, y: g.vy + ev.clientY - g.sy };
         this.applyView();
         break;
@@ -967,6 +966,7 @@ export class Canvas {
     };
     switch (g.type) {
       case "pan":
+        if (g.click && !g.moved && !ev.shiftKey && this.selection.size) this.select([]);
         this.drawOverlay();
         break;
       case "marquee": {
@@ -1143,6 +1143,8 @@ export class Canvas {
     const k = ev.key;
     if (k === " ") { this.space = true; ev.preventDefault(); this.drawOverlay(); return; }
     if (k === "Escape") {
+      // a pan called off puts the view back where it started
+      if (this.gesture?.type === "pan") { this.view = { ...this.view, x: this.gesture.vx, y: this.gesture.vy }; this.applyView(); }
       if (this.gesture) { const was = this.gesture.type; this.gesture = null; this.guides = []; this.ghost.replaceChildren(); this.show(s.doc, s.geometry); this.host.say(was === "place" ? "stopped placing" : "cancelled"); this.host.changed(); }
       else if (this.connectTool) this.stopConnectTool("cancelled the connector");
       else if (this.selection.size) { this.select([]); this.host.say("nothing selected"); }
@@ -1157,6 +1159,15 @@ export class Canvas {
     }
     if (mod && (k === "0" || k === "1")) { ev.preventDefault(); if (k === "0") this.zoomTo(1); else this.fit(); return; }
     if (mod && (k === "=" || k === "+")) { ev.preventDefault(); this.zoomStep(1.2); return; }
+    // the keyboard's way to move the view: Ctrl (Cmd) with an arrow, Shift for a bigger step
+    const pans: Record<string, Pt> = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+    if (mod && pans[k]) {
+      ev.preventDefault();
+      const step = ev.shiftKey ? 320 : 80;
+      this.view = { ...this.view, x: this.view.x + pans[k][0] * step, y: this.view.y + pans[k][1] * step };
+      this.applyView();
+      return;
+    }
     if (mod && k === "-") { ev.preventDefault(); this.zoomStep(1 / 1.2); return; }
     if (!s.inSync) return;
     if (mod && k.toLowerCase() === "c") { ev.preventDefault(); this.copy(); return; }
@@ -1239,6 +1250,35 @@ export class Canvas {
     const w = this.root.clientWidth, h = this.root.clientHeight;
     if (sx > 40 && sx < w - 40 && sy > 40 && sy < h - 40) return;
     this.view = { ...this.view, x: this.view.x + w / 2 - sx, y: this.view.y + h / 2 - sy };
+    this.applyView();
+  }
+
+  /**
+   * Bring shapes and lines wholly into view, inside the canvas less `avoid` pixels on the right (an open
+   * panel): left alone if they already are and are big enough to see, centered otherwise, zoomed out if
+   * they would not fit and zoomed in to actual size if they are too small to read.
+   */
+  revealAll(uids: string[], avoid: { right?: number } = {}): void {
+    const geo = this.geo, d = this.doc;
+    if (!geo || !d) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const take = (p: Pt): void => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); };
+    for (const n of d.nodes) {
+      if (!uids.includes(n.uid)) continue;
+      const g = geo.nodes.get(n.id);
+      if (g) { take([g.cx - g.w / 2, g.cy - g.h / 2]); take([g.cx + g.w / 2, g.cy + g.h / 2]); }
+    }
+    for (const e of geo.edges) if (uids.includes(e.uid)) for (const p of drawnPath(e)) take(p);
+    if (!Number.isFinite(x0)) return;
+    const w = Math.max(120, this.root.clientWidth - (avoid.right ?? 0)), h = this.root.clientHeight;
+    const m = 48;
+    const a = this.toScreen([x0, y0]), b = this.toScreen([x1, y1]);
+    const inView = a[0] >= m && a[1] >= m && b[0] <= w - m && b[1] <= h - m;
+    if (inView && this.view.zoom >= 0.5) return;
+    const fits = Math.min((w - 2 * m) / (((x1 - x0) || 0.01) * PX), (h - 2 * m) / (((y1 - y0) || 0.01) * PX));
+    const z = Math.max(MIN_ZOOM, Math.min(fits, this.view.zoom < 0.5 ? 1 : this.view.zoom));
+    const cx = ((x0 + x1) / 2) * PX * z, cy = ((y0 + y1) / 2) * PX * z;
+    this.view = { zoom: z, x: w / 2 - cx, y: h / 2 - cy };
     this.applyView();
   }
 

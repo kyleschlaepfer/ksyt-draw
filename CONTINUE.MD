@@ -12,6 +12,19 @@ QA script), `docs/revamp/IMMERSIVE_DRAW_UX_AUDIT.md` (issues, causes, remedies, 
 numbers), and section 0 of `docs/revamp/UI_PRESERVATION_CONTRACT.md` (what is superseded in draw
 only).
 
+### Follow-up corrections (2026-11-05, same day)
+
+- The notation check is a clear count at the right of the status strip ("1 notation warning",
+  "no notation issues"); the whole control is a button that opens a list upward with severity,
+  problem, fix and "show it". "Show it" closes the list, selects the element and pans or zooms to
+  it (`Canvas.revealAll`). Escape, "close" or a click elsewhere closes the list.
+- Select mode: a plain drag on empty canvas pans (4 px threshold; a click clears the selection),
+  Shift+drag draws the selection box, Space+drag and the middle button pan over anything, Escape
+  during a pan restores the view, Ctrl+arrows pan from the keyboard. The guide, the library hint,
+  the canvas's accessible name and the status strip's idle line say so.
+- 11 more tests in `test/e2e/workspace.spec.ts`; all 130 browser tests and 473 unit tests pass.
+  Screenshots: `docs/revamp/immersive/corrections/`.
+
 ### Verification on this branch
 
 | Check | Result |
