@@ -8,7 +8,7 @@ import { hits, nearestT, pathLength, pointAt, routeEdge, simplify } from "../src
 import { nodeSize, sideAnchor, type NodeGeom } from "../src/core/geom/shape";
 import { stubMeasurer } from "../src/core/measure";
 import { resolve } from "../src/core/geom/resolve";
-import { allIssues, locate, review, rulesV2 } from "../src/core/diagnostics";
+import { allIssues, locate, review, rulesV2, type RuleFinding } from "../src/core/diagnostics";
 import { lint } from "../src/core/lint";
 import { toContract } from "../src/core/doc/contract";
 
@@ -218,9 +218,25 @@ describe("diagnostics", () => {
   it("the reviewer's findings are unchanged for v1 files, and v2 rules add to them", () => {
     for (const f of ["flow-unlabeled", "usecase-actor-inside", "usecase-permit"]) {
       const d = parseDoc(fixture(`diagrams/${f}.ksd`));
-      expect(review(d).findings.filter((x) => !("nodes" in x) && !("edges" in x))).toEqual(lint(toContract(d)).findings);
+      // the reviewer's wording, locations and severities stay exactly the Python reviewer's; only the ids are added
+      const strip = (fs: RuleFinding[]) => fs.map(({ nodes: _n, edges: _e, ...rest }) => rest);
+      expect(strip(review(d).findings)).toEqual(lint(toContract(d)).findings);
       expect(rulesV2(d)).toEqual([]);
     }
+  });
+  it("a finding points at the element it is about, not every element with the same name", () => {
+    // two use cases called "track"; only the second is unconnected
+    const d = parseDoc('diagram use-case\ntitle t\nactor r "Resident"\nboundary p "Portal" {\n  use-case t1 "track"\n  use-case t2 "track"\n}\nr -- t1\n');
+    const iso = review(d).findings.find((f) => f.rule_id === "STRUCT-ISOLATED")!;
+    expect(iso.location).toBe("use-case 'track'");
+    expect(locate(iso, d)).toEqual({ nodes: ["t2"], edges: [] });
+    // two same-named use cases each get their own label note, each pointing at its own shape
+    const twins = parseDoc('diagram use-case\ntitle t\nactor r\nboundary p "P" {\n  use-case a "receipts"\n  use-case b "receipts"\n}\nr -- a\nr -- b\n');
+    expect(review(twins).findings.filter((f) => f.rule_id === "UC-LABEL-VERB").map((f) => locate(f, twins).nodes)).toEqual([["a"], ["b"]]);
+    // edge findings carry the edge's uid, as the v2 rules do
+    const cls = parseDoc("diagram class\ntitle t\nclass A\nclass B\nA -- B\n");
+    const mult = review(cls).findings.find((f) => f.rule_id === "CLASS-MULTIPLICITY")!;
+    expect(locate(mult, cls)).toEqual({ nodes: ["A", "B"], edges: [cls.edges[0].uid] });
   });
   it("partition rules: a node outside every lane, an empty lane, a lone lane", () => {
     const d = parseDoc('diagram activity\ntitle t\npartition a "A" {\n  start s\n  action x\n}\npartition b "B" {\n}\naction loose\ns -> x\nx -> loose\n');

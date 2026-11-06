@@ -5,6 +5,11 @@
  * It is written against the reviewer's contract 1.0 shape, so it also grades the families the
  * parser can't produce yet (ERD, class, sequence, state, DFD, causal) from a hand-written spec.
  * Keep it a port: new rules go into the reviewer first (spec/lint.md).
+ *
+ * One addition the reviewer doesn't have: each finding also records the node and edge ids it is about
+ * (`refs`, via lintWithRefs). The reviewer locates by label, and two shapes can share a label, so "show it"
+ * can't find the right one from the location alone. The findings themselves are untouched; the fixtures
+ * still compare them to the Python output field for field.
  */
 import type { Confidence, Diagram, Finding, LintResult, LintStatus, Severity } from "./model";
 import { pyRepr } from "./parse";
@@ -103,7 +108,11 @@ export function cue(patterns: string[], text: string | null | undefined): string
   return patterns.filter((p) => new RegExp(p).test(t));
 }
 
-interface AddOpts { conf?: Confidence; umlOnly?: boolean; strictSev?: Severity | null }
+interface AddOpts { conf?: Confidence; umlOnly?: boolean; strictSev?: Severity | null; nodes?: unknown[]; edges?: unknown[] }
+
+/** The node and edge ids a finding is about. Not part of the reviewer's output (it locates by label, which is
+ * ambiguous when two elements share a name); kept beside the findings so the tool can point at the right one. */
+export interface FindingRefs { nodes: string[]; edges: string[] }
 
 // ---------------------------------------------------------------- review core
 export class Review {
@@ -114,6 +123,8 @@ export class Review {
   claimed: string;
   narr: string;
   findings: Finding[] = [];
+  /** refs[i] belongs to findings[i] */
+  refs: FindingRefs[] = [];
   out = new Map<string, ReviewEdge[]>();
   inc = new Map<string, ReviewEdge[]>();
   inferred = "sketch";
@@ -138,6 +149,8 @@ export class Review {
     if (umlOnly && this.profile === "general-diagram") return;
     if (this.profile === "strict-uml" && strictSev) sev = strictSev;
     this.findings.push({ severity: sev, rule_id: rule, location: loc, problem, rationale: why, minimal_fix: fix, confidence: conf });
+    const ids = (xs: unknown[] | undefined) => [...new Set((xs ?? []).filter((x) => x != null).map(String))];
+    this.refs.push({ nodes: ids(o.nodes), edges: ids(o.edges) });
   }
 
   label(nid: unknown): string {
@@ -193,7 +206,7 @@ export class Review {
           this.add("major", "STRUCT-DANGLING-EDGE", `edge ${e.id}`,
             `The ${end} end of this connector is not attached to any diagram element (${pyRepr(e[end])}).`,
             "A connector that starts or ends nowhere leaves the relationship unreadable.",
-            "Attach it to the element it refers to, or remove it.", { conf: "medium" });
+            "Attach it to the element it refers to, or remove it.", { conf: "medium", edges: [e.id] });
         }
       }
     }
@@ -206,7 +219,7 @@ export class Review {
         this.add("minor", "STRUCT-ISOLATED", `${n.kind} '${this.label(nid)}'`,
           "This element is not connected to anything.",
           "Unconnected parts invite the viewer to guess how they relate.",
-          "Connect it, or move it off this diagram if the narration does not use it.", { conf: "medium" });
+          "Connect it, or move it off this diagram if the narration does not use it.", { conf: "medium", nodes: [nid] });
       }
     }
   }
@@ -226,7 +239,7 @@ export class Review {
         this.add("major", "XDIAG-ARROW-MEANING", `connectors drawn as '${st}'`,
           `The same connector style carries different meanings here (${[...ms].sort().join(", ")}).`,
           "A viewer reads one shape as one meaning; mixing them without a legend misleads.",
-          "Give each meaning its own stroke (solid vs dashed, labeled) or add a one-line legend.");
+          "Give each meaning its own stroke (solid vs dashed, labeled) or add a one-line legend.", { edges: this.edges.filter((e) => e.style === st).map((e) => e.id) });
       }
     }
   }
@@ -246,7 +259,7 @@ export class Review {
           this.add("minor", "UC-ASSOC-DIRECTED", `${this.label(a)} -> ${this.label(b)}`,
             "The actor link is drawn as a directed arrow.",
             "Actor-use case associations are plain lines; an arrowhead reads as a step in a sequence.",
-            "Draw a plain line (no arrowhead).", { umlOnly: true, strictSev: "major" });
+            "Draw a plain line (no arrowhead).", { umlOnly: true, strictSev: "major", nodes: [a, b], edges: [e.id] });
         }
       }
     }
@@ -256,20 +269,20 @@ export class Review {
         this.add("major", "UC-ACTOR-INSIDE", `actor '${this.label(n.id)}'`,
           "The actor is drawn inside the system boundary.",
           "Actors are roles outside the subject; inside the box they read as part of the system.",
-          "Move the actor outside the boundary.");
+          "Move the actor outside the boundary.", { nodes: [n.id] });
       }
       if (n.kind === "use-case" && boundaries.length > 0 && !truthy(inside)) {
         this.add("minor", "UC-OUTSIDE-BOUNDARY", `use case '${this.label(n.id)}'`,
           "This use case sits outside the system boundary.",
           "Use cases are services of the subject, so they belong inside its box.",
-          "Move it inside the boundary (or draw a second subject if it belongs to another system).");
+          "Move it inside the boundary (or draw a second subject if it belongs to another system).", { nodes: [n.id] });
       }
       const nw = words(norm(n.label));
       if (n.kind === "use-case" && words(n.label || "").length === 1 && nw.length > 0 && !VERBS.has(nw[0])) {
         this.add("suggestion", "UC-LABEL-VERB", `use case '${this.label(n.id)}'`,
           "A one-word, non-verb label reads as a thing, not a goal.",
           "Use cases name something the actor wants done.",
-          'Use a verb phrase ("place order", not "orders").', { conf: "medium" });
+          'Use a verb phrase ("place order", not "orders").', { conf: "medium", nodes: [n.id] });
       }
     }
     for (const e of this.edges) {
@@ -279,14 +292,14 @@ export class Review {
         this.add("major", "UC-SEQUENCE-ARROW", `${this.label(a)} -> ${this.label(b)}`,
           "Two use cases are joined by a control-flow arrow.",
           "Use-case diagrams have no time order; an arrow between goals reads as 'then'.",
-          "Use «include»/«extend» if one reuses the other; if the point is order, use an activity diagram.");
+          "Use «include»/«extend» if one reuses the other; if the point is order, use an activity diagram.", { nodes: [a, b], edges: [e.id] });
       }
       if (k !== "include" && k !== "extend") continue;
       if ((truthy(e.style) && e.style !== "dashed-arrow") || !(e.directed ?? true)) {
         this.add("minor", "UC-DEPENDENCY-STYLE", `«${k}» ${this.label(a)} -> ${this.label(b)}`,
           `«${k}» is not drawn as a dashed arrow.`,
           "The dashed dependency arrow is what distinguishes «include»/«extend» from an association.",
-          `Draw it dashed with an open arrowhead and the «${k}» label.`, { umlOnly: true });
+          `Draw it dashed with an open arrowhead and the «${k}» label.`, { umlOnly: true, nodes: [a, b], edges: [e.id] });
       }
       // direction: narration first (high confidence), then structure (medium)
       let rev: Confidence | false | null = this.narratedDirection(k, a, b);
@@ -300,12 +313,12 @@ export class Review {
             `The «include» arrow appears reversed: it points from '${this.label(a)}' to '${this.label(b)}'.`,
             "«include» points from the including (base) use case to the included, reused one. " +
             "Reversed, it says the reused fragment depends on the base.",
-            `Reverse it: arrow from '${this.label(b)}' to '${this.label(a)}'.`, { conf: rev });
+            `Reverse it: arrow from '${this.label(b)}' to '${this.label(a)}'.`, { conf: rev, nodes: [a, b], edges: [e.id] });
         } else {
           this.add("major", "UC-EXTEND-DIRECTION", `«extend» ${this.label(a)} -> ${this.label(b)}`,
             `The «extend» arrow appears reversed: it points from '${this.label(a)}' to '${this.label(b)}'.`,
             "«extend» points from the optional extension to the base use case it extends.",
-            `Reverse it: arrow from '${this.label(b)}' to '${this.label(a)}'.`, { conf: rev });
+            `Reverse it: arrow from '${this.label(b)}' to '${this.label(a)}'.`, { conf: rev, nodes: [a, b], edges: [e.id] });
         }
       }
     }
@@ -338,32 +351,32 @@ export class Review {
             this.add("major", `${pfx}-DECISION-GUARD`, `decision '${this.label(nid)}'`,
               `${unl.length} of ${outs.length} outgoing branches are unlabeled.`,
               "The viewer cannot tell which path is which outcome.",
-              `Label each branch where it leaves the diamond (${isFlowchart ? "Yes / No" : "[approved] / [rejected]"}).`);
+              `Label each branch where it leaves the diamond (${isFlowchart ? "Yes / No" : "[approved] / [rejected]"}).`, { nodes: [nid] });
           }
           const labels = outs.filter((e) => truthy(guard(e))).map((e) => norm(guard(e)));
           if (labels.length !== new Set(labels).size) {
             this.add("major", `${pfx}-DUPLICATE-GUARD`, `decision '${this.label(nid)}'`,
               "Two branches carry the same label.",
               "Branches of one decision must be distinguishable outcomes.",
-              "Give each branch its own outcome label.");
+              "Give each branch its own outcome label.", { nodes: [nid] });
           }
           const targets = outs.map((e) => e.to);
           if (new Set(targets).size < targets.length) {
             this.add("major", `${pfx}-BRANCH-SAME-TARGET`, `decision '${this.label(nid)}'`,
               "Two branches lead to the same next step.",
               "If every outcome goes to the same place, the decision changes nothing on the slide.",
-              "Route each branch to the step that outcome actually leads to.", { conf: "medium" });
+              "Route each branch to the step that outcome actually leads to.", { conf: "medium", nodes: [nid] });
           }
         } else if (outs.length === 1 && ins.length >= 2) {
           this.add("suggestion", `${pfx}-MERGE-AS-DECISION`, `diamond '${this.label(nid)}'`,
             "This diamond only joins paths (several in, one out).",
             "That is a merge, not a decision; a question inside it suggests a choice that isn't there.",
-            "Leave the merge diamond empty, or drop it and join the arrows.", { umlOnly: true });
+            "Leave the merge diamond empty, or drop it and join the arrows.", { umlOnly: true, nodes: [nid] });
         } else {
           this.add("major", `${pfx}-DECISION-ONE-EXIT`, `decision '${this.label(nid)}'`,
             `This decision has ${outs.length} way out.`,
             "A decision with one exit is not a choice.",
-            "Draw and label each outcome branch, or make it a plain step.");
+            "Draw and label each outcome branch, or make it a plain step.", { nodes: [nid] });
         }
       }
       if (k === "fork" || k === "join") {
@@ -371,13 +384,13 @@ export class Review {
           this.add("major", `ACTIVITY-${k.toUpperCase()}-STRUCTURE`, `${k} bar`,
             `A ${k} bar needs at least two ${k === "fork" ? "outgoing" : "incoming"} paths; this one has ${k === "fork" ? outs.length : ins.length}.`,
             "The bar's whole meaning is splitting into, or waiting for, concurrent paths.",
-            "Add the concurrent paths, or remove the bar.");
+            "Add the concurrent paths, or remove the bar.", { nodes: [nid] });
         }
         if (k === "fork" && outs.some((e) => truthy(guard(e)))) {
           this.add("major", "ACTIVITY-GUARDED-FORK", "fork bar",
             "Paths leaving the fork carry guards/labels.",
             "Guards mean only one path is taken; a fork means all are.",
-            "If only one path runs, use a decision diamond; if all run, remove the guards.");
+            "If only one path runs, use a decision diamond; if all run, remove the guards.", { nodes: [nid] });
         }
       }
       const hasEnd = [...this.nodes.keys()].some((x) => ["final", "terminator", "flow-final"].includes(this.kind(x) ?? ""));
@@ -385,7 +398,7 @@ export class Review {
         this.add("minor", `${pfx}-DEAD-END`, `step '${this.label(nid)}'`,
           "The flow stops here without an end marker.",
           "A viewer can't tell if the process ends or the drawing is unfinished.",
-          `Continue the arrow or add an end (${isFlowchart ? "terminator" : "final node"}).`, { conf: "medium" });
+          `Continue the arrow or add an end (${isFlowchart ? "terminator" : "final node"}).`, { conf: "medium", nodes: [nid] });
       }
     }
     const forks = [...this.nodes.values()].filter((n) => n.kind === "fork");
@@ -395,13 +408,13 @@ export class Review {
       this.add("major", "ACTIVITY-PARALLEL-VS-EXCLUSIVE", "fork bar",
         `The narration describes a choice ("${m ? m[0] : ""}") but the diagram forks into concurrent paths.`,
         "A fork bar teaches that every path runs at the same time.",
-        "Replace the fork with a decision diamond and label each outcome.", { conf: "medium" });
+        "Replace the fork with a decision diamond and label each outcome.", { conf: "medium", nodes: forks.map((n) => n.id) });
     }
     if (decisions.length > 0 && parallel.length > 0 && exclusive.length === 0 && forks.length === 0) {
       this.add("major", "ACTIVITY-EXCLUSIVE-VS-PARALLEL", `decision '${this.label(decisions[0].id)}'`,
         "The narration describes concurrent work but the diagram uses a decision (one path taken).",
         "A decision teaches that only one branch happens.",
-        "Use a fork bar to split into concurrent paths and a join bar where they meet.", { conf: "medium" });
+        "Use a fork bar to split into concurrent paths and a join bar where they meet.", { conf: "medium", nodes: [decisions[0].id] });
     }
     if (this.claimed === "activity") {
       if (![...this.nodes.values()].some((n) => n.kind === "initial")) {
@@ -434,18 +447,18 @@ export class Review {
       if (!ca || !cb) {
         this.add("major", "ERD-CARDINALITY-MISSING", loc, `Cardinality is missing on ${!ca && !cb ? "both" : "one"} end.`,
           "Without both ends the viewer can't tell one-to-many from many-to-many.",
-          "Mark both ends (crow's foot for many, bar for one, circle for optional).");
+          "Mark both ends (crow's foot for many, bar for one, circle for optional).", { nodes: [a, b], edges: [e.id] });
         continue;
       }
       if (ca.includes("many") && cb.includes("many") && physical) {
         this.add("major", "ERD-MN-NEEDS-JUNCTION", loc,
           "Two tables are related many-to-many directly.",
           "Relational tables can't store M:N without a junction table; drawn as tables, this teaches a schema that can't exist.",
-          "Insert a junction table with both foreign keys, one-to-many on each side.");
+          "Insert a junction table with both foreign keys, one-to-many on each side.", { nodes: [a, b], edges: [e.id] });
       } else if (ca.includes("many") && cb.includes("many")) {
         this.add("suggestion", "ERD-MN-CONCEPTUAL", loc, "Many-to-many at the conceptual level.",
           "Fine in a conceptual ERD; say so if the lesson later turns it into tables.",
-          "Optionally note 'resolved by a junction table' when the lesson gets there.", { conf: "medium" });
+          "Optionally note 'resolved by a junction table' when the lesson gets there.", { conf: "medium", nodes: [a, b], edges: [e.id] });
       }
     }
     for (const [nid, n] of this.nodes) {
@@ -454,7 +467,7 @@ export class Review {
       if (physical && !keys.some((k) => k.toUpperCase().includes("PK"))) {
         this.add("minor", "ERD-PK-MISSING", `table '${this.label(nid)}'`, "No primary key is marked.",
           "Every table in a physical model has one; leaving it off hides how rows are identified.",
-          "Mark the key column(s) PK.");
+          "Mark the key column(s) PK.", { nodes: [nid] });
       }
       const fks = keys.filter((k) => k.toUpperCase().includes("FK"));
       if (fks.length >= 2) {
@@ -465,7 +478,7 @@ export class Review {
             this.add("major", "ERD-JUNCTION-SIDE", `junction '${this.label(nid)}'`,
               "The junction table is on the 'one' side of a relationship.",
               "Each row of a junction table references one parent row; many junction rows per parent.",
-              "Put the crow's foot (many) at the junction end.");
+              "Put the crow's foot (many) at the junction end.", { nodes: [nid], edges: [e.id] });
           }
         }
       }
@@ -478,13 +491,13 @@ export class Review {
       if (k === "generalization" && truthy(e.style) && e.style !== "hollow-triangle") {
         this.add("minor", "CLASS-GENERALIZATION-STYLE", `${this.label(e.from)} -> ${this.label(e.to)}`,
           "Inheritance is not drawn with a hollow triangle.", "That head is what says 'is a kind of'.",
-          "Use a hollow triangle pointing at the parent.", { umlOnly: true });
+          "Use a hollow triangle pointing at the parent.", { umlOnly: true, nodes: [e.from, e.to], edges: [e.id] });
       }
       if (k === "association" && this.claimed === "class" && !(truthy(e.card_from) && truthy(e.card_to))) {
         this.add("minor", "CLASS-MULTIPLICITY", `${this.label(e.from)} - ${this.label(e.to)}`,
           "Association without multiplicities.", "The story usually depends on how many.",
           "Add multiplicities (1, 0..1, *, 1..*) at both ends if the narration relies on them.",
-          { conf: "medium", strictSev: "major" });
+          { conf: "medium", strictSev: "major", nodes: [e.from, e.to], edges: [e.id] });
       }
     }
   }
@@ -496,14 +509,14 @@ export class Review {
       this.add("major", "SEQ-MESSAGE-ORDER", "messages",
         "Messages have no unambiguous top-to-bottom order.",
         "In a sequence diagram, time runs down the lifelines; order is the content.",
-        "Stack messages one per row in the order they happen.");
+        "Stack messages one per row in the order they happen.", { edges: msgs.map((e) => e.id) });
     }
     for (const e of msgs) {
       if (this.kind(e.from) !== "lifeline" || this.kind(e.to) !== "lifeline") {
         this.add("major", "SEQ-NOT-LIFELINE", `message ${e.id}`,
           "A message does not run between two lifelines.",
           "Messages are sent between participants' lifelines.",
-          "Attach both ends to lifelines.", { conf: "medium" });
+          "Attach both ends to lifelines.", { conf: "medium", nodes: [e.from, e.to], edges: [e.id] });
       }
     }
   }
@@ -513,7 +526,7 @@ export class Review {
       if (this.edgeKind(e) === "transition" && !truthy(e.label)) {
         this.add("minor", "STATE-TRANSITION-EVENT", `${this.label(e.from)} -> ${this.label(e.to)}`,
           "Transition without an event.", "A state change happens because of something.",
-          "Label it with the event (and [guard] if any).", { strictSev: "major", umlOnly: true });
+          "Label it with the event (and [guard] if any).", { strictSev: "major", umlOnly: true, nodes: [e.from, e.to], edges: [e.id] });
       }
     }
     for (const n of this.nodes.values()) {
@@ -521,7 +534,7 @@ export class Review {
       if (n.kind === "state" && nw.length > 0 && VERBS.has(nw[0])) {
         this.add("suggestion", "STATE-NAMED-AS-ACTION", `state '${this.label(n.id)}'`,
           "This state is named like an action.", "States are situations (Submitted, Approved).",
-          "Rename to a condition or past participle.", { conf: "medium" });
+          "Rename to a condition or past participle.", { conf: "medium", nodes: [n.id] });
       }
     }
   }
@@ -534,11 +547,11 @@ export class Review {
       if (["dfd-process", "process", "action", "step"].includes(k ?? "")) {
         if (ins.length > 0 && outs.length === 0) {
           this.add("major", "DFD-BLACK-HOLE", `process '${this.label(nid)}'`, "Data goes in, nothing comes out.",
-            "A process transforms inputs into outputs.", "Add the output flow, or explain it is a sink.");
+            "A process transforms inputs into outputs.", "Add the output flow, or explain it is a sink.", { nodes: [nid] });
         }
         if (outs.length > 0 && ins.length === 0) {
           this.add("major", "DFD-MIRACLE", `process '${this.label(nid)}'`, "Data comes out of nothing.",
-            "A process cannot produce data without input.", "Add the input flow.");
+            "A process cannot produce data without input.", "Add the input flow.", { nodes: [nid] });
         }
       }
     }
@@ -548,19 +561,19 @@ export class Review {
       const loc = `${this.label(e.from)} -> ${this.label(e.to)}`;
       if (ka === "data-store" && kb === "data-store") {
         this.add("major", "DFD-STORE-TO-STORE", loc, "Data flows store to store with no process.",
-          "Something has to move it; that something is a process.", "Put a process between the stores.");
+          "Something has to move it; that something is a process.", "Put a process between the stores.", { nodes: [e.from, e.to], edges: [e.id] });
       }
       if ((ka === "external-entity" && kb === "data-store") || (ka === "data-store" && kb === "external-entity")) {
         this.add("major", "DFD-EXTERNAL-TO-STORE", loc, "An external entity touches a data store directly.",
-          "Outsiders reach stored data only through a process.", "Route the flow through a process.");
+          "Outsiders reach stored data only through a process.", "Route the flow through a process.", { nodes: [e.from, e.to], edges: [e.id] });
       }
       if (ka === "external-entity" && kb === "external-entity") {
         this.add("major", "DFD-EXTERNAL-TO-EXTERNAL", loc, "Flow between two external entities.",
-          "That exchange is outside the system and doesn't belong on its DFD.", "Remove it or add the process.");
+          "That exchange is outside the system and doesn't belong on its DFD.", "Remove it or add the process.", { nodes: [e.from, e.to], edges: [e.id] });
       }
       if (!truthy(e.label)) {
         this.add("minor", "DFD-UNLABELED-FLOW", loc, "Data flow has no label.", "Each flow names the data that moves.",
-          'Label it with the data ("order details").');
+          'Label it with the data ("order details").', { nodes: [e.from, e.to], edges: [e.id] });
       }
     }
   }
@@ -571,7 +584,7 @@ export class Review {
         this.add("minor", "CAUSAL-UNLABELED", `${this.label(e.from)} -> ${this.label(e.to)}`,
           "Influence arrow without a sign or verb.",
           "Whether more A means more or less B is the whole claim.",
-          "Label + / - (or a short verb like 'increases').");
+          "Label + / - (or a short verb like 'increases').", { nodes: [e.from, e.to], edges: [e.id] });
       }
     }
   }
@@ -645,9 +658,14 @@ export function statusFor(findings: Finding[], inferred: string, claimed: string
 
 /** Review a parsed diagram (or any contract 1.0 spec). Never throws. */
 export function lint(d: Diagram | ReviewDiagram): LintResult {
+  return lintWithRefs(d).result;
+}
+
+/** lint(), plus the ids each finding is about (refs[i] for findings[i]). */
+export function lintWithRefs(d: Diagram | ReviewDiagram): { result: LintResult; refs: FindingRefs[] } {
   const rv = new Review(d as ReviewDiagram);
   const findings = rv.run();
-  return { inferred_family: rv.inferred, status: statusFor(findings, rv.inferred, rv.claimed), findings };
+  return { result: { inferred_family: rv.inferred, status: statusFor(findings, rv.inferred, rv.claimed), findings }, refs: rv.refs };
 }
 
 /** The status in plain words for the panel title. */
