@@ -17,7 +17,7 @@ import { CLASSIFIERS } from "./doc/types";
 import { toContract } from "./doc/contract";
 import { printMember } from "./doc/print";
 import type { Diagnostic, ParsedSource } from "./doc/parse";
-import { lint, statusFor } from "./lint";
+import { lintWithRefs, statusFor } from "./lint";
 import type { QaReport } from "./qa";
 
 export type IssueSource = "syntax" | "reference" | "notation" | "layout" | "accessibility" | "practice";
@@ -187,8 +187,15 @@ export function rulesV2(d: ChalkDoc): RuleFinding[] {
 
 /** The notation check for a document: the reviewer's rules on its contract form, plus the v2 rules. */
 export function review(d: ChalkDoc): LintResult & { findings: RuleFinding[] } {
-  const base = lint(toContract(d));
-  const findings: RuleFinding[] = [...base.findings, ...rulesV2(d)];
+  const { result: base, refs } = lintWithRefs(toContract(d));
+  // the reviewer locates by label, which can't tell two elements with the same name apart; carry the ids it used
+  const uidOf = (id: string) => d.edges.find((e) => e.id === id)?.uid;
+  const located = base.findings.map((f, i): RuleFinding => {
+    const r = refs[i];
+    if (!r || (!r.nodes.length && !r.edges.length)) return f;
+    return { ...f, nodes: r.nodes, edges: r.edges.map(uidOf).filter((u): u is string => !!u) };
+  });
+  const findings: RuleFinding[] = [...located, ...rulesV2(d)];
   return { inferred_family: base.inferred_family, status: statusFor(findings, base.inferred_family, d.meta.type), findings };
 }
 
